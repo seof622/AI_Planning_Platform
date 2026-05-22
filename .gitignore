@@ -1,0 +1,53 @@
+# Local real documents
+# Keep source documents, exports, and office files out of Git/cloud remotes.
+*.pdf
+*.doc
+*.docx
+*.ppt
+*.pptx
+*.xls
+*.xlsx
+*.hwp
+*.hwpx
+
+# Local notes and private drafts
+*.local.*
+*.private.*
+local-docs/
+private-docs/
+
+# Environment variables and secrets
+.env
+.env.*
+!.env.example
+
+# Node / frontend
+node_modules/
+.next/
+out/
+dist/
+build/
+coverage/
+*.tsbuildinfo
+
+# Python / backend
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

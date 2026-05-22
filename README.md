@@ -76,3 +76,26 @@ AI가 생성한 구조를 Node 기반 캔버스로 시각화합니다.
 ## 4. 목표
 
 사용자의 아이디어를 구조화된 설계와 실행 가능한 계획으로 변환하는 AI 플랫폼 구축을 목표로 합니다.
+
+---
+
+## 5. 디렉토리 구조
+
+```text
+AI_Planning_Platform/
+├─ apps/
+│  ├─ web/                 # Next.js, React, React Flow, Zustand
+│  └─ api/                 # FastAPI 또는 NestJS 백엔드
+├─ packages/
+│  ├─ ai/                  # LangGraph, OpenAI API, AI planning workflows
+│  └─ shared/              # 공통 타입, 스키마, 유틸리티
+├─ infra/
+│  ├─ docker/              # Docker 및 로컬 실행 환경
+│  └─ db/
+│     └─ migrations/       # PostgreSQL migration
+├─ docs/                   # 기획, 아키텍처, API 문서
+├─ scripts/                # 개발/운영 자동화 스크립트
+└─ tests/                  # 통합 테스트 및 E2E 테스트
+```
+
+자세한 설명은 `docs/project-structure.md`에 정리되어 있습니다.
