@@ -5,7 +5,7 @@ const generatedAt = "2026-06-11T00:00:00.000Z";
 export const mockPlanningResult = {
   project: {
     id: "project-ai-planning-platform",
-    title: "AI 계획 플랫폼",
+    title: "플랜노트",
     description:
       "사용자 목표를 구조화된 컴포넌트 그래프와 실행 가능한 로드맵으로 전환합니다.",
     status: "generated",
@@ -43,7 +43,7 @@ export const mockPlanningResult = {
         "계획 요청을 받고 목업 또는 AI 생성 결과를 조율합니다.",
       category: "백엔드",
       priority: "high",
-      position: { x: 280, y: 80 },
+      position: { x: 390, y: 80 },
       metadata: {
         owner: "apps/api",
       },
@@ -56,7 +56,7 @@ export const mockPlanningResult = {
         "요구사항을 분석해 추천 컴포넌트, 엣지, 로드맵 단계를 생성합니다.",
       category: "AI 계층",
       priority: "high",
-      position: { x: 560, y: 80 },
+      position: { x: 780, y: 80 },
       metadata: {
         owner: "packages/ai",
       },
@@ -68,7 +68,7 @@ export const mockPlanningResult = {
       description: "생성된 노드와 의존성을 React Flow로 렌더링합니다.",
       category: "프론트엔드",
       priority: "high",
-      position: { x: 280, y: 280 },
+      position: { x: 390, y: 330 },
       metadata: {
         owner: "apps/web",
       },
@@ -80,7 +80,7 @@ export const mockPlanningResult = {
       description: "그래프를 기반으로 정렬된 구현 단계를 보여줍니다.",
       category: "계획",
       priority: "medium",
-      position: { x: 560, y: 280 },
+      position: { x: 780, y: 330 },
       metadata: {
         owner: "apps/web",
       },
@@ -93,7 +93,7 @@ export const mockPlanningResult = {
         "프로젝트, 요구사항, 생성된 그래프와 로드맵을 저장합니다.",
       category: "영속성",
       priority: "medium",
-      position: { x: 840, y: 180 },
+      position: { x: 1170, y: 205 },
       metadata: {
         owner: "infra/db",
       },

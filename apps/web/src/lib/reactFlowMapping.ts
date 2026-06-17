@@ -38,7 +38,7 @@ export function toReactFlowEdges(result: PlanningResult): Edge[] {
     target: edge.target,
     label: edge.label || dependencyLabels[edge.dependencyType],
     animated: edge.dependencyType === "feeds",
-    type: "smoothstep",
+    type: "labeledDependency",
     markerEnd: {
       type: "arrowclosed",
       color: dependencyColors[edge.dependencyType],
@@ -47,17 +47,6 @@ export function toReactFlowEdges(result: PlanningResult): Edge[] {
       stroke: dependencyColors[edge.dependencyType],
       strokeDasharray: getDependencyDash(edge),
       strokeWidth: edge.dependencyType === "blocks" ? 2.5 : 2,
-    },
-    labelStyle: {
-      fill: "#18212b",
-      fontSize: 12,
-      fontWeight: 700,
-    },
-    labelBgPadding: [6, 4],
-    labelBgBorderRadius: 6,
-    labelBgStyle: {
-      fill: "#ffffff",
-      fillOpacity: 0.86,
     },
   }));
 }

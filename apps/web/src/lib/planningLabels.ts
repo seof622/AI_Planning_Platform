@@ -39,19 +39,19 @@ export const nodeTypeColors: Record<
   ComponentNodeType,
   { accent: string; border: string; background: string }
 > = {
-  ai: { accent: "#7c3aed", border: "#c4b5fd", background: "#f5f3ff" },
-  api: { accent: "#2563eb", border: "#bfdbfe", background: "#eff6ff" },
-  data: { accent: "#0891b2", border: "#a5f3fc", background: "#ecfeff" },
-  feature: { accent: "#0f766e", border: "#99f6e4", background: "#f0fdfa" },
-  infra: { accent: "#475569", border: "#cbd5e1", background: "#f8fafc" },
-  system: { accent: "#4f46e5", border: "#c7d2fe", background: "#eef2ff" },
-  ui: { accent: "#c2410c", border: "#fed7aa", background: "#fff7ed" },
-  workflow: { accent: "#be123c", border: "#fecdd3", background: "#fff1f2" },
+  ai: { accent: "#e67e22", border: "#f5c99d", background: "#fff7ef" },
+  api: { accent: "#2f80ed", border: "#c7ddf7", background: "#f3f8ff" },
+  data: { accent: "#3d8b8b", border: "#b9dddd", background: "#f3fbfb" },
+  feature: { accent: "#4f8a5b", border: "#c9dfce", background: "#f5fbf6" },
+  infra: { accent: "#667382", border: "#d4dbe3", background: "#f8fafc" },
+  system: { accent: "#7161ef", border: "#d6d1fb", background: "#f7f5ff" },
+  ui: { accent: "#c45f0c", border: "#f5c99d", background: "#fff7ef" },
+  workflow: { accent: "#b45375", border: "#edc8d5", background: "#fff6f9" },
 };
 
 export const dependencyColors: Record<DependencyType, string> = {
   blocks: "#b42318",
-  feeds: "#0f766e",
-  related: "#64748b",
-  requires: "#2563eb",
+  feeds: "#e67e22",
+  related: "#667382",
+  requires: "#2f80ed",
 };

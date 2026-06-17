@@ -11,6 +11,7 @@ import {
 } from "@xyflow/react";
 import type { PlanningResult } from "@ai-planning-platform/shared";
 import { ComponentNodeCard } from "./ComponentNodeCard";
+import { LabeledDependencyEdge } from "./LabeledDependencyEdge";
 import { StatusView } from "./StatusView";
 import { toReactFlowEdges, toReactFlowNodes } from "../lib/reactFlowMapping";
 import type { PlanningStatus } from "../store/planningStore";
@@ -24,6 +25,10 @@ interface PlanningCanvasProps {
 
 const nodeTypes = {
   componentNode: ComponentNodeCard,
+};
+
+const edgeTypes = {
+  labeledDependency: LabeledDependencyEdge,
 };
 
 type NodeStyleWithAccent = Node["style"] & {
@@ -65,6 +70,7 @@ export function PlanningCanvas({
       <ReactFlow
         nodes={selectedNodes}
         edges={edges}
+        edgeTypes={edgeTypes}
         nodeTypes={nodeTypes}
         onNodeClick={handleNodeClick}
         onPaneClick={() => onSelectNode(null)}
@@ -73,7 +79,7 @@ export function PlanningCanvas({
         minZoom={0.45}
         maxZoom={1.4}
       >
-        <Background gap={20} size={1} color="#cbd5e1" />
+        <Background gap={20} size={1} color="#d9e0e7" />
         <Controls position="bottom-left" />
         <MiniMap
           nodeColor={(node) => {

@@ -22,20 +22,20 @@ export function RoadmapPanel({ errorMessage, roadmap, status }: RoadmapPanelProp
 
       {status === "error" ? (
         <StatusViewCopy
-          title="로드맵을 사용할 수 없음"
+          title="로드맵 없음"
           copy={errorMessage ?? "계획 결과를 불러올 수 없습니다."}
         />
       ) : null}
 
       {status === "empty" ? (
         <StatusViewCopy
-          title="아직 로드맵이 없음"
-          copy="목업 계획 결과를 불러와 구현 단계를 확인하세요."
+          title="로드맵 없음"
+          copy="계획을 생성하세요."
         />
       ) : null}
 
       {status === "loading" ? (
-        <StatusViewCopy title="로드맵 불러오는 중" copy="목업 계획 단계를 준비하고 있습니다." />
+        <StatusViewCopy title="생성 중" copy="로드맵을 준비하고 있습니다." />
       ) : null}
 
       {status === "ready" ? (
@@ -63,7 +63,7 @@ function StatusViewCopy({ title, copy }: { title: string; copy: string }) {
     <div className="status-view">
       <div className="status-view__box">
         <h3 className="status-view__title">{title}</h3>
-        <p className="status-view__copy">{copy}</p>
+        {copy ? <p className="status-view__copy">{copy}</p> : null}
       </div>
     </div>
   );

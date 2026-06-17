@@ -38,13 +38,7 @@ export function PlanningWorkspace() {
   return (
     <main className="workspace">
       <header className="workspace__header">
-        <div>
-          <h1 className="workspace__title">AI 계획 플랫폼</h1>
-          <p className="workspace__summary">
-            {planningResult?.summary ??
-              "제품 아이디어를 컴포넌트 그래프와 구현 로드맵으로 전환합니다."}
-          </p>
-        </div>
+        <h1 className="workspace__title">플랜노트</h1>
         <div className="workspace__status">상태: {statusLabels[status]}</div>
       </header>
 

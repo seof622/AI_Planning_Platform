@@ -15,18 +15,10 @@ export function NodeDetailPanel({ node }: NodeDetailPanelProps) {
   if (!node) {
     return (
       <aside className="panel">
-        <h2 className="panel__title">노드 상세</h2>
-        <p className="panel__description">
-          캔버스에서 컴포넌트를 선택해 역할, 담당 영역, 우선순위, 메타데이터를
-          확인하세요.
-        </p>
+        <h2 className="panel__title">상세</h2>
         <div className="status-view">
           <div className="status-view__box">
-            <h3 className="status-view__title">선택된 노드 없음</h3>
-            <p className="status-view__copy">
-              그래프를 살펴볼 준비가 되었습니다. 노드를 선택하면 해당 계획 계약을
-              검토할 수 있습니다.
-            </p>
+            <h3 className="status-view__title">노드를 선택하세요</h3>
           </div>
         </div>
       </aside>
