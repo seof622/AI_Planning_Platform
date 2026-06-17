@@ -8,24 +8,24 @@ interface StatusViewProps {
 
 const statusCopy: Record<PlanningStatus, { title: string; copy: string }> = {
   empty: {
-    title: "No graph loaded",
-    copy: "Use the requirement panel to load the mock planning graph.",
+    title: "불러온 그래프 없음",
+    copy: "요구사항 패널에서 목업 계획 그래프를 불러오세요.",
   },
   error: {
-    title: "Unable to load graph",
-    copy: "The planning result is unavailable. Reload the mock graph to recover.",
+    title: "그래프를 불러올 수 없음",
+    copy: "계획 결과를 사용할 수 없습니다. 목업 그래프를 다시 불러오세요.",
   },
   idle: {
-    title: "Preparing workspace",
-    copy: "The planning canvas is initializing.",
+    title: "작업 공간 준비 중",
+    copy: "계획 캔버스를 초기화하고 있습니다.",
   },
   loading: {
-    title: "Loading graph",
-    copy: "The mock planning result is being prepared.",
+    title: "그래프 불러오는 중",
+    copy: "목업 계획 결과를 준비하고 있습니다.",
   },
   ready: {
-    title: "Graph ready",
-    copy: "Select a node to inspect details.",
+    title: "그래프 준비 완료",
+    copy: "노드를 선택해 상세 정보를 확인하세요.",
   },
 };
 

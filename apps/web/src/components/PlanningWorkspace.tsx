@@ -7,6 +7,14 @@ import { PlanningCanvas } from "./PlanningCanvas";
 import { RequirementPanel } from "./RequirementPanel";
 import { RoadmapPanel } from "./RoadmapPanel";
 
+const statusLabels = {
+  empty: "비어 있음",
+  error: "오류",
+  idle: "대기 중",
+  loading: "불러오는 중",
+  ready: "준비 완료",
+};
+
 export function PlanningWorkspace() {
   const {
     errorMessage,
@@ -31,13 +39,13 @@ export function PlanningWorkspace() {
     <main className="workspace">
       <header className="workspace__header">
         <div>
-          <h1 className="workspace__title">AI Planning Platform</h1>
+          <h1 className="workspace__title">AI 계획 플랫폼</h1>
           <p className="workspace__summary">
             {planningResult?.summary ??
-              "Turn a product idea into a component graph and implementation roadmap."}
+              "제품 아이디어를 컴포넌트 그래프와 구현 로드맵으로 전환합니다."}
           </p>
         </div>
-        <div className="workspace__status">Status: {status}</div>
+        <div className="workspace__status">상태: {statusLabels[status]}</div>
       </header>
 
       <div className="workspace__grid">
@@ -45,7 +53,7 @@ export function PlanningWorkspace() {
           isLoading={status === "loading"}
           onLoadMock={loadMockResult}
           onReset={resetToEmpty}
-          onShowError={() => setErrorState("Mock planning result failed to load.")}
+          onShowError={() => setErrorState("목업 계획 결과를 불러오지 못했습니다.")}
           requirementText={requirementText}
           setRequirementText={setRequirementText}
         />

@@ -38,7 +38,7 @@ export const usePlanningStore = create<PlanningState>((set, get) => ({
       });
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : "Unable to load planning result.";
+        error instanceof Error ? error.message : "계획 결과를 불러올 수 없습니다.";
 
       set({
         errorMessage: message,

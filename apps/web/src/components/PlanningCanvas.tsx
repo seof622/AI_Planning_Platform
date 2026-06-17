@@ -61,7 +61,7 @@ export function PlanningCanvas({
   }
 
   return (
-    <section className="canvas-shell" aria-label="Planning dependency graph">
+    <section className="canvas-shell" aria-label="계획 의존성 그래프">
       <ReactFlow
         nodes={selectedNodes}
         edges={edges}

@@ -19,9 +19,9 @@ export function RequirementPanel({
 }: RequirementPanelProps) {
   return (
     <aside className="panel">
-      <h2 className="panel__title">Requirement</h2>
+      <h2 className="panel__title">요구사항</h2>
       <p className="panel__description">
-        Draft the planning goal and generate the current mock graph contract.
+        계획 목표를 작성하고 현재 목업 그래프 계약을 생성합니다.
       </p>
       <form
         className="requirement-form"
@@ -31,21 +31,21 @@ export function RequirementPanel({
         }}
       >
         <textarea
-          aria-label="Planning requirement"
+          aria-label="계획 요구사항"
           value={requirementText}
           onChange={(event) => setRequirementText(event.target.value)}
-          placeholder="Describe the product goal, user workflow, or architecture you want to plan."
+          placeholder="계획하려는 제품 목표, 사용자 흐름, 아키텍처를 설명해 주세요."
         />
         <button className="button button--primary" type="submit" disabled={isLoading}>
-          {isLoading ? "Loading" : "Generate mock plan"}
+          {isLoading ? "불러오는 중" : "목업 계획 생성"}
         </button>
       </form>
-      <div className="button-row" aria-label="MVP state controls">
+      <div className="button-row" aria-label="MVP 상태 제어">
         <button className="button" type="button" onClick={onReset}>
-          Empty
+          비우기
         </button>
         <button className="button" type="button" onClick={onShowError}>
-          Error
+          오류
         </button>
       </div>
     </aside>

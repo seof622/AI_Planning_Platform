@@ -8,31 +8,31 @@ import type {
 export const nodeTypeLabels: Record<ComponentNodeType, string> = {
   ai: "AI",
   api: "API",
-  data: "Data",
-  feature: "Feature",
-  infra: "Infra",
-  system: "System",
+  data: "데이터",
+  feature: "기능",
+  infra: "인프라",
+  system: "시스템",
   ui: "UI",
-  workflow: "Workflow",
+  workflow: "워크플로",
 };
 
 export const priorityLabels: Record<Priority, string> = {
-  high: "High",
-  low: "Low",
-  medium: "Medium",
+  high: "높음",
+  low: "낮음",
+  medium: "보통",
 };
 
 export const effortLabels: Record<EffortSize, string> = {
-  large: "Large",
-  medium: "Medium",
-  small: "Small",
+  large: "큼",
+  medium: "보통",
+  small: "작음",
 };
 
 export const dependencyLabels: Record<DependencyType, string> = {
-  blocks: "Blocks",
-  feeds: "Feeds",
-  related: "Related",
-  requires: "Requires",
+  blocks: "차단",
+  feeds: "전달",
+  related: "관련",
+  requires: "필요",
 };
 
 export const nodeTypeColors: Record<

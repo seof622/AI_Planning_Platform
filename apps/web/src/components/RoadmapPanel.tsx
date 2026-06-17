@@ -14,28 +14,28 @@ export function RoadmapPanel({ errorMessage, roadmap, status }: RoadmapPanelProp
   const sortedRoadmap = [...roadmap].sort((left, right) => left.order - right.order);
 
   return (
-    <section className="roadmap" aria-label="Planning roadmap">
+    <section className="roadmap" aria-label="계획 로드맵">
       <div className="roadmap__header">
-        <h2 className="roadmap__title">Roadmap</h2>
-        <span className="pill">{sortedRoadmap.length} steps</span>
+        <h2 className="roadmap__title">로드맵</h2>
+        <span className="pill">{sortedRoadmap.length}단계</span>
       </div>
 
       {status === "error" ? (
         <StatusViewCopy
-          title="Roadmap unavailable"
-          copy={errorMessage ?? "The planning result could not be loaded."}
+          title="로드맵을 사용할 수 없음"
+          copy={errorMessage ?? "계획 결과를 불러올 수 없습니다."}
         />
       ) : null}
 
       {status === "empty" ? (
         <StatusViewCopy
-          title="No roadmap yet"
-          copy="Load the mock planning result to inspect implementation steps."
+          title="아직 로드맵이 없음"
+          copy="목업 계획 결과를 불러와 구현 단계를 확인하세요."
         />
       ) : null}
 
       {status === "loading" ? (
-        <StatusViewCopy title="Loading roadmap" copy="Preparing the mock planning steps." />
+        <StatusViewCopy title="로드맵 불러오는 중" copy="목업 계획 단계를 준비하고 있습니다." />
       ) : null}
 
       {status === "ready" ? (
@@ -45,7 +45,7 @@ export function RoadmapPanel({ errorMessage, roadmap, status }: RoadmapPanelProp
               <div className="roadmap-step__topline">
                 <span className="roadmap-step__order">{step.order}</span>
                 <span className={`pill pill--${step.priority}`}>
-                  {priorityLabels[step.priority]} · {effortLabels[step.estimatedEffort]}
+                  {priorityLabels[step.priority]} / {effortLabels[step.estimatedEffort]}
                 </span>
               </div>
               <h3 className="roadmap-step__title">{step.title}</h3>
