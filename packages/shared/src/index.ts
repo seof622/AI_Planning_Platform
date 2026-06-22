@@ -7,15 +7,18 @@ export type {
   EffortSize,
   ISODateString,
   Metadata,
+  PlanningBrief,
   PlanningRequest,
   PlanningResult,
   PlanningResultMetadata,
   Priority,
   Project,
   ProjectStatus,
+  QualityPriority,
   Requirement,
   RequirementSource,
   RoadmapStep,
+  ServicePlatform,
   TimestampFields,
 } from "./types";
 

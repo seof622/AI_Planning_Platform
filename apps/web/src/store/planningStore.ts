@@ -1,11 +1,41 @@
 import { create } from "zustand";
-import type { ComponentNode, PlanningResult } from "@ai-planning-platform/shared";
+import type {
+  ComponentNode,
+  PlanningRequest,
+  PlanningResult,
+  QualityPriority,
+  ServicePlatform,
+} from "@ai-planning-platform/shared";
 import { loadMockPlanningResult } from "../lib/mockPlanningClient";
 
 export type PlanningStatus = "idle" | "ready" | "loading" | "error" | "empty";
 
+export interface PlanningBriefDraft {
+  constraints: string;
+  mustHaveFeatures: string;
+  platform: ServicePlatform;
+  qualityPriority: QualityPriority;
+  targetUsers: string;
+}
+
+const initialPlanningBrief: PlanningBriefDraft = {
+  constraints: "",
+  mustHaveFeatures: "",
+  platform: "web",
+  qualityPriority: "speed",
+  targetUsers: "",
+};
+
+function splitList(value: string): string[] {
+  return value
+    .split(/[\n,]/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
 interface PlanningState {
   errorMessage: string | null;
+  planningBrief: PlanningBriefDraft;
   planningResult: PlanningResult | null;
   requirementText: string;
   selectedNodeId: string | null;
@@ -14,11 +44,16 @@ interface PlanningState {
   resetToEmpty: () => void;
   selectNode: (nodeId: string | null) => void;
   setErrorState: (message: string) => void;
+  setPlanningBriefField: <K extends keyof PlanningBriefDraft>(
+    field: K,
+    value: PlanningBriefDraft[K],
+  ) => void;
   setRequirementText: (value: string) => void;
 }
 
 export const usePlanningStore = create<PlanningState>((set, get) => ({
   errorMessage: null,
+  planningBrief: initialPlanningBrief,
   planningResult: null,
   requirementText: "",
   selectedNodeId: null,
@@ -27,8 +62,19 @@ export const usePlanningStore = create<PlanningState>((set, get) => ({
     set({ errorMessage: null, status: "loading" });
 
     try {
-      const result = await loadMockPlanningResult();
       const currentRequirement = get().requirementText.trim();
+      const planningBrief = get().planningBrief;
+      const request: PlanningRequest = {
+        requirement: currentRequirement,
+        brief: {
+          constraints: planningBrief.constraints.trim() || undefined,
+          mustHaveFeatures: splitList(planningBrief.mustHaveFeatures),
+          platform: planningBrief.platform,
+          qualityPriority: planningBrief.qualityPriority,
+          targetUsers: splitList(planningBrief.targetUsers),
+        },
+      };
+      const result = await loadMockPlanningResult(request);
 
       set({
         planningResult: result,
@@ -51,7 +97,9 @@ export const usePlanningStore = create<PlanningState>((set, get) => ({
   resetToEmpty() {
     set({
       errorMessage: null,
+      planningBrief: initialPlanningBrief,
       planningResult: null,
+      requirementText: "",
       selectedNodeId: null,
       status: "empty",
     });
@@ -66,6 +114,11 @@ export const usePlanningStore = create<PlanningState>((set, get) => ({
       selectedNodeId: null,
       status: "error",
     });
+  },
+  setPlanningBriefField(field, value) {
+    set((state) => ({
+      planningBrief: { ...state.planningBrief, [field]: value },
+    }));
   },
   setRequirementText(value) {
     set({ requirementText: value });

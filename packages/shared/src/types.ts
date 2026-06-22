@@ -22,6 +22,20 @@ export type Priority = "low" | "medium" | "high";
 
 export type EffortSize = "small" | "medium" | "large";
 
+export type ServicePlatform =
+  | "web"
+  | "mobile"
+  | "api"
+  | "internal_tool"
+  | "multi_platform";
+
+export type QualityPriority =
+  | "speed"
+  | "cost"
+  | "stability"
+  | "scalability"
+  | "security";
+
 export interface TimestampFields {
   createdAt: ISODateString;
   updatedAt: ISODateString;
@@ -78,8 +92,17 @@ export interface RoadmapStep {
   componentNodeIds?: string[];
 }
 
+export interface PlanningBrief {
+  targetUsers: string[];
+  platform: ServicePlatform;
+  mustHaveFeatures: string[];
+  qualityPriority: QualityPriority;
+  constraints?: string;
+}
+
 export interface PlanningRequest {
   requirement: string;
+  brief?: PlanningBrief;
   project?: Pick<Project, "id" | "title" | "description">;
   options?: {
     includeRoadmap?: boolean;

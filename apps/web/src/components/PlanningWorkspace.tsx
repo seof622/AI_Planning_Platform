@@ -19,12 +19,14 @@ export function PlanningWorkspace() {
   const {
     errorMessage,
     loadMockResult,
+    planningBrief,
     planningResult,
     requirementText,
     resetToEmpty,
     selectedNodeId,
     selectNode,
     setErrorState,
+    setPlanningBriefField,
     setRequirementText,
     status,
   } = usePlanningStore();
@@ -48,7 +50,9 @@ export function PlanningWorkspace() {
           onLoadMock={loadMockResult}
           onReset={resetToEmpty}
           onShowError={() => setErrorState("목업 계획 결과를 불러오지 못했습니다.")}
+          planningBrief={planningBrief}
           requirementText={requirementText}
+          setPlanningBriefField={setPlanningBriefField}
           setRequirementText={setRequirementText}
         />
         <PlanningCanvas
