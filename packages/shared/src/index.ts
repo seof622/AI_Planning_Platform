@@ -1,5 +1,6 @@
 export type {
   CanvasPosition,
+  ActionItemNecessity,
   ComponentNode,
   ComponentNodeType,
   DependencyEdge,
@@ -8,17 +9,18 @@ export type {
   ISODateString,
   Metadata,
   PlanningBrief,
+  PlanningActionItem,
   PlanningRequest,
   PlanningResult,
   PlanningResultMetadata,
   Priority,
   Project,
   ProjectStatus,
-  QualityPriority,
+  PlanType,
   Requirement,
   RequirementSource,
   RoadmapStep,
-  ServicePlatform,
+  SuccessCriterion,
   TimestampFields,
 } from "./types";
 

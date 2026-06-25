@@ -1,25 +1,26 @@
 "use client";
 
 import type {
-  QualityPriority,
-  ServicePlatform,
+  PlanType,
+  SuccessCriterion,
 } from "@ai-planning-platform/shared";
 import type { PlanningBriefDraft } from "../store/planningStore";
 
-const platformLabels: Record<ServicePlatform, string> = {
-  api: "API / 백엔드",
-  internal_tool: "내부 업무 도구",
-  mobile: "모바일 앱",
-  multi_platform: "여러 플랫폼",
-  web: "웹 서비스",
+const planTypeLabels: Record<PlanType, string> = {
+  creative: "창작 / 아이디어",
+  daily: "일상 / 루틴",
+  decision: "선택 / 의사결정",
+  event: "행사 / 여행",
+  learning: "학습 / 성장",
+  project: "프로젝트",
 };
 
-const priorityLabels: Record<QualityPriority, string> = {
-  cost: "비용 절감",
-  scalability: "확장성",
-  security: "보안",
-  speed: "빠른 출시",
-  stability: "안정성",
+const criterionLabels: Record<SuccessCriterion, string> = {
+  balance: "균형",
+  clarity: "명확함",
+  consistency: "꾸준함",
+  quality: "완성도",
+  speed: "빠른 실행",
 };
 
 interface RequirementPanelProps {
@@ -46,17 +47,69 @@ export function RequirementPanel({
   setPlanningBriefField,
   setRequirementText,
 }: RequirementPanelProps) {
-  const featureCount = planningBrief.mustHaveFeatures
-    .split(/[\n,]/)
-    .filter((feature) => feature.trim().length > 0).length;
+  const contextCount = planningBrief.context.filter(
+    (item) => item.trim().length > 0,
+  ).length;
+  const actionCount = planningBrief.actionItems.filter(
+    (item) => item.text.trim().length > 0,
+  ).length;
+  const requiredActionCount = planningBrief.actionItems.filter(
+    (item) => item.necessity === "required" && item.text.trim().length > 0,
+  ).length;
   const canSubmit =
     requirementText.trim().length > 0 &&
-    planningBrief.targetUsers.trim().length > 0 &&
-    featureCount > 0;
+    contextCount > 0 &&
+    actionCount > 0;
+
+  function updateContextItem(index: number, value: string) {
+    setPlanningBriefField(
+      "context",
+      planningBrief.context.map((item, itemIndex) =>
+        itemIndex === index ? value : item,
+      ),
+    );
+  }
+
+  function addContextItem() {
+    setPlanningBriefField("context", [...planningBrief.context, ""]);
+  }
+
+  function removeContextItem(index: number) {
+    setPlanningBriefField(
+      "context",
+      planningBrief.context.filter((_, itemIndex) => itemIndex !== index),
+    );
+  }
+
+  function updateActionItem(
+    index: number,
+    value: Partial<PlanningBriefDraft["actionItems"][number]>,
+  ) {
+    setPlanningBriefField(
+      "actionItems",
+      planningBrief.actionItems.map((item, itemIndex) =>
+        itemIndex === index ? { ...item, ...value } : item,
+      ),
+    );
+  }
+
+  function addActionItem() {
+    setPlanningBriefField("actionItems", [
+      ...planningBrief.actionItems,
+      { necessity: "optional", text: "" },
+    ]);
+  }
+
+  function removeActionItem(index: number) {
+    setPlanningBriefField(
+      "actionItems",
+      planningBrief.actionItems.filter((_, itemIndex) => itemIndex !== index),
+    );
+  }
 
   return (
     <aside className="panel panel--requirements">
-      <h2 className="panel__title">요구사항</h2>
+      <h2 className="panel__title">계획 입력</h2>
       <form
         className="requirement-form"
         onSubmit={(event) => {
@@ -65,54 +118,130 @@ export function RequirementPanel({
         }}
       >
         <label className="form-field">
-          <span className="form-field__label">제품과 해결할 문제</span>
+          <span className="form-field__label">계획 주제</span>
           <textarea
             aria-label="계획 요구사항"
             required
             value={requirementText}
             onChange={(event) => setRequirementText(event.target.value)}
-            placeholder="무엇을 만들고 싶나요?"
+            placeholder="무엇을 계획하고 싶나요?"
           />
         </label>
 
-        <label className="form-field">
-          <span className="form-field__label">주요 사용자</span>
-          <input
-            required
-            value={planningBrief.targetUsers}
-            onChange={(event) =>
-              setPlanningBriefField("targetUsers", event.target.value)
-            }
-            placeholder="예: 고객, 운영 관리자"
-          />
-        </label>
+        <section className="form-field">
+          <div className="form-field__header">
+            <span className="form-field__label">상황 / 대상</span>
+          </div>
+          <div className="repeatable-list">
+            {planningBrief.context.map((item, index) => (
+              <div className="repeatable-row" key={index}>
+                <div className="repeatable-input-shell">
+                  <input
+                    value={item}
+                    onChange={(event) =>
+                      updateContextItem(index, event.target.value)
+                    }
+                    placeholder={
+                      index === 0
+                        ? "예: 나 혼자, 가족 여행, 시험 준비"
+                        : "추가 상황 또는 대상"
+                    }
+                  />
+                  {index === planningBrief.context.length - 1 ? (
+                    <div className="repeatable-inline-actions">
+                      <button
+                        aria-label="상황 또는 대상 추가"
+                        className="icon-button"
+                        type="button"
+                        onClick={addContextItem}
+                      >
+                        +
+                      </button>
+                      <button
+                        aria-label="상황 또는 대상 삭제"
+                        className="icon-button icon-button--ghost"
+                        disabled={planningBrief.context.length === 1}
+                        type="button"
+                        onClick={() => removeContextItem(index)}
+                      >
+                        -
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
 
-        <label className="form-field">
-          <span className="form-field__label">핵심 기능</span>
-          <textarea
-            className="form-field__compact-textarea"
-            required
-            value={planningBrief.mustHaveFeatures}
-            onChange={(event) =>
-              setPlanningBriefField("mustHaveFeatures", event.target.value)
-            }
-            placeholder={"기능을 줄마다 입력하세요"}
-          />
-        </label>
+        <section className="form-field">
+          <div className="form-field__header">
+            <span className="form-field__label">해야 할 일</span>
+          </div>
+          <div className="repeatable-list">
+            {planningBrief.actionItems.map((item, index) => (
+              <div className="repeatable-row repeatable-row--action" key={index}>
+                <div className="repeatable-input-shell">
+                  <input
+                    value={item.text}
+                    onChange={(event) =>
+                      updateActionItem(index, { text: event.target.value })
+                    }
+                    placeholder={index === 0 ? "예: 숙소 후보 정리" : "추가할 일"}
+                  />
+                  {index === planningBrief.actionItems.length - 1 ? (
+                    <div className="repeatable-inline-actions">
+                      <button
+                        aria-label="해야 할 일 추가"
+                        className="icon-button"
+                        type="button"
+                        onClick={addActionItem}
+                      >
+                        +
+                      </button>
+                      <button
+                        aria-label="해야 할 일 삭제"
+                        className="icon-button icon-button--ghost"
+                        disabled={planningBrief.actionItems.length === 1}
+                        type="button"
+                        onClick={() => removeActionItem(index)}
+                      >
+                        -
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
+                <select
+                  aria-label="해야 할 일 구분"
+                  value={item.necessity}
+                  onChange={(event) =>
+                    updateActionItem(index, {
+                      necessity: event.target
+                        .value as PlanningBriefDraft["actionItems"][number]["necessity"],
+                    })
+                  }
+                >
+                  <option value="required">필수</option>
+                  <option value="optional">선택</option>
+                </select>
+              </div>
+            ))}
+          </div>
+        </section>
 
         <div className="form-field-grid">
           <label className="form-field">
-            <span className="form-field__label">서비스 형태</span>
+            <span className="form-field__label">계획 유형</span>
             <select
-              value={planningBrief.platform}
+              value={planningBrief.planType}
               onChange={(event) =>
                 setPlanningBriefField(
-                  "platform",
-                  event.target.value as PlanningBriefDraft["platform"],
+                  "planType",
+                  event.target.value as PlanningBriefDraft["planType"],
                 )
               }
             >
-              {Object.entries(platformLabels).map(([value, label]) => (
+              {Object.entries(planTypeLabels).map(([value, label]) => (
                 <option key={value} value={value}>
                   {label}
                 </option>
@@ -121,17 +250,17 @@ export function RequirementPanel({
           </label>
 
           <label className="form-field">
-            <span className="form-field__label">우선순위</span>
+            <span className="form-field__label">중요 기준</span>
             <select
-              value={planningBrief.qualityPriority}
+              value={planningBrief.successCriterion}
               onChange={(event) =>
                 setPlanningBriefField(
-                  "qualityPriority",
-                  event.target.value as PlanningBriefDraft["qualityPriority"],
+                  "successCriterion",
+                  event.target.value as PlanningBriefDraft["successCriterion"],
                 )
               }
             >
-              {Object.entries(priorityLabels).map(([value, label]) => (
+              {Object.entries(criterionLabels).map(([value, label]) => (
                 <option key={value} value={value}>
                   {label}
                 </option>
@@ -148,7 +277,7 @@ export function RequirementPanel({
             onChange={(event) =>
               setPlanningBriefField("constraints", event.target.value)
             }
-            placeholder="기술, 일정, 보안 또는 운영 제약"
+            placeholder="시간, 예산, 장소, 체력, 함께하는 사람"
           />
         </label>
 
@@ -156,20 +285,22 @@ export function RequirementPanel({
           <h3>입력 요약</h3>
           <dl>
             <div>
-              <dt>대상</dt>
-              <dd>{planningBrief.targetUsers.trim() || "미입력"}</dd>
+              <dt>상황</dt>
+              <dd>{contextCount}개</dd>
             </div>
             <div>
-              <dt>형태</dt>
-              <dd>{platformLabels[planningBrief.platform]}</dd>
+              <dt>유형</dt>
+              <dd>{planTypeLabels[planningBrief.planType]}</dd>
             </div>
             <div>
-              <dt>기능</dt>
-              <dd>{featureCount}개</dd>
+              <dt>할 일</dt>
+              <dd>
+                {actionCount}개 / 필수 {requiredActionCount}개
+              </dd>
             </div>
             <div>
-              <dt>우선</dt>
-              <dd>{priorityLabels[planningBrief.qualityPriority]}</dd>
+              <dt>기준</dt>
+              <dd>{criterionLabels[planningBrief.successCriterion]}</dd>
             </div>
           </dl>
         </section>

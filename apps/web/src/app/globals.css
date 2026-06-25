@@ -83,7 +83,7 @@ button {
 
 .workspace__grid {
   display: grid;
-  grid-template-columns: minmax(260px, 320px) minmax(520px, 1fr) minmax(280px, 360px);
+  grid-template-columns: minmax(340px, 400px) minmax(520px, 1fr) minmax(280px, 360px);
   grid-template-rows: minmax(520px, calc(100vh - 210px)) auto;
   gap: 16px;
   max-width: 1520px;
@@ -136,6 +136,14 @@ button {
   gap: 7px;
 }
 
+.form-field__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-width: 0;
+  gap: 8px;
+}
+
 .form-field__label {
   color: var(--text-muted);
   font-size: 11px;
@@ -176,6 +184,88 @@ button {
 .requirement-form textarea:focus {
   border-color: var(--accent);
   outline: 3px solid var(--accent-soft);
+}
+
+.repeatable-list {
+  display: grid;
+  gap: 8px;
+}
+
+.repeatable-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
+}
+
+.repeatable-row--action {
+  grid-template-columns: minmax(0, 1fr) 72px;
+  gap: 7px;
+}
+
+.repeatable-row--action select {
+  padding-right: 6px;
+  padding-left: 8px;
+}
+
+.repeatable-input-shell {
+  position: relative;
+  min-width: 0;
+}
+
+.repeatable-input-shell input {
+  padding-right: 72px;
+}
+
+.repeatable-inline-actions {
+  position: absolute;
+  top: 50%;
+  right: 5px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transform: translateY(-50%);
+}
+
+.icon-button {
+  display: inline-grid;
+  width: 26px;
+  min-width: 26px;
+  height: 26px;
+  place-items: center;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  background: var(--accent);
+  color: #ffffff;
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1;
+  transition:
+    background 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease;
+}
+
+.icon-button--ghost {
+  border-color: var(--border);
+  background: var(--surface);
+  color: var(--text-muted);
+}
+
+.icon-button:hover:not(:disabled) {
+  border-color: var(--accent-strong);
+  background: var(--accent-strong);
+  color: #ffffff;
+}
+
+.icon-button--ghost:hover:not(:disabled) {
+  border-color: var(--danger);
+  background: #fff4f2;
+  color: var(--danger);
+}
+
+.icon-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
 }
 
 .requirement-summary {
@@ -500,7 +590,7 @@ button {
 
 @media (max-width: 1180px) {
   .workspace__grid {
-    grid-template-columns: minmax(260px, 340px) minmax(420px, 1fr);
+    grid-template-columns: minmax(320px, 380px) minmax(420px, 1fr);
     grid-template-rows: auto minmax(500px, 680px) auto;
   }
 

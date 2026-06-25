@@ -22,19 +22,27 @@ export type Priority = "low" | "medium" | "high";
 
 export type EffortSize = "small" | "medium" | "large";
 
-export type ServicePlatform =
-  | "web"
-  | "mobile"
-  | "api"
-  | "internal_tool"
-  | "multi_platform";
+export type PlanType =
+  | "daily"
+  | "project"
+  | "learning"
+  | "event"
+  | "decision"
+  | "creative";
 
-export type QualityPriority =
+export type SuccessCriterion =
+  | "clarity"
   | "speed"
-  | "cost"
-  | "stability"
-  | "scalability"
-  | "security";
+  | "balance"
+  | "quality"
+  | "consistency";
+
+export type ActionItemNecessity = "required" | "optional";
+
+export interface PlanningActionItem {
+  title: string;
+  necessity: ActionItemNecessity;
+}
 
 export interface TimestampFields {
   createdAt: ISODateString;
@@ -93,10 +101,10 @@ export interface RoadmapStep {
 }
 
 export interface PlanningBrief {
-  targetUsers: string[];
-  platform: ServicePlatform;
-  mustHaveFeatures: string[];
-  qualityPriority: QualityPriority;
+  actionItems: PlanningActionItem[];
+  context: string[];
+  planType: PlanType;
+  successCriterion: SuccessCriterion;
   constraints?: string;
 }
 

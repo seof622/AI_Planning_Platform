@@ -1,36 +1,51 @@
 import { create } from "zustand";
 import type {
+  ActionItemNecessity,
   ComponentNode,
+  PlanType,
+  PlanningActionItem,
   PlanningRequest,
   PlanningResult,
-  QualityPriority,
-  ServicePlatform,
+  SuccessCriterion,
 } from "@ai-planning-platform/shared";
 import { loadMockPlanningResult } from "../lib/mockPlanningClient";
 
 export type PlanningStatus = "idle" | "ready" | "loading" | "error" | "empty";
 
+export interface PlanningActionItemDraft {
+  necessity: ActionItemNecessity;
+  text: string;
+}
+
 export interface PlanningBriefDraft {
+  actionItems: PlanningActionItemDraft[];
   constraints: string;
-  mustHaveFeatures: string;
-  platform: ServicePlatform;
-  qualityPriority: QualityPriority;
-  targetUsers: string;
+  context: string[];
+  planType: PlanType;
+  successCriterion: SuccessCriterion;
 }
 
 const initialPlanningBrief: PlanningBriefDraft = {
+  actionItems: [{ necessity: "required", text: "" }],
   constraints: "",
-  mustHaveFeatures: "",
-  platform: "web",
-  qualityPriority: "speed",
-  targetUsers: "",
+  context: [""],
+  planType: "daily",
+  successCriterion: "clarity",
 };
 
-function splitList(value: string): string[] {
-  return value
-    .split(/[\n,]/)
+function trimList(values: string[]): string[] {
+  return values
     .map((item) => item.trim())
     .filter(Boolean);
+}
+
+function trimActionItems(values: PlanningActionItemDraft[]): PlanningActionItem[] {
+  return values
+    .map((item) => ({
+      necessity: item.necessity,
+      title: item.text.trim(),
+    }))
+    .filter((item) => item.title.length > 0);
 }
 
 interface PlanningState {
@@ -67,11 +82,11 @@ export const usePlanningStore = create<PlanningState>((set, get) => ({
       const request: PlanningRequest = {
         requirement: currentRequirement,
         brief: {
+          actionItems: trimActionItems(planningBrief.actionItems),
           constraints: planningBrief.constraints.trim() || undefined,
-          mustHaveFeatures: splitList(planningBrief.mustHaveFeatures),
-          platform: planningBrief.platform,
-          qualityPriority: planningBrief.qualityPriority,
-          targetUsers: splitList(planningBrief.targetUsers),
+          context: trimList(planningBrief.context),
+          planType: planningBrief.planType,
+          successCriterion: planningBrief.successCriterion,
         },
       };
       const result = await loadMockPlanningResult(request);
