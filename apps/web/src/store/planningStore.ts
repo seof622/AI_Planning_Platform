@@ -94,7 +94,7 @@ export const usePlanningStore = create<PlanningState>((set, get) => ({
       set({
         planningResult: result,
         requirementText: currentRequirement || result.requirement?.content || "",
-        selectedNodeId: result.nodes[0]?.id ?? null,
+        selectedNodeId: null,
         status: result.nodes.length > 0 ? "ready" : "empty",
       });
     } catch (error) {

@@ -39,12 +39,7 @@ export function PlanningWorkspace() {
 
   return (
     <main className="workspace">
-      <header className="workspace__header">
-        <h1 className="workspace__title">플랜노트</h1>
-        <div className="workspace__status">상태: {statusLabels[status]}</div>
-      </header>
-
-      <div className="workspace__grid">
+      <div className="workspace__body">
         <RequirementPanel
           isLoading={status === "loading"}
           onLoadMock={loadMockResult}
@@ -55,18 +50,24 @@ export function PlanningWorkspace() {
           setPlanningBriefField={setPlanningBriefField}
           setRequirementText={setRequirementText}
         />
-        <PlanningCanvas
-          onSelectNode={selectNode}
-          result={planningResult}
-          selectedNodeId={selectedNodeId}
-          status={status}
-        />
-        <NodeDetailPanel node={selectedNode} />
-        <RoadmapPanel
-          errorMessage={errorMessage}
-          roadmap={planningResult?.roadmap ?? []}
-          status={status}
-        />
+        <div className="workspace__canvas-area">
+          <PlanningCanvas
+            onSelectNode={selectNode}
+            result={planningResult}
+            selectedNodeId={selectedNodeId}
+            status={status}
+          />
+          <RoadmapPanel
+            errorMessage={errorMessage}
+            roadmap={planningResult?.roadmap ?? []}
+            status={status}
+          />
+          <NodeDetailPanel node={selectedNode} />
+        </div>
+      </div>
+
+      <div className={`workspace__status workspace__status--${status}`}>
+        {statusLabels[status]}
       </div>
     </main>
   );

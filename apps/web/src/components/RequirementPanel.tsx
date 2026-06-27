@@ -96,7 +96,7 @@ export function RequirementPanel({
   function addActionItem() {
     setPlanningBriefField("actionItems", [
       ...planningBrief.actionItems,
-      { necessity: "optional", text: "" },
+      { necessity: "required", text: "" },
     ]);
   }
 
@@ -182,6 +182,22 @@ export function RequirementPanel({
             {planningBrief.actionItems.map((item, index) => (
               <div className="repeatable-row repeatable-row--action" key={index}>
                 <div className="repeatable-input-shell">
+                  <button
+                    aria-label="해야 할 일 필수 여부"
+                    aria-pressed={item.necessity === "required"}
+                    className={`necessity-toggle necessity-toggle--${item.necessity}`}
+                    type="button"
+                    onClick={() =>
+                      updateActionItem(index, {
+                        necessity:
+                          item.necessity === "required"
+                            ? "optional"
+                            : "required",
+                      })
+                    }
+                  >
+                    {item.necessity === "required" ? "필수" : "선택"}
+                  </button>
                   <input
                     value={item.text}
                     onChange={(event) =>
@@ -211,19 +227,6 @@ export function RequirementPanel({
                     </div>
                   ) : null}
                 </div>
-                <select
-                  aria-label="해야 할 일 구분"
-                  value={item.necessity}
-                  onChange={(event) =>
-                    updateActionItem(index, {
-                      necessity: event.target
-                        .value as PlanningBriefDraft["actionItems"][number]["necessity"],
-                    })
-                  }
-                >
-                  <option value="required">필수</option>
-                  <option value="optional">선택</option>
-                </select>
               </div>
             ))}
           </div>

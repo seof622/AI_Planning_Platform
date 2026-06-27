@@ -13,22 +13,13 @@ const metadataLabels: Record<string, string> = {
 
 export function NodeDetailPanel({ node }: NodeDetailPanelProps) {
   if (!node) {
-    return (
-      <aside className="panel">
-        <h2 className="panel__title">상세</h2>
-        <div className="status-view">
-          <div className="status-view__box">
-            <h3 className="status-view__title">노드를 선택하세요</h3>
-          </div>
-        </div>
-      </aside>
-    );
+    return <aside className="detail-drawer" aria-hidden="true" />;
   }
 
   const metadataEntries = Object.entries(node.metadata ?? {});
 
   return (
-    <aside className="panel">
+    <aside className="detail-drawer detail-drawer--open">
       <h2 className="panel__title">{node.label}</h2>
       <p className="panel__description">{node.description}</p>
       <div className="detail-list">
