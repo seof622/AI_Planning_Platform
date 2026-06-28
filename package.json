@@ -10,6 +10,7 @@
     "web:dev": "npm run dev -w apps/web",
     "web:build": "npm run build -w apps/web",
     "web:typecheck": "npm run typecheck -w apps/web",
-    "shared:typecheck": "npm run typecheck -w packages/shared"
+    "shared:typecheck": "npm run typecheck -w packages/shared",
+    "shared:validate:mock": "npm run validate:mock -w packages/shared"
   }
 }

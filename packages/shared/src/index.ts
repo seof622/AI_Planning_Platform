@@ -22,7 +22,15 @@ export type {
   RoadmapStep,
   SuccessCriterion,
   TimestampFields,
-} from "./types";
+} from "./types.js";
 
-export { isPlanningResultGraphConsistent } from "./types";
-export { mockPlanningResult } from "./fixtures/mockPlanningResult";
+export { isPlanningResultGraphConsistent } from "./types.js";
+export type {
+  ContractValidationIssue,
+  ContractValidationResult,
+} from "./validation.js";
+export {
+  validatePlanningRequest,
+  validatePlanningResult,
+} from "./validation.js";
+export { mockPlanningResult } from "./fixtures/mockPlanningResult.js";

@@ -1,4 +1,4 @@
-import type { PlanningResult } from "../types";
+import type { PlanningResult } from "../types.js";
 
 const generatedAt = "2026-06-11T00:00:00.000Z";
 
