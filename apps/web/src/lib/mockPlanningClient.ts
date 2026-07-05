@@ -7,12 +7,17 @@ export async function loadMockPlanningResult(
   await new Promise((resolve) => window.setTimeout(resolve, 250));
 
   const requirement = request.requirement.trim();
+  const baseRequirement = mockPlanningResult.requirement;
 
   return {
     ...mockPlanningResult,
-    requirement: {
-      ...mockPlanningResult.requirement,
-      content: requirement || mockPlanningResult.requirement.content,
-    },
+    ...(baseRequirement
+      ? {
+          requirement: {
+            ...baseRequirement,
+            content: requirement || baseRequirement.content,
+          },
+        }
+      : {}),
   };
 }
