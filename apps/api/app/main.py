@@ -24,9 +24,6 @@ def health() -> dict[str, str]:
 
 @app.post("/planning/mock")
 def planning_mock(request: PlanningRequest) -> dict:
-    if not request.requirement.strip():
-        raise HTTPException(status_code=422, detail="Requirement must not be empty.")
-
     return build_mock_planning_result(request)
 
 

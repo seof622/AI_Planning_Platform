@@ -40,6 +40,13 @@ def test_planning_generate_uses_placeholder_metadata() -> None:
 
 
 def test_empty_requirement_is_rejected() -> None:
-    response = client.post("/planning/mock", json={"requirement": "   "})
+    response = client.post("/planning/generate", json={"requirement": "   "})
 
     assert response.status_code == 422
+
+
+def test_planning_mock_accepts_empty_requirement_for_initial_ui_load() -> None:
+    response = client.post("/planning/mock", json={"requirement": "   "})
+
+    assert response.status_code == 200
+    assert response.json()["metadata"]["model"] == "mock"

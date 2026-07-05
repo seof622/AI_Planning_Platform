@@ -2,19 +2,23 @@
 
 FastAPI skeleton for the planning API.
 
-## Local setup
+## Local Setup
 
 ```bash
 cd apps/api
-python -m venv .venv
-.venv\Scripts\activate
-python -m pip install -e ".[dev]"
+uv sync --extra dev
 ```
 
 ## Run
 
 ```bash
-uvicorn app.main:app --reload --port 8000
+uv run uvicorn app.main:app --reload --port 8000
+```
+
+The Web app expects this base URL by default:
+
+```text
+NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
 ```
 
 ## Endpoints
@@ -32,5 +36,5 @@ packages/shared/src/fixtures/mockPlanningResult.json
 ## Test
 
 ```bash
-pytest
+uv run pytest
 ```
