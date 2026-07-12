@@ -21,6 +21,20 @@ The Web app expects this base URL by default:
 NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
 ```
 
+## Docker
+
+From the repository root:
+
+```bash
+docker compose up --build api
+```
+
+The API image copies the canonical mock fixture from:
+
+```text
+packages/shared/src/fixtures/mockPlanningResult.json
+```
+
 ## Endpoints
 
 - `GET /health`

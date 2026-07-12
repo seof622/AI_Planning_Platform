@@ -119,3 +119,20 @@ Docker는 FastAPI 기본 서버가 만들어진 직후, PostgreSQL persistence�
 - `apps/web/src/lib/mockPlanningClient.ts`의 직접 fixture 접근을 API 호출 방식으로 교체한다.
 - 기존 loading, error, empty state 동작은 유지한다.
 - 완료 기준: Web이 API response로부터 기존과 동일한 graph와 roadmap을 렌더링해야 한다.
+
+## 진행 메모 2026-07-12
+
+- `packages/shared` typecheck와 mock fixture contract 검증 통과.
+- `apps/api` FastAPI 테스트 통과.
+- `apps/web` typecheck 통과.
+- `compose.yaml`, `apps/api/Dockerfile`, 루트 `.env.example`로 Docker Compose 로컬 런타임 초안 추가.
+- Docker Compose 설정 문법 검증 통과.
+- `docker compose build api` 통과.
+- `docker compose up -d api postgres` 실행 후 API와 PostgreSQL healthcheck 통과.
+- `GET /health`가 `{"status":"ok"}`를 반환하는 것을 확인.
+
+### 다음 작업
+
+1. Web dev server와 API container를 함께 실행해 `/planning/mock` 기반 canvas 렌더링을 브라우저에서 확인한다.
+2. 문제가 없으면 AI Layer 실제 연동 전, API request/response validation 범위를 한 단계 보강한다.
+3. 이후 AI Layer 실제 연동 단계로 넘어간다.

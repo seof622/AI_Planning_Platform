@@ -99,3 +99,21 @@ AI_Planning_Platform/
 ```
 
 자세한 설명은 `docs/project-structure.md`에 정리되어 있습니다.
+
+---
+
+## 6. Docker 로컬 실행
+
+API와 PostgreSQL 로컬 런타임은 Docker Compose로 실행할 수 있습니다.
+
+```bash
+docker compose up --build
+```
+
+API health check:
+
+```text
+http://localhost:8000/health
+```
+
+로컬 포트, CORS origin, PostgreSQL 계정을 바꾸려면 `.env.example`을 기준으로 `.env`를 생성해 수정합니다.
