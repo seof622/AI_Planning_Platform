@@ -51,3 +51,8 @@ class PlanningRequest(BaseModel):
     project: PlanningProjectInput | None = None
     options: PlanningOptions | None = None
     metadata: dict[str, Any] | None = None
+
+
+class ProjectCreate(BaseModel):
+    title: str
+    description: str = ""

@@ -146,3 +146,19 @@ Docker는 FastAPI 기본 서버가 만들어진 직후, PostgreSQL persistence�
 - Web 계획 생성 요청을 `/planning/mock`에서 `/planning/generate`로 전환.
 - API 테스트, Web typecheck/build, API Docker image build 통과.
 - 실제 OpenAI 호출 검증은 `OPENAI_API_KEY` 설정 후 진행 필요.
+
+## 진행 메모 2026-07-24 - PostgreSQL Persistence
+
+- SQLAlchemy repository layer와 PostgreSQL Psycopg driver 추가.
+- `projects`, `requirements`, `planning_results` 초기 Alembic migration 추가.
+- PlanningResult 전체 계약을 JSONB로 저장하고 그대로 복원하는 구조 적용.
+- 프로젝트 생성, 목록, 상세, 프로젝트별 계획 생성, 최신 결과 조회 API 추가.
+- API container 시작 시 PostgreSQL migration 자동 적용.
+- canonical mock fixture를 저장하는 local seed script 추가.
+- SQLite repository round-trip 테스트 및 PostgreSQL migration 검증 추가.
+
+### 다음 작업
+
+1. `OPENAI_API_KEY` 설정 후 프로젝트별 실제 AI 생성과 DB 저장을 end-to-end로 검증한다.
+2. Web에 프로젝트 생성·선택·저장 결과 불러오기 흐름을 추가한다.
+3. 대표 입력 평가와 AI prompt/version 품질 관리를 시작한다.

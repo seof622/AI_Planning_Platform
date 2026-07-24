@@ -1,6 +1,6 @@
 from functools import lru_cache
 
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from planning_ai import (
     PlanningConfigurationError,
@@ -9,9 +9,20 @@ from planning_ai import (
     PlanningWorkflow,
 )
 
+from sqlalchemy.orm import Session
+
 from .config import get_cors_origins
+from .database import get_db_session
 from .fixtures import build_mock_planning_result
-from .schemas import PlanningRequest
+from .repository import (
+    create_project,
+    get_latest_planning_result,
+    get_project,
+    list_projects,
+    save_planning_result,
+    serialize_project,
+)
+from .schemas import PlanningRequest, ProjectCreate
 
 
 app = FastAPI(title="AI Planning Platform API", version="0.1.0")
@@ -30,6 +41,15 @@ def get_planning_workflow() -> PlanningWorkflow:
     return PlanningWorkflow()
 
 
+def generate_result(request: PlanningRequest) -> dict:
+    try:
+        return get_planning_workflow().generate(request.model_dump(exclude_none=True))
+    except PlanningConfigurationError as error:
+        raise HTTPException(status_code=503, detail=str(error)) from error
+    except (PlanningProviderError, PlanningValidationError) as error:
+        raise HTTPException(status_code=502, detail=str(error)) from error
+
+
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
@@ -45,9 +65,72 @@ def planning_generate(request: PlanningRequest) -> dict:
     if not request.requirement.strip():
         raise HTTPException(status_code=422, detail="Requirement must not be empty.")
 
-    try:
-        return get_planning_workflow().generate(request.model_dump(exclude_none=True))
-    except PlanningConfigurationError as error:
-        raise HTTPException(status_code=503, detail=str(error)) from error
-    except (PlanningProviderError, PlanningValidationError) as error:
-        raise HTTPException(status_code=502, detail=str(error)) from error
+    return generate_result(request)
+
+
+@app.post("/projects", status_code=201)
+def projects_create(
+    payload: ProjectCreate,
+    session: Session = Depends(get_db_session),
+) -> dict:
+    if not payload.title.strip():
+        raise HTTPException(status_code=422, detail="Project title must not be empty.")
+    return serialize_project(
+        create_project(
+            session,
+            title=payload.title,
+            description=payload.description,
+        )
+    )
+
+
+@app.get("/projects")
+def projects_list(session: Session = Depends(get_db_session)) -> list[dict]:
+    return [serialize_project(project) for project in list_projects(session)]
+
+
+@app.get("/projects/{project_id}")
+def projects_get(
+    project_id: str,
+    session: Session = Depends(get_db_session),
+) -> dict:
+    project = get_project(session, project_id)
+    if project is None:
+        raise HTTPException(status_code=404, detail="Project not found.")
+    return serialize_project(project)
+
+
+@app.post("/projects/{project_id}/planning/generate")
+def projects_generate(
+    project_id: str,
+    request: PlanningRequest,
+    session: Session = Depends(get_db_session),
+) -> dict:
+    if not request.requirement.strip():
+        raise HTTPException(status_code=422, detail="Requirement must not be empty.")
+
+    project = get_project(session, project_id)
+    if project is None:
+        raise HTTPException(status_code=404, detail="Project not found.")
+
+    result = generate_result(request)
+    return save_planning_result(
+        session,
+        project=project,
+        requirement_content=request.requirement,
+        result=result,
+    )
+
+
+@app.get("/projects/{project_id}/planning-results/latest")
+def projects_latest_result(
+    project_id: str,
+    session: Session = Depends(get_db_session),
+) -> dict:
+    if get_project(session, project_id) is None:
+        raise HTTPException(status_code=404, detail="Project not found.")
+
+    result = get_latest_planning_result(session, project_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Planning result not found.")
+    return result

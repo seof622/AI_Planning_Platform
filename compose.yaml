@@ -5,9 +5,13 @@ services:
       dockerfile: apps/api/Dockerfile
     environment:
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-ai_planning}:${POSTGRES_PASSWORD:-ai_planning_local}@postgres:5432/${POSTGRES_DB:-ai_planning_platform}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENAI_MODEL: ${OPENAI_MODEL:-gpt-5-mini}
       OPENAI_TIMEOUT_SECONDS: ${OPENAI_TIMEOUT_SECONDS:-60}
+    depends_on:
+      postgres:
+        condition: service_healthy
     ports:
       - "${API_PORT:-8000}:8000"
     healthcheck:

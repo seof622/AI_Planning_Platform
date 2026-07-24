@@ -63,3 +63,28 @@ OPENAI_TIMEOUT_SECONDS=60
 ```bash
 uv run pytest
 ```
+
+## PostgreSQL Persistence
+
+The API container runs the Alembic migration automatically before Uvicorn starts.
+
+Project endpoints:
+
+- `POST /projects`
+- `GET /projects`
+- `GET /projects/{project_id}`
+- `POST /projects/{project_id}/planning/generate`
+- `GET /projects/{project_id}/planning-results/latest`
+
+Seed one project with the canonical mock planning result:
+
+```bash
+docker compose exec api uv run python -m scripts.seed_mock_project
+```
+
+Run or roll back migrations manually:
+
+```bash
+docker compose exec api uv run alembic upgrade head
+docker compose exec api uv run alembic downgrade base
+```
