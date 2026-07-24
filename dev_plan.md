@@ -133,6 +133,16 @@ Docker는 FastAPI 기본 서버가 만들어진 직후, PostgreSQL persistence�
 
 ### 다음 작업
 
-1. Web dev server와 API container를 함께 실행해 `/planning/mock` 기반 canvas 렌더링을 브라우저에서 확인한다.
-2. 문제가 없으면 AI Layer 실제 연동 전, API request/response validation 범위를 한 단계 보강한다.
-3. 이후 AI Layer 실제 연동 단계로 넘어간다.
+1. API key가 설정된 환경에서 실제 생성 결과의 canvas/roadmap 렌더링을 검증한다.
+2. 대표 요구사항을 모아 AI output 품질과 graph consistency를 평가한다.
+3. 이후 PostgreSQL persistence 단계로 넘어간다.
+
+## 진행 메모 2026-07-24
+
+- `packages/ai`에 LangGraph planning workflow 추가.
+- OpenAI Responses API와 Pydantic Structured Outputs 기반 provider adapter 추가.
+- AI 결과의 node/edge/roadmap reference 검증과 canvas position 정규화 추가.
+- `/planning/generate`를 실제 AI workflow에 연결하고 provider 오류를 HTTP 응답으로 변환.
+- Web 계획 생성 요청을 `/planning/mock`에서 `/planning/generate`로 전환.
+- API 테스트, Web typecheck/build, API Docker image build 통과.
+- 실제 OpenAI 호출 검증은 `OPENAI_API_KEY` 설정 후 진행 필요.

@@ -41,10 +41,21 @@ packages/shared/src/fixtures/mockPlanningResult.json
 - `POST /planning/mock`
 - `POST /planning/generate`
 
-Both planning endpoints currently read the canonical mock fixture from:
+`/planning/mock` reads the canonical mock fixture from:
 
 ```text
 packages/shared/src/fixtures/mockPlanningResult.json
+```
+
+`/planning/generate` runs the LangGraph workflow in `packages/ai` and uses the
+OpenAI Responses API with Pydantic Structured Outputs.
+
+Set these environment variables before calling it:
+
+```text
+OPENAI_API_KEY=your-api-key
+OPENAI_MODEL=gpt-5-mini
+OPENAI_TIMEOUT_SECONDS=60
 ```
 
 ## Test

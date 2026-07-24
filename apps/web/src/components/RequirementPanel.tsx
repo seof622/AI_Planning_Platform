@@ -25,7 +25,7 @@ const criterionLabels: Record<SuccessCriterion, string> = {
 
 interface RequirementPanelProps {
   isLoading: boolean;
-  onLoadMock: () => Promise<void>;
+  onGenerate: () => Promise<void>;
   onReset: () => void;
   onShowError: () => void;
   planningBrief: PlanningBriefDraft;
@@ -39,7 +39,7 @@ interface RequirementPanelProps {
 
 export function RequirementPanel({
   isLoading,
-  onLoadMock,
+  onGenerate,
   onReset,
   onShowError,
   planningBrief,
@@ -114,7 +114,7 @@ export function RequirementPanel({
         className="requirement-form"
         onSubmit={(event) => {
           event.preventDefault();
-          void onLoadMock();
+          void onGenerate();
         }}
       >
         <label className="form-field">

@@ -4,13 +4,13 @@ const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") ??
   "http://localhost:8000";
 
-export async function loadMockPlanningResult(
+export async function generatePlanningResult(
   request: PlanningRequest,
 ): Promise<PlanningResult> {
   let response: Response;
 
   try {
-    response = await fetch(`${API_BASE_URL}/planning/mock`, {
+    response = await fetch(`${API_BASE_URL}/planning/generate`, {
       body: JSON.stringify(request),
       headers: {
         "Content-Type": "application/json",
@@ -22,7 +22,12 @@ export async function loadMockPlanningResult(
   }
 
   if (!response.ok) {
-    throw new Error("API에서 목업 계획 결과를 불러오지 못했습니다.");
+    const errorBody = (await response.json().catch(() => null)) as {
+      detail?: string;
+    } | null;
+    throw new Error(
+      errorBody?.detail ?? "API에서 AI 계획 결과를 생성하지 못했습니다.",
+    );
   }
 
   return (await response.json()) as PlanningResult;

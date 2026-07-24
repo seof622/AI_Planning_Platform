@@ -5,6 +5,9 @@ services:
       dockerfile: apps/api/Dockerfile
     environment:
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-5-mini}
+      OPENAI_TIMEOUT_SECONDS: ${OPENAI_TIMEOUT_SECONDS:-60}
     ports:
       - "${API_PORT:-8000}:8000"
     healthcheck:

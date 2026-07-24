@@ -7,6 +7,7 @@ WORKDIR /app/apps/api
 
 RUN pip install --no-cache-dir uv
 
+COPY packages/ai /app/packages/ai
 COPY apps/api/pyproject.toml apps/api/uv.lock ./
 RUN uv sync --frozen --no-dev
 

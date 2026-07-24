@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect } from "react";
 import { getSelectedNode, usePlanningStore } from "../store/planningStore";
 import { NodeDetailPanel } from "./NodeDetailPanel";
 import { PlanningCanvas } from "./PlanningCanvas";
@@ -18,7 +17,7 @@ const statusLabels = {
 export function PlanningWorkspace() {
   const {
     errorMessage,
-    loadMockResult,
+    generateResult,
     planningBrief,
     planningResult,
     requirementText,
@@ -31,10 +30,6 @@ export function PlanningWorkspace() {
     status,
   } = usePlanningStore();
 
-  useEffect(() => {
-    void loadMockResult();
-  }, [loadMockResult]);
-
   const selectedNode = getSelectedNode(planningResult, selectedNodeId);
 
   return (
@@ -42,9 +37,9 @@ export function PlanningWorkspace() {
       <div className="workspace__body">
         <RequirementPanel
           isLoading={status === "loading"}
-          onLoadMock={loadMockResult}
+          onGenerate={generateResult}
           onReset={resetToEmpty}
-          onShowError={() => setErrorState("목업 계획 결과를 불러오지 못했습니다.")}
+          onShowError={() => setErrorState("AI 계획 결과를 생성하지 못했습니다.")}
           planningBrief={planningBrief}
           requirementText={requirementText}
           setPlanningBriefField={setPlanningBriefField}

@@ -8,7 +8,7 @@ import type {
   PlanningResult,
   SuccessCriterion,
 } from "@ai-planning-platform/shared";
-import { loadMockPlanningResult } from "../lib/mockPlanningClient";
+import { generatePlanningResult } from "../lib/planningClient";
 
 export type PlanningStatus = "idle" | "ready" | "loading" | "error" | "empty";
 
@@ -55,7 +55,7 @@ interface PlanningState {
   requirementText: string;
   selectedNodeId: string | null;
   status: PlanningStatus;
-  loadMockResult: () => Promise<void>;
+  generateResult: () => Promise<void>;
   resetToEmpty: () => void;
   selectNode: (nodeId: string | null) => void;
   setErrorState: (message: string) => void;
@@ -73,7 +73,7 @@ export const usePlanningStore = create<PlanningState>((set, get) => ({
   requirementText: "",
   selectedNodeId: null,
   status: "idle",
-  async loadMockResult() {
+  async generateResult() {
     set({ errorMessage: null, status: "loading" });
 
     try {
@@ -89,7 +89,7 @@ export const usePlanningStore = create<PlanningState>((set, get) => ({
           successCriterion: planningBrief.successCriterion,
         },
       };
-      const result = await loadMockPlanningResult(request);
+      const result = await generatePlanningResult(request);
 
       set({
         planningResult: result,
