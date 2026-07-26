@@ -7,7 +7,8 @@
 - 모델 카탈로그 API, 요청별 모델 선택, Web select UI 연결 완료.
 - Shared/Web typecheck, canonical mock validation, API test 13개 통과.
 - Web production build와 Docker API model catalog smoke test 통과.
-- 실제 OpenAI 생성 검증은 API quota가 준비된 후 모델별로 진행한다.
+- API 크레딧 충전 후 Web에서 실제 OpenAI 계획 생성 성공을 확인했다.
+- 새로고침 후 DB 결과 복원과 허용 모델별 smoke test는 후속 E2E로 진행한다.
 
 ### 목표
 
@@ -258,7 +259,7 @@ Docker는 FastAPI 기본 서버가 만들어진 직후, PostgreSQL persistence�
 - `/planning/generate`를 실제 AI workflow에 연결하고 provider 오류를 HTTP 응답으로 변환.
 - Web 계획 생성 요청을 `/planning/mock`에서 `/planning/generate`로 전환.
 - API 테스트, Web typecheck/build, API Docker image build 통과.
-- 실제 OpenAI 호출 검증은 `OPENAI_API_KEY` 설정 후 진행 필요.
+- `OPENAI_API_KEY`와 API 크레딧 설정 후 Web의 실제 OpenAI 계획 생성 성공 확인.
 
 ## 진행 메모 2026-07-24 - PostgreSQL Persistence
 
@@ -272,6 +273,7 @@ Docker는 FastAPI 기본 서버가 만들어진 직후, PostgreSQL persistence�
 
 ### 다음 작업
 
-1. `OPENAI_API_KEY` 설정 후 프로젝트별 실제 AI 생성과 DB 저장을 end-to-end로 검증한다.
-2. Web에 프로젝트 생성·선택·저장 결과 불러오기 흐름을 추가한다.
-3. 대표 입력 평가와 AI prompt/version 품질 관리를 시작한다.
+1. 실제 AI 생성 성공은 확인했으며, 새로고침 후 DB 결과 복원까지 end-to-end로 검증한다.
+2. Web 프로젝트·모델 선택·결과 복원 흐름의 자동화 테스트를 추가한다.
+3. Planning brief 전체를 저장하고 프로젝트 재선택 시 복원하도록 확장한다.
+4. 대표 입력 평가와 AI prompt/version 품질 관리를 시작한다.

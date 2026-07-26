@@ -23,8 +23,8 @@ Date: 2026-07-26
 
 ## Remaining
 
-1. Run the full project creation, OpenAI generation, PostgreSQL persistence,
-   refresh, and restore flow with Docker Desktop and `OPENAI_API_KEY` available.
+1. OpenAI generation was confirmed after API credits were added. Complete the
+   remaining refresh and PostgreSQL restore verification.
 2. Add automated Web tests for project creation, selection, restore, and API
    error handling.
 3. Decide whether the planning brief should be persisted and restored together
