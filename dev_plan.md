@@ -277,4 +277,7 @@ Docker는 FastAPI 기본 서버가 만들어진 직후, PostgreSQL persistence�
 2. Web 프로젝트·모델 선택·결과 복원 흐름의 자동화 테스트 5개 추가 완료.
 3. Planning brief 전체를 저장하고 프로젝트 재선택 시 복원하도록 확장한다.
 4. 대표 입력 평가와 AI prompt/version 품질 관리를 시작한다.
-5. npm audit에서 확인된 Next.js 런타임 취약점을 별도 dependency upgrade로 해결한다.
+5. Next.js와 ESLint config를 15.5.22로 업데이트해 Next 직접 취약점을 해결했다.
+   - Web test 5개, typecheck, lint, production build 통과.
+   - 현재 Next 15·16이 고정하는 PostCSS 8.4.31과 Sharp 0.34.x 관련 audit
+     경고는 upstream 안전 버전 반영 후 후속 패치한다.

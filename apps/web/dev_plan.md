@@ -9,10 +9,13 @@
 - Covered selected model propagation in project planning requests.
 - Covered user interaction with the AI model select UI.
 - Five Web tests, TypeScript typecheck, and ESLint pass.
-- Production build was not repeated because an externally owned development
-  server was using `.next`; the prior feature build remains valid.
-- `npm audit --omit=dev` reports existing high-severity runtime advisories in
-  Next.js, PostCSS, and Sharp. Handle these as a separate dependency upgrade.
+- Updated Next.js and `eslint-config-next` from 15.5.19 to 15.5.22.
+- Five Web tests, TypeScript typecheck, ESLint, and an isolated production build
+  pass on Next.js 15.5.22.
+- The patch resolves the direct Next.js advisories. `npm audit --omit=dev`
+  still reports PostCSS 8.4.31 and Sharp 0.34.x inherited through Next.js.
+  Current Next.js 15 and 16 releases pin those vulnerable ranges, so follow up
+  when upstream publishes compatible patched dependencies.
 
 ## 역할
 
