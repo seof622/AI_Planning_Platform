@@ -274,6 +274,7 @@ Docker는 FastAPI 기본 서버가 만들어진 직후, PostgreSQL persistence�
 ### 다음 작업
 
 1. 실제 AI 생성 성공은 확인했으며, 새로고침 후 DB 결과 복원까지 end-to-end로 검증한다.
-2. Web 프로젝트·모델 선택·결과 복원 흐름의 자동화 테스트를 추가한다.
+2. Web 프로젝트·모델 선택·결과 복원 흐름의 자동화 테스트 5개 추가 완료.
 3. Planning brief 전체를 저장하고 프로젝트 재선택 시 복원하도록 확장한다.
 4. 대표 입력 평가와 AI prompt/version 품질 관리를 시작한다.
+5. npm audit에서 확인된 Next.js 런타임 취약점을 별도 dependency upgrade로 해결한다.

@@ -1,5 +1,19 @@
 # apps/web Development Plan
 
+## Progress 2026-07-26 - Web Automation Tests
+
+- Added Vitest, jsdom, and Testing Library test infrastructure.
+- Added the root `npm run web:test` command.
+- Covered server model catalog default selection and API errors.
+- Covered first-project selection and latest planning result restoration.
+- Covered selected model propagation in project planning requests.
+- Covered user interaction with the AI model select UI.
+- Five Web tests, TypeScript typecheck, and ESLint pass.
+- Production build was not repeated because an externally owned development
+  server was using `.next`; the prior feature build remains valid.
+- `npm audit --omit=dev` reports existing high-severity runtime advisories in
+  Next.js, PostCSS, and Sharp. Handle these as a separate dependency upgrade.
+
 ## 역할
 
 `apps/web`은 사용자가 AI planning 결과를 보고 조작하는 핵심 인터페이스이다.
