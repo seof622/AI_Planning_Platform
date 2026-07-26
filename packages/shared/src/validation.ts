@@ -75,6 +75,17 @@ export function validatePlanningRequest(
     addIssue(issues, "requirement", "Requirement must not be empty.");
   }
 
+  if (
+    request.options?.model !== undefined &&
+    (!hasText(request.options.model) || request.options.model.length > 100)
+  ) {
+    addIssue(
+      issues,
+      "options.model",
+      "Model must contain between 1 and 100 characters.",
+    );
+  }
+
   request.brief?.actionItems.forEach((item, index) => {
     if (!hasText(item.title)) {
       addIssue(

@@ -7,11 +7,17 @@ from planning_ai import (
     PlanningProviderError,
     PlanningValidationError,
     PlanningWorkflow,
+    OpenAIPlanningProvider,
 )
 
 from sqlalchemy.orm import Session
 
-from .config import get_cors_origins
+from .config import (
+    get_allowed_openai_models,
+    get_cors_origins,
+    get_default_openai_model,
+    get_openai_model_catalog,
+)
 from .database import get_db_session
 from .fixtures import build_mock_planning_result
 from .repository import (
@@ -37,13 +43,23 @@ app.add_middleware(
 
 
 @lru_cache
-def get_planning_workflow() -> PlanningWorkflow:
-    return PlanningWorkflow()
+def get_planning_workflow(model: str) -> PlanningWorkflow:
+    return PlanningWorkflow(provider=OpenAIPlanningProvider(model=model))
 
 
 def generate_result(request: PlanningRequest) -> dict:
+    requested_model = request.options.model if request.options else None
+    model = requested_model or get_default_openai_model()
+    if model not in get_allowed_openai_models():
+        raise HTTPException(
+            status_code=422,
+            detail=f"Unsupported planning model: {model}.",
+        )
+
     try:
-        return get_planning_workflow().generate(request.model_dump(exclude_none=True))
+        return get_planning_workflow(model).generate(
+            request.model_dump(exclude_none=True)
+        )
     except PlanningConfigurationError as error:
         raise HTTPException(status_code=503, detail=str(error)) from error
     except (PlanningProviderError, PlanningValidationError) as error:
@@ -53,6 +69,11 @@ def generate_result(request: PlanningRequest) -> dict:
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@app.get("/planning/models")
+def planning_models() -> dict:
+    return get_openai_model_catalog()
 
 
 @app.post("/planning/mock")

@@ -1,6 +1,7 @@
 "use client";
 
 import type {
+  AIModelOption,
   PlanType,
   SuccessCriterion,
 } from "@ai-planning-platform/shared";
@@ -24,30 +25,42 @@ const criterionLabels: Record<SuccessCriterion, string> = {
 };
 
 interface RequirementPanelProps {
+  generatedModel?: string;
   hasSelectedProject: boolean;
   isLoading: boolean;
+  modelErrorMessage: string | null;
+  models: AIModelOption[];
+  modelStatus: "idle" | "loading" | "ready" | "error";
   onGenerate: () => Promise<void>;
   onReset: () => void;
   onShowError: () => void;
   planningBrief: PlanningBriefDraft;
   requirementText: string;
+  selectedModel: string;
   setPlanningBriefField: <K extends keyof PlanningBriefDraft>(
     field: K,
     value: PlanningBriefDraft[K],
   ) => void;
   setRequirementText: (value: string) => void;
+  setSelectedModel: (value: string) => void;
 }
 
 export function RequirementPanel({
+  generatedModel,
   hasSelectedProject,
   isLoading,
+  modelErrorMessage,
+  models,
+  modelStatus,
   onGenerate,
   onReset,
   onShowError,
   planningBrief,
   requirementText,
+  selectedModel,
   setPlanningBriefField,
   setRequirementText,
+  setSelectedModel,
 }: RequirementPanelProps) {
   const contextCount = planningBrief.context.filter(
     (item) => item.trim().length > 0,
@@ -60,6 +73,8 @@ export function RequirementPanel({
   ).length;
   const canSubmit =
     hasSelectedProject &&
+    modelStatus === "ready" &&
+    selectedModel.length > 0 &&
     requirementText.trim().length > 0 &&
     contextCount > 0 &&
     actionCount > 0;
@@ -120,6 +135,39 @@ export function RequirementPanel({
           void onGenerate();
         }}
       >
+        <label className="form-field">
+          <span className="form-field__label">AI 모델</span>
+          <select
+            aria-label="AI 모델"
+            disabled={modelStatus !== "ready" || models.length === 0}
+            value={selectedModel}
+            onChange={(event) => setSelectedModel(event.target.value)}
+          >
+            {models.length === 0 ? (
+              <option value="">
+                {modelStatus === "loading"
+                  ? "모델 목록을 불러오는 중"
+                  : "사용 가능한 모델 없음"}
+              </option>
+            ) : null}
+            {models.map((model) => (
+              <option key={model.id} value={model.id}>
+                {model.label}
+              </option>
+            ))}
+          </select>
+          {modelErrorMessage ? (
+            <span className="form-field__error" role="alert">
+              {modelErrorMessage}
+            </span>
+          ) : null}
+          {generatedModel ? (
+            <span className="form-field__hint">
+              최근 결과 모델: {generatedModel}
+            </span>
+          ) : null}
+        </label>
+
         <label className="form-field">
           <span className="form-field__label">계획 주제</span>
           <textarea

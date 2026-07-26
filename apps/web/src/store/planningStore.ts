@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import type {
   ActionItemNecessity,
+  AIModelOption,
   ComponentNode,
   PlanType,
   PlanningActionItem,
@@ -13,6 +14,7 @@ import {
   createProject,
   generatePlanningResult,
   getLatestPlanningResult,
+  getPlanningModels,
   listProjects,
 } from "../lib/planningClient";
 
@@ -58,16 +60,21 @@ interface PlanningState {
   errorMessage: string | null;
   planningBrief: PlanningBriefDraft;
   planningResult: PlanningResult | null;
+  modelErrorMessage: string | null;
+  models: AIModelOption[];
+  modelStatus: "idle" | "loading" | "ready" | "error";
   projectErrorMessage: string | null;
   projects: Project[];
   projectStatus: "idle" | "loading" | "ready" | "error";
   requirementText: string;
+  selectedModel: string;
   selectedProjectId: string | null;
   selectedNodeId: string | null;
   status: PlanningStatus;
   createAndSelectProject: (title: string) => Promise<void>;
   generateResult: () => Promise<void>;
   loadProjects: () => Promise<void>;
+  loadModels: () => Promise<void>;
   resetToEmpty: () => void;
   selectProject: (projectId: string) => Promise<void>;
   selectNode: (nodeId: string | null) => void;
@@ -77,16 +84,21 @@ interface PlanningState {
     value: PlanningBriefDraft[K],
   ) => void;
   setRequirementText: (value: string) => void;
+  setSelectedModel: (value: string) => void;
 }
 
 export const usePlanningStore = create<PlanningState>((set, get) => ({
   errorMessage: null,
   planningBrief: initialPlanningBrief,
   planningResult: null,
+  modelErrorMessage: null,
+  models: [],
+  modelStatus: "idle",
   projectErrorMessage: null,
   projects: [],
   projectStatus: "idle",
   requirementText: "",
+  selectedModel: "",
   selectedProjectId: null,
   selectedNodeId: null,
   status: "idle",
@@ -132,6 +144,9 @@ export const usePlanningStore = create<PlanningState>((set, get) => ({
           context: trimList(planningBrief.context),
           planType: planningBrief.planType,
           successCriterion: planningBrief.successCriterion,
+        },
+        options: {
+          model: get().selectedModel,
         },
       };
       const project = get().projects.find(
@@ -198,6 +213,30 @@ export const usePlanningStore = create<PlanningState>((set, get) => ({
       });
     }
   },
+  async loadModels() {
+    if (get().modelStatus === "loading") {
+      return;
+    }
+    set({ modelErrorMessage: null, modelStatus: "loading" });
+    try {
+      const catalog = await getPlanningModels();
+      set({
+        models: catalog.models,
+        modelStatus: "ready",
+        selectedModel: catalog.defaultModel,
+      });
+    } catch (error) {
+      set({
+        modelErrorMessage:
+          error instanceof Error
+            ? error.message
+            : "AI 모델 목록을 불러오지 못했습니다.",
+        models: [],
+        modelStatus: "error",
+        selectedModel: "",
+      });
+    }
+  },
   resetToEmpty() {
     set({
       errorMessage: null,
@@ -224,10 +263,15 @@ export const usePlanningStore = create<PlanningState>((set, get) => ({
     });
     try {
       const result = await getLatestPlanningResult(projectId);
+      const resultModel = result?.metadata.model;
       set({
         planningResult: result,
         projectStatus: "ready",
         requirementText: result?.requirement?.content ?? "",
+        selectedModel:
+          resultModel && get().models.some((model) => model.id === resultModel)
+            ? resultModel
+            : get().selectedModel,
         status: result && result.nodes.length > 0 ? "ready" : "empty",
       });
     } catch (error) {
@@ -259,6 +303,9 @@ export const usePlanningStore = create<PlanningState>((set, get) => ({
   },
   setRequirementText(value) {
     set({ requirementText: value });
+  },
+  setSelectedModel(value) {
+    set({ selectedModel: value });
   },
 }));
 

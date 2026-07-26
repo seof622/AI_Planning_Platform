@@ -68,7 +68,11 @@ def test_project_planning_result_round_trip(monkeypatch) -> None:
             yield session
 
     app.dependency_overrides[get_db_session] = override_session
-    monkeypatch.setattr(main_module, "get_planning_workflow", FakeWorkflow)
+    monkeypatch.setattr(
+        main_module,
+        "get_planning_workflow",
+        lambda _: FakeWorkflow(),
+    )
 
     try:
         client = TestClient(app)

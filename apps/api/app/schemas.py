@@ -1,6 +1,6 @@
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 ComponentNodeType = Literal[
@@ -40,6 +40,7 @@ class PlanningProjectInput(BaseModel):
 
 class PlanningOptions(BaseModel):
     includeRoadmap: bool | None = None
+    model: str | None = Field(default=None, min_length=1, max_length=100)
     preferredNodeTypes: list[ComponentNodeType] | None = None
 
 

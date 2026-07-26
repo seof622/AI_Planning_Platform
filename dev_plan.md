@@ -1,5 +1,118 @@
 # AI Planning Platform Development Plan
 
+## 추가 작업 계획 2026-07-26 - AI 모델 선택 UI
+
+상태: 구현 및 기본 검증 완료
+
+- 모델 카탈로그 API, 요청별 모델 선택, Web select UI 연결 완료.
+- Shared/Web typecheck, canonical mock validation, API test 13개 통과.
+- Web production build와 Docker API model catalog smoke test 통과.
+- 실제 OpenAI 생성 검증은 API quota가 준비된 후 모델별로 진행한다.
+
+### 목표
+
+사용자가 계획 생성 전에 서버가 허용한 OpenAI 모델 중 하나를 선택하고,
+API가 선택값을 검증한 뒤 해당 모델로 계획을 생성하도록 한다.
+클라이언트가 임의의 모델 ID를 직접 지정하는 방식은 허용하지 않는다.
+
+### 현재 구조 분석
+
+- 현재 기본 모델은 루트 `.env`와 `compose.yaml`의 `OPENAI_MODEL` 한 개로 결정된다.
+- `OpenAIPlanningProvider`는 생성 시 모델을 고정하며 `PlanningWorkflow`도 API에서
+  `lru_cache`로 재사용되므로 요청별 모델 선택을 처리할 수 없다.
+- Web의 `PlanningRequest`와 API의 Pydantic schema에는 모델 선택 필드가 없다.
+- `PlanningResult.metadata.model`과 `planning_results.model` 컬럼에는 실제 사용
+  모델이 이미 저장되므로 첫 구현에는 DB migration이 필요하지 않다.
+- Web에 모델 ID를 하드코딩하면 지원 모델 변경, 계정별 접근 권한, 비용 정책과
+  쉽게 불일치한다.
+
+### 설계 원칙
+
+1. 모델 허용 목록과 기본 모델의 최종 권한은 API 서버가 가진다.
+2. Web은 서버가 반환한 허용 목록만 표시하고 임의 문자열을 전송하지 않는다.
+3. `OPENAI_MODEL`은 기본 선택값으로 유지하고 `OPENAI_ALLOWED_MODELS`를 추가한다.
+4. 선택 모델은 Planning 요청의 명시적 options 필드로 전달한다.
+5. 실제 사용 모델은 기존 `PlanningResult.metadata.model`과 DB `model` 컬럼에
+   계속 기록한다.
+6. 허용되지 않거나 사용할 수 없는 모델은 생성 전에 422 응답으로 차단한다.
+7. 모델 접근 권한, quota, rate limit 오류는 현재 provider 오류 형식을 유지해
+   사용자가 원인을 확인할 수 있게 한다.
+
+### 변경 대상
+
+#### 1. 환경 설정과 API 모델 카탈로그
+
+- `.env.example`에 쉼표 구분 `OPENAI_ALLOWED_MODELS` 예시를 추가한다.
+- `OPENAI_MODEL`이 허용 목록에 포함되는지 API 시작 또는 설정 로드 시 검증한다.
+- `GET /planning/models` endpoint를 추가한다.
+- 응답에는 모델 ID, 사용자 표시명, 기본 선택 여부만 포함한다.
+- API key, 내부 비용 한도, provider credential은 응답에 포함하지 않는다.
+
+#### 2. Shared Planning 계약
+
+- `packages/shared`에 모델 option과 모델 카탈로그 응답 타입을 추가한다.
+- `PlanningRequest.options.model`을 명시적 필드로 정의한다.
+- 문자열 길이와 빈 값 검증은 shared helper와 API schema 양쪽에서 일치시킨다.
+- `docs/planning-result-contract.md`에 모델 선택 요청·응답 규칙을 문서화한다.
+
+#### 3. API와 AI workflow
+
+- API Pydantic `PlanningOptions`에 `model` 필드를 추가한다.
+- 요청 모델이 서버 허용 목록에 속하는지 검증한다.
+- 전역으로 캐시된 단일 모델 workflow 구조를 요청 모델별 provider/workflow
+  생성 또는 모델별 안전한 cache 구조로 변경한다.
+- `OpenAIPlanningProvider`가 검증된 요청 모델을 사용하도록 연결한다.
+- 요청값이 없으면 `OPENAI_MODEL` 기본값을 사용해 기존 호출과 호환한다.
+- normalization 결과의 `metadata.model`이 실제 호출 모델과 동일한지 검증한다.
+
+#### 4. Web UI와 상태
+
+- 계획 입력 영역에 `AI 모델` select를 추가한다.
+- 초기 화면에서 `GET /planning/models`를 호출해 허용 모델 목록과 기본값을
+  불러온다.
+- 목록 loading, 조회 실패, 빈 목록 상태를 처리한다.
+- 모델 목록이 없거나 선택값이 없으면 계획 생성 버튼을 비활성화한다.
+- 선택 모델을 Zustand state에 보관하고 `PlanningRequest.options.model`로 보낸다.
+- 저장된 최신 결과를 불러오면 `metadata.model`을 결과 정보로 표시한다.
+- 이전 결과의 모델이 현재 허용 목록에서 제거됐더라도 결과 열람은 허용하되,
+  새 생성에는 현재 허용 모델을 다시 선택하게 한다.
+
+#### 5. 테스트
+
+- shared: 모델 option validation과 기존 model 없는 요청의 하위 호환성 테스트.
+- API: 모델 목록, 기본 모델, 허용 모델, 비허용 모델 422 응답 테스트.
+- AI: 요청별 모델 전달과 `metadata.model` 일치 테스트.
+- Web: 목록 loading/error/empty, 기본 선택, 생성 request payload 테스트.
+- persistence: 선택 모델이 JSONB metadata와 `planning_results.model`에 동일하게
+  저장되는지 round-trip 테스트.
+- E2E: 서로 다른 허용 모델로 생성 후 프로젝트 최신 결과 복원까지 확인한다.
+
+### 구현 순서
+
+1. 서버 설정과 모델 카탈로그 endpoint를 먼저 구현한다.
+2. Shared/API request contract와 검증을 추가한다.
+3. AI workflow를 요청별 모델 실행 구조로 변경한다.
+4. API 단위 테스트와 persistence 테스트를 통과시킨다.
+5. Web select UI와 Zustand/request 연결을 구현한다.
+6. Web typecheck/build와 전체 API 테스트를 실행한다.
+7. 실제 API key 환경에서 허용 모델별 smoke test를 수행한다.
+
+### 완료 기준
+
+- Web에서 서버 허용 모델만 선택할 수 있다.
+- 선택한 모델이 실제 OpenAI 요청과 결과 metadata, DB 저장값에 일관되게 반영된다.
+- 모델을 선택하지 않은 기존 요청은 서버 기본 모델로 정상 동작한다.
+- 비허용 모델은 OpenAI 호출 전에 차단된다.
+- 모델 목록 조회 실패가 기존 프로젝트와 저장 결과 열람을 막지 않는다.
+- 비밀값이 Web bundle, API 응답, Git diff에 포함되지 않는다.
+
+### 후속 검토
+
+- 모델별 예상 비용·속도·품질 설명과 추천 표시.
+- 프로젝트별 기본 모델 저장.
+- 관리자 역할 기반 모델 허용 정책.
+- 생성 이력과 모델별 품질·비용 평가 대시보드.
+
 ## 목표
 
 AI Planning Platform은 사용자의 아이디어와 요구사항을 구조화된 설계, dependency graph, 실행 가능한 로드맵으로 변환하는 플랫폼이다.

@@ -114,9 +114,20 @@ export interface PlanningRequest {
   project?: Pick<Project, "id" | "title" | "description">;
   options?: {
     includeRoadmap?: boolean;
+    model?: string;
     preferredNodeTypes?: ComponentNodeType[];
   };
   metadata?: Metadata;
+}
+
+export interface AIModelOption {
+  id: string;
+  label: string;
+}
+
+export interface AIModelCatalog {
+  defaultModel: string;
+  models: AIModelOption[];
 }
 
 export interface PlanningResultMetadata extends Metadata {

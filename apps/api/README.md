@@ -55,8 +55,12 @@ Set these environment variables before calling it:
 ```text
 OPENAI_API_KEY=your-api-key
 OPENAI_MODEL=gpt-5-mini
+OPENAI_ALLOWED_MODELS=gpt-5-mini,gpt-5.6-luna,gpt-5.6-terra,gpt-5.6-sol
 OPENAI_TIMEOUT_SECONDS=60
 ```
+
+`GET /planning/models` returns the configured model catalog for the Web UI.
+`OPENAI_MODEL` must be included in `OPENAI_ALLOWED_MODELS`.
 
 ## Test
 

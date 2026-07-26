@@ -135,6 +135,20 @@ Recommended endpoints:
 - `POST /planning/mock`: accepts `PlanningRequest`, returns mock `PlanningResult`.
 - `POST /planning/generate`: accepts `PlanningRequest`, returns generated `PlanningResult`.
 
+## AI Model Selection
+
+- `GET /planning/models` returns the server-managed model catalog:
+  `{ defaultModel, models: [{ id, label }] }`.
+- `PlanningRequest.options.model` may contain one model ID returned by that
+  catalog.
+- Omitting `options.model` uses the server-side `OPENAI_MODEL` default.
+- The API rejects a model outside `OPENAI_ALLOWED_MODELS` with HTTP 422 before
+  making an OpenAI request.
+- `PlanningResult.metadata.model` records the model actually used. Persisted
+  planning results also copy this value into `planning_results.model`.
+- Model credentials, account limits, and API keys are never part of the model
+  catalog response.
+
 Web state mapping:
 
 - Empty request or validation failure: show error state with a readable message.

@@ -1,5 +1,7 @@
 export type {
   CanvasPosition,
+  AIModelCatalog,
+  AIModelOption,
   ActionItemNecessity,
   ComponentNode,
   ComponentNodeType,

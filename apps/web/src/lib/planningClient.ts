@@ -1,4 +1,5 @@
 import type {
+  AIModelCatalog,
   PlanningRequest,
   PlanningResult,
   Project,
@@ -65,6 +66,10 @@ async function requestJson<T>(
 
 export function listProjects(): Promise<Project[]> {
   return requestJson<Project[]>("/projects");
+}
+
+export function getPlanningModels(): Promise<AIModelCatalog> {
+  return requestJson<AIModelCatalog>("/planning/models");
 }
 
 export function createProject(

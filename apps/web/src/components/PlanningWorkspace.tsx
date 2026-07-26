@@ -21,7 +21,11 @@ export function PlanningWorkspace() {
     createAndSelectProject,
     errorMessage,
     generateResult,
+    loadModels,
     loadProjects,
+    modelErrorMessage,
+    models,
+    modelStatus,
     planningBrief,
     planningResult,
     projectErrorMessage,
@@ -30,20 +34,23 @@ export function PlanningWorkspace() {
     requirementText,
     resetToEmpty,
     selectedNodeId,
+    selectedModel,
     selectedProjectId,
     selectNode,
     selectProject,
     setErrorState,
     setPlanningBriefField,
     setRequirementText,
+    setSelectedModel,
     status,
   } = usePlanningStore();
 
   const selectedNode = getSelectedNode(planningResult, selectedNodeId);
 
   useEffect(() => {
+    void loadModels();
     void loadProjects();
-  }, [loadProjects]);
+  }, [loadModels, loadProjects]);
 
   return (
     <main className="workspace">
@@ -58,8 +65,12 @@ export function PlanningWorkspace() {
             selectedProjectId={selectedProjectId}
           />
           <RequirementPanel
+            generatedModel={planningResult?.metadata.model}
             hasSelectedProject={selectedProjectId !== null}
             isLoading={status === "loading"}
+            modelErrorMessage={modelErrorMessage}
+            models={models}
+            modelStatus={modelStatus}
             onGenerate={generateResult}
             onReset={resetToEmpty}
             onShowError={() =>
@@ -67,8 +78,10 @@ export function PlanningWorkspace() {
             }
             planningBrief={planningBrief}
             requirementText={requirementText}
+            selectedModel={selectedModel}
             setPlanningBriefField={setPlanningBriefField}
             setRequirementText={setRequirementText}
+            setSelectedModel={setSelectedModel}
           />
         </div>
         <div className="workspace__canvas-area">

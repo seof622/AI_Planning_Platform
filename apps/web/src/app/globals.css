@@ -314,6 +314,18 @@ button {
   resize: vertical;
 }
 
+.form-field__error {
+  color: var(--danger);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.form-field__hint {
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
 .requirement-form select {
   appearance: none;
   padding-right: 34px;
