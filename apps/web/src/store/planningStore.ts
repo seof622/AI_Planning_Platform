@@ -6,9 +6,15 @@ import type {
   PlanningActionItem,
   PlanningRequest,
   PlanningResult,
+  Project,
   SuccessCriterion,
 } from "@ai-planning-platform/shared";
-import { generatePlanningResult } from "../lib/planningClient";
+import {
+  createProject,
+  generatePlanningResult,
+  getLatestPlanningResult,
+  listProjects,
+} from "../lib/planningClient";
 
 export type PlanningStatus = "idle" | "ready" | "loading" | "error" | "empty";
 
@@ -52,11 +58,18 @@ interface PlanningState {
   errorMessage: string | null;
   planningBrief: PlanningBriefDraft;
   planningResult: PlanningResult | null;
+  projectErrorMessage: string | null;
+  projects: Project[];
+  projectStatus: "idle" | "loading" | "ready" | "error";
   requirementText: string;
+  selectedProjectId: string | null;
   selectedNodeId: string | null;
   status: PlanningStatus;
+  createAndSelectProject: (title: string) => Promise<void>;
   generateResult: () => Promise<void>;
+  loadProjects: () => Promise<void>;
   resetToEmpty: () => void;
+  selectProject: (projectId: string) => Promise<void>;
   selectNode: (nodeId: string | null) => void;
   setErrorState: (message: string) => void;
   setPlanningBriefField: <K extends keyof PlanningBriefDraft>(
@@ -70,10 +83,42 @@ export const usePlanningStore = create<PlanningState>((set, get) => ({
   errorMessage: null,
   planningBrief: initialPlanningBrief,
   planningResult: null,
+  projectErrorMessage: null,
+  projects: [],
+  projectStatus: "idle",
   requirementText: "",
+  selectedProjectId: null,
   selectedNodeId: null,
   status: "idle",
+  async createAndSelectProject(title) {
+    set({ projectErrorMessage: null, projectStatus: "loading" });
+    try {
+      const project = await createProject(title);
+      set((state) => ({
+        projects: [project, ...state.projects],
+        projectStatus: "ready",
+      }));
+      await get().selectProject(project.id);
+    } catch (error) {
+      set({
+        projectErrorMessage:
+          error instanceof Error
+            ? error.message
+            : "프로젝트를 생성하지 못했습니다.",
+        projectStatus: "error",
+      });
+    }
+  },
   async generateResult() {
+    const selectedProjectId = get().selectedProjectId;
+    if (!selectedProjectId) {
+      set({
+        errorMessage: "계획을 저장할 프로젝트를 먼저 선택해 주세요.",
+        status: "error",
+      });
+      return;
+    }
+
     set({ errorMessage: null, status: "loading" });
 
     try {
@@ -89,10 +134,25 @@ export const usePlanningStore = create<PlanningState>((set, get) => ({
           successCriterion: planningBrief.successCriterion,
         },
       };
-      const result = await generatePlanningResult(request);
+      const project = get().projects.find(
+        (item) => item.id === selectedProjectId,
+      );
+      if (project) {
+        request.project = {
+          description: project.description,
+          id: project.id,
+          title: project.title,
+        };
+      }
+      const result = await generatePlanningResult(selectedProjectId, request);
 
       set({
         planningResult: result,
+        projects: get().projects.map((item) =>
+          item.id === result.project?.id && result.project
+            ? result.project
+            : item,
+        ),
         requirementText: currentRequirement || result.requirement?.content || "",
         selectedNodeId: null,
         status: result.nodes.length > 0 ? "ready" : "empty",
@@ -109,6 +169,35 @@ export const usePlanningStore = create<PlanningState>((set, get) => ({
       });
     }
   },
+  async loadProjects() {
+    if (get().projectStatus === "loading") {
+      return;
+    }
+    set({ projectErrorMessage: null, projectStatus: "loading" });
+    try {
+      const projects = await listProjects();
+      set({ projects, projectStatus: "ready" });
+      const firstProject = projects[0];
+      if (firstProject) {
+        await get().selectProject(firstProject.id);
+      } else {
+        set({
+          planningResult: null,
+          requirementText: "",
+          selectedProjectId: null,
+          status: "empty",
+        });
+      }
+    } catch (error) {
+      set({
+        projectErrorMessage:
+          error instanceof Error
+            ? error.message
+            : "프로젝트 목록을 불러오지 못했습니다.",
+        projectStatus: "error",
+      });
+    }
+  },
   resetToEmpty() {
     set({
       errorMessage: null,
@@ -118,6 +207,39 @@ export const usePlanningStore = create<PlanningState>((set, get) => ({
       selectedNodeId: null,
       status: "empty",
     });
+  },
+  async selectProject(projectId) {
+    if (!projectId) {
+      return;
+    }
+    set({
+      errorMessage: null,
+      planningResult: null,
+      projectErrorMessage: null,
+      projectStatus: "loading",
+      requirementText: "",
+      selectedNodeId: null,
+      selectedProjectId: projectId,
+      status: "loading",
+    });
+    try {
+      const result = await getLatestPlanningResult(projectId);
+      set({
+        planningResult: result,
+        projectStatus: "ready",
+        requirementText: result?.requirement?.content ?? "",
+        status: result && result.nodes.length > 0 ? "ready" : "empty",
+      });
+    } catch (error) {
+      set({
+        projectErrorMessage:
+          error instanceof Error
+            ? error.message
+            : "프로젝트를 불러오지 못했습니다.",
+        projectStatus: "error",
+        status: "empty",
+      });
+    }
   },
   selectNode(nodeId) {
     set({ selectedNodeId: nodeId });

@@ -1,8 +1,10 @@
 "use client";
 
+import { useEffect } from "react";
 import { getSelectedNode, usePlanningStore } from "../store/planningStore";
 import { NodeDetailPanel } from "./NodeDetailPanel";
 import { PlanningCanvas } from "./PlanningCanvas";
+import { ProjectPanel } from "./ProjectPanel";
 import { RequirementPanel } from "./RequirementPanel";
 import { RoadmapPanel } from "./RoadmapPanel";
 
@@ -16,14 +18,21 @@ const statusLabels = {
 
 export function PlanningWorkspace() {
   const {
+    createAndSelectProject,
     errorMessage,
     generateResult,
+    loadProjects,
     planningBrief,
     planningResult,
+    projectErrorMessage,
+    projects,
+    projectStatus,
     requirementText,
     resetToEmpty,
     selectedNodeId,
+    selectedProjectId,
     selectNode,
+    selectProject,
     setErrorState,
     setPlanningBriefField,
     setRequirementText,
@@ -32,19 +41,36 @@ export function PlanningWorkspace() {
 
   const selectedNode = getSelectedNode(planningResult, selectedNodeId);
 
+  useEffect(() => {
+    void loadProjects();
+  }, [loadProjects]);
+
   return (
     <main className="workspace">
       <div className="workspace__body">
-        <RequirementPanel
-          isLoading={status === "loading"}
-          onGenerate={generateResult}
-          onReset={resetToEmpty}
-          onShowError={() => setErrorState("AI 계획 결과를 생성하지 못했습니다.")}
-          planningBrief={planningBrief}
-          requirementText={requirementText}
-          setPlanningBriefField={setPlanningBriefField}
-          setRequirementText={setRequirementText}
-        />
+        <div className="workspace__sidebar">
+          <ProjectPanel
+            errorMessage={projectErrorMessage}
+            isLoading={projectStatus === "loading"}
+            onCreate={createAndSelectProject}
+            onSelect={selectProject}
+            projects={projects}
+            selectedProjectId={selectedProjectId}
+          />
+          <RequirementPanel
+            hasSelectedProject={selectedProjectId !== null}
+            isLoading={status === "loading"}
+            onGenerate={generateResult}
+            onReset={resetToEmpty}
+            onShowError={() =>
+              setErrorState("AI 계획 결과를 생성하지 못했습니다.")
+            }
+            planningBrief={planningBrief}
+            requirementText={requirementText}
+            setPlanningBriefField={setPlanningBriefField}
+            setRequirementText={setRequirementText}
+          />
+        </div>
         <div className="workspace__canvas-area">
           <PlanningCanvas
             onSelectNode={selectNode}

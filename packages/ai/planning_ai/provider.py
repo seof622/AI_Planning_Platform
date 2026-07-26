@@ -49,8 +49,25 @@ class OpenAIPlanningProvider:
                 ],
                 text_format=GeneratedPlanningResult,
             )
-        except (OpenAIError, ValidationError) as error:
-            raise PlanningProviderError("OpenAI planning request failed.") from error
+        except OpenAIError as error:
+            status_code = getattr(error, "status_code", None)
+            error_code = getattr(error, "code", None)
+            details = str(error).strip() or error.__class__.__name__
+            context = [
+                f"status={status_code}" if status_code is not None else None,
+                f"code={error_code}" if error_code else None,
+            ]
+            suffix = ", ".join(item for item in context if item)
+            prefix = (
+                f"OpenAI planning request failed ({suffix})"
+                if suffix
+                else "OpenAI planning request failed"
+            )
+            raise PlanningProviderError(f"{prefix}: {details[:500]}") from error
+        except ValidationError as error:
+            raise PlanningProviderError(
+                f"OpenAI structured response validation failed: {str(error)[:500]}"
+            ) from error
 
         parsed = response.output_parsed
         if parsed is None:

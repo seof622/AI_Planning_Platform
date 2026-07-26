@@ -24,6 +24,7 @@ const criterionLabels: Record<SuccessCriterion, string> = {
 };
 
 interface RequirementPanelProps {
+  hasSelectedProject: boolean;
   isLoading: boolean;
   onGenerate: () => Promise<void>;
   onReset: () => void;
@@ -38,6 +39,7 @@ interface RequirementPanelProps {
 }
 
 export function RequirementPanel({
+  hasSelectedProject,
   isLoading,
   onGenerate,
   onReset,
@@ -57,6 +59,7 @@ export function RequirementPanel({
     (item) => item.necessity === "required" && item.text.trim().length > 0,
   ).length;
   const canSubmit =
+    hasSelectedProject &&
     requirementText.trim().length > 0 &&
     contextCount > 0 &&
     actionCount > 0;
