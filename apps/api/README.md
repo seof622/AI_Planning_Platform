@@ -79,12 +79,27 @@ Project endpoints:
 - `GET /projects/{project_id}`
 - `POST /projects/{project_id}/planning/generate`
 - `GET /projects/{project_id}/planning-results/latest`
+- `GET /projects/{project_id}/planning-results`
+- `GET /projects/{project_id}/planning-results/{result_id}`
+- `GET /projects/{project_id}/planning-results/{result_id}/planning-brief`
+- `POST /projects/{project_id}/planning-results/{result_id}/restore`
 - `GET /projects/{project_id}/planning-brief`
 - `PUT /projects/{project_id}/planning-brief`
 
 The Web automatically saves the current requirement, planning brief fields, and
 selected model to the project planning-brief endpoint. Selecting the project
 again restores this draft independently from the latest generated result.
+
+The planning-results collection returns newest-first history summaries. A
+history item can then be loaded by ID without changing the project's current
+planning brief. Restoring an item creates a new latest result, restores its
+requirement and planning brief snapshot, and records the source result ID.
+Results created before brief snapshots were introduced remain viewable but are
+not restorable.
+
+When a history item is selected, the Web loads both its result and its brief
+snapshot. Historical browsing never autosaves that snapshot over the current
+project draft; editing a historical brief starts a new current draft.
 
 Seed one project with the canonical mock planning result:
 

@@ -58,6 +58,17 @@ const persistedBrief = {
   selectedModel: "gpt-5.6-luna",
 };
 
+const planningHistory = [
+  {
+    canRestore: true,
+    createdAt: "2026-07-26T00:00:00Z",
+    id: "planning-result-latest",
+    model: "gpt-5.6-luna",
+    summary: "Test plan",
+    workflowVersion: "test",
+  },
+];
+
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
     headers: { "Content-Type": "application/json" },
@@ -103,7 +114,8 @@ describe("planningStore", () => {
     vi.mocked(fetch)
       .mockResolvedValueOnce(jsonResponse([project]))
       .mockResolvedValueOnce(jsonResponse(planningResult))
-      .mockResolvedValueOnce(jsonResponse(persistedBrief));
+      .mockResolvedValueOnce(jsonResponse(persistedBrief))
+      .mockResolvedValueOnce(jsonResponse(planningHistory));
 
     await usePlanningStore.getState().loadProjects();
 
@@ -113,6 +125,8 @@ describe("planningStore", () => {
     expect(state.requirementText).toBe("Build a test plan");
     expect(state.planningBrief.actionItems[0]?.text).toBe("Implement tests");
     expect(state.planningBrief.constraints).toBe("Keep it focused");
+    expect(state.planningHistory).toEqual(planningHistory);
+    expect(state.selectedPlanningResultId).toBe("planning-result-latest");
     expect(state.selectedModel).toBe("gpt-5.6-luna");
     expect(state.status).toBe("ready");
   });
@@ -158,11 +172,13 @@ describe("planningStore", () => {
       selectedModel: "gpt-5.6-luna",
       selectedProjectId: project.id,
     });
-    vi.mocked(fetch).mockResolvedValueOnce(jsonResponse(planningResult));
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(jsonResponse(planningResult))
+      .mockResolvedValueOnce(jsonResponse(planningHistory));
 
     await usePlanningStore.getState().generateResult();
 
-    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(fetch).toHaveBeenCalledTimes(2);
     const [url, init] = vi.mocked(fetch).mock.calls[0]!;
     expect(url).toBe(
       "http://localhost:8000/projects/project-test/planning/generate",
@@ -176,6 +192,95 @@ describe("planningStore", () => {
       requirement: "Build a test plan",
     });
     expect(usePlanningStore.getState().status).toBe("ready");
+    expect(usePlanningStore.getState().planningHistory).toEqual(planningHistory);
+  });
+
+  it("loads a selected historical planning result", async () => {
+    const historicalResult = { ...planningResult, summary: "Older plan" };
+    usePlanningStore.setState({
+      planningHistory,
+      selectedPlanningResultId: "planning-result-latest",
+      selectedProjectId: project.id,
+    });
+    const historicalBrief = {
+      ...persistedBrief,
+      brief: {
+        ...persistedBrief.brief,
+        constraints: "Older constraint",
+      },
+    };
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(jsonResponse(historicalResult))
+      .mockResolvedValueOnce(jsonResponse(historicalBrief));
+
+    await usePlanningStore
+      .getState()
+      .selectPlanningResult("planning-result-older");
+
+    expect(fetch).toHaveBeenCalledWith(
+      "http://localhost:8000/projects/project-test/planning-results/planning-result-older",
+      undefined,
+    );
+    expect(usePlanningStore.getState().planningResult?.summary).toBe(
+      "Older plan",
+    );
+    expect(usePlanningStore.getState().planningBrief.constraints).toBe(
+      "Older constraint",
+    );
+    expect(usePlanningStore.getState().isViewingHistoricalResult).toBe(true);
+    expect(usePlanningStore.getState().selectedPlanningResultId).toBe(
+      "planning-result-older",
+    );
+  });
+
+  it("does not autosave while viewing a historical result", async () => {
+    usePlanningStore.setState({
+      isViewingHistoricalResult: true,
+      projectStatus: "ready",
+      selectedProjectId: project.id,
+    });
+
+    await usePlanningStore.getState().saveCurrentPlanningBrief();
+
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("restores a historical result and its planning brief as a new version", async () => {
+    const restoredHistory = [
+      {
+        ...planningHistory[0]!,
+        id: "planning-result-restored",
+        restoredFromResultId: "planning-result-latest",
+      },
+      ...planningHistory,
+    ];
+    usePlanningStore.setState({
+      models: [{ id: "gpt-5.6-luna", label: "GPT-5.6 Luna" }],
+      planningHistory,
+      selectedPlanningResultId: "planning-result-latest",
+      selectedProjectId: project.id,
+    });
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(
+        jsonResponse({
+          planningBrief: persistedBrief,
+          result: planningResult,
+        }),
+      )
+      .mockResolvedValueOnce(jsonResponse(restoredHistory));
+
+    await usePlanningStore.getState().restoreSelectedPlanningResult();
+
+    expect(fetch).toHaveBeenNthCalledWith(
+      1,
+      "http://localhost:8000/projects/project-test/planning-results/planning-result-latest/restore",
+      { method: "POST" },
+    );
+    const state = usePlanningStore.getState();
+    expect(state.requirementText).toBe(persistedBrief.requirement);
+    expect(state.planningBrief.actionItems[0]?.text).toBe("Implement tests");
+    expect(state.selectedPlanningResultId).toBe("planning-result-restored");
+    expect(state.planningHistory).toEqual(restoredHistory);
   });
 
   it("keeps project viewing available when model catalog loading fails", async () => {

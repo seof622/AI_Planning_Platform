@@ -134,10 +134,59 @@ def test_project_planning_result_round_trip(monkeypatch) -> None:
         assert latest_response.status_code == 200
         assert latest_response.json() == generated
 
+        history_response = client.get(
+            f"/projects/{project['id']}/planning-results"
+        )
+        assert history_response.status_code == 200
+        history = history_response.json()
+        assert len(history) == 1
+        assert history[0]["summary"] == generated["summary"]
+        assert history[0]["model"] == "test-model"
+        assert history[0]["canRestore"] is True
+
+        detail_response = client.get(
+            f"/projects/{project['id']}/planning-results/{history[0]['id']}"
+        )
+        assert detail_response.status_code == 200
+        assert detail_response.json() == generated
+
+        snapshot_response = client.get(
+            f"/projects/{project['id']}/planning-results/"
+            f"{history[0]['id']}/planning-brief"
+        )
+        assert snapshot_response.status_code == 200
+        assert snapshot_response.json()["brief"] == brief_payload["brief"]
+        assert snapshot_response.json()["requirement"] == brief_payload["requirement"]
+
+        restore_response = client.post(
+            f"/projects/{project['id']}/planning-results/{history[0]['id']}/restore"
+        )
+        assert restore_response.status_code == 200
+        restored = restore_response.json()
+        assert restored["planningBrief"]["requirement"] == brief_payload["requirement"]
+        assert restored["planningBrief"]["brief"] == brief_payload["brief"]
+        assert restored["planningBrief"]["selectedModel"] == "test-model"
+        assert restored["result"]["summary"] == generated["summary"]
+        assert (
+            restored["result"]["metadata"]["restoredFromResultId"]
+            == history[0]["id"]
+        )
+
+        restored_history_response = client.get(
+            f"/projects/{project['id']}/planning-results"
+        )
+        restored_history = restored_history_response.json()
+        assert len(restored_history) == 2
+        assert restored_history[0]["restoredFromResultId"] == history[0]["id"]
+        assert restored_history[0]["canRestore"] is True
+
         restored_brief_response = client.get(
             f"/projects/{project['id']}/planning-brief"
         )
-        assert restored_brief_response.json() == brief_payload
+        restored_brief = restored_brief_response.json()
+        assert restored_brief["requirement"] == brief_payload["requirement"]
+        assert restored_brief["brief"] == brief_payload["brief"]
+        assert restored_brief["selectedModel"] == "test-model"
 
         list_response = client.get("/projects")
         assert list_response.status_code == 200

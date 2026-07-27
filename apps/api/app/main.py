@@ -23,7 +23,11 @@ from .fixtures import build_mock_planning_result
 from .repository import (
     create_project,
     get_latest_planning_result,
+    get_planning_result,
+    get_planning_result_brief,
     get_project,
+    list_planning_results,
+    restore_planning_result,
     list_projects,
     save_project_planning_brief,
     save_planning_result,
@@ -203,3 +207,74 @@ def projects_latest_result(
     if result is None:
         raise HTTPException(status_code=404, detail="Planning result not found.")
     return result
+
+
+@app.get("/projects/{project_id}/planning-results")
+def projects_planning_results(
+    project_id: str,
+    session: Session = Depends(get_db_session),
+) -> list[dict]:
+    if get_project(session, project_id) is None:
+        raise HTTPException(status_code=404, detail="Project not found.")
+    return list_planning_results(session, project_id)
+
+
+@app.get("/projects/{project_id}/planning-results/{result_id}")
+def projects_planning_result(
+    project_id: str,
+    result_id: str,
+    session: Session = Depends(get_db_session),
+) -> dict:
+    if get_project(session, project_id) is None:
+        raise HTTPException(status_code=404, detail="Project not found.")
+    result = get_planning_result(session, project_id, result_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Planning result not found.")
+    return result
+
+
+@app.post("/projects/{project_id}/planning-results/{result_id}/restore")
+def projects_restore_planning_result(
+    project_id: str,
+    result_id: str,
+    session: Session = Depends(get_db_session),
+) -> dict:
+    project = get_project(session, project_id)
+    if project is None:
+        raise HTTPException(status_code=404, detail="Project not found.")
+    if get_planning_result(session, project_id, result_id) is None:
+        raise HTTPException(status_code=404, detail="Planning result not found.")
+    result = restore_planning_result(
+        session,
+        project=project,
+        result_id=result_id,
+    )
+    if result is None:
+        raise HTTPException(
+            status_code=409,
+            detail="This planning result has no restorable brief snapshot.",
+        )
+    planning_brief = serialize_project_planning_brief(project)
+    return {
+        "planningBrief": planning_brief,
+        "result": result,
+    }
+
+
+@app.get("/projects/{project_id}/planning-results/{result_id}/planning-brief")
+def projects_planning_result_brief(
+    project_id: str,
+    result_id: str,
+    session: Session = Depends(get_db_session),
+) -> dict:
+    if get_project(session, project_id) is None:
+        raise HTTPException(status_code=404, detail="Project not found.")
+    if get_planning_result(session, project_id, result_id) is None:
+        raise HTTPException(status_code=404, detail="Planning result not found.")
+    brief = get_planning_result_brief(session, project_id, result_id)
+    if brief is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Planning brief snapshot not found.",
+        )
+    return brief

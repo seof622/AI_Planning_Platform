@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { getSelectedNode, usePlanningStore } from "../store/planningStore";
 import { NodeDetailPanel } from "./NodeDetailPanel";
 import { PlanningCanvas } from "./PlanningCanvas";
+import { PlanningHistoryPanel } from "./PlanningHistoryPanel";
 import { ProjectPanel } from "./ProjectPanel";
 import { RequirementPanel } from "./RequirementPanel";
 import { RoadmapPanel } from "./RoadmapPanel";
@@ -21,23 +22,30 @@ export function PlanningWorkspace() {
     createAndSelectProject,
     errorMessage,
     generateResult,
+    historyErrorMessage,
+    historyStatus,
+    isViewingHistoricalResult,
     loadModels,
     loadProjects,
     modelErrorMessage,
     models,
     modelStatus,
     planningBrief,
+    planningHistory,
     planningResult,
     projectErrorMessage,
     projects,
     projectStatus,
     requirementText,
     resetToEmpty,
+    restoreSelectedPlanningResult,
     saveCurrentPlanningBrief,
     selectedNodeId,
     selectedModel,
+    selectedPlanningResultId,
     selectedProjectId,
     selectNode,
+    selectPlanningResult,
     selectProject,
     setErrorState,
     setPlanningBriefField,
@@ -56,7 +64,11 @@ export function PlanningWorkspace() {
   }, [loadModels, loadProjects]);
 
   useEffect(() => {
-    if (!selectedProjectId || projectStatus !== "ready") {
+    if (
+      !selectedProjectId ||
+      projectStatus !== "ready" ||
+      isViewingHistoricalResult
+    ) {
       return;
     }
     const timeoutId = window.setTimeout(() => {
@@ -65,6 +77,7 @@ export function PlanningWorkspace() {
     return () => window.clearTimeout(timeoutId);
   }, [
     planningBrief,
+    isViewingHistoricalResult,
     projectStatus,
     requirementText,
     saveCurrentPlanningBrief,
@@ -83,6 +96,14 @@ export function PlanningWorkspace() {
             onSelect={selectProject}
             projects={projects}
             selectedProjectId={selectedProjectId}
+          />
+          <PlanningHistoryPanel
+            errorMessage={historyErrorMessage}
+            history={planningHistory}
+            isLoading={historyStatus === "loading" || status === "loading"}
+            onRestore={restoreSelectedPlanningResult}
+            onSelect={selectPlanningResult}
+            selectedResultId={selectedPlanningResultId}
           />
           <RequirementPanel
             generatedModel={planningResult?.metadata.model}

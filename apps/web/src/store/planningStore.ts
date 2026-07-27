@@ -7,6 +7,7 @@ import type {
   PlanningActionItem,
   PlanningRequest,
   PlanningResult,
+  PlanningResultHistoryItem,
   Project,
   ProjectPlanningBrief,
   SuccessCriterion,
@@ -16,9 +17,13 @@ import {
   generatePlanningResult,
   getLatestPlanningResult,
   getPlanningModels,
+  getPlanningResult,
+  getPlanningResultBrief,
   getProjectPlanningBrief,
+  listPlanningResults,
   listProjects,
   saveProjectPlanningBrief,
+  restorePlanningResult,
 } from "../lib/planningClient";
 
 export type PlanningStatus = "idle" | "ready" | "loading" | "error" | "empty";
@@ -104,6 +109,10 @@ function toDraft(
 
 interface PlanningState {
   errorMessage: string | null;
+  historyErrorMessage: string | null;
+  historyStatus: "idle" | "loading" | "ready" | "error";
+  isViewingHistoricalResult: boolean;
+  planningHistory: PlanningResultHistoryItem[];
   planningBrief: PlanningBriefDraft;
   planningResult: PlanningResult | null;
   modelErrorMessage: string | null;
@@ -114,6 +123,7 @@ interface PlanningState {
   projectStatus: "idle" | "loading" | "ready" | "error";
   requirementText: string;
   selectedModel: string;
+  selectedPlanningResultId: string | null;
   selectedProjectId: string | null;
   selectedNodeId: string | null;
   status: PlanningStatus;
@@ -121,9 +131,12 @@ interface PlanningState {
   generateResult: () => Promise<void>;
   loadProjects: () => Promise<void>;
   loadModels: () => Promise<void>;
+  loadPlanningHistory: (projectId: string) => Promise<void>;
   resetToEmpty: () => void;
+  restoreSelectedPlanningResult: () => Promise<void>;
   saveCurrentPlanningBrief: () => Promise<void>;
   selectProject: (projectId: string) => Promise<void>;
+  selectPlanningResult: (resultId: string) => Promise<void>;
   selectNode: (nodeId: string | null) => void;
   setErrorState: (message: string) => void;
   setPlanningBriefField: <K extends keyof PlanningBriefDraft>(
@@ -136,6 +149,10 @@ interface PlanningState {
 
 export const usePlanningStore = create<PlanningState>((set, get) => ({
   errorMessage: null,
+  historyErrorMessage: null,
+  historyStatus: "idle",
+  isViewingHistoricalResult: false,
+  planningHistory: [],
   planningBrief: initialPlanningBrief,
   planningResult: null,
   modelErrorMessage: null,
@@ -146,6 +163,7 @@ export const usePlanningStore = create<PlanningState>((set, get) => ({
   projectStatus: "idle",
   requirementText: "",
   selectedModel: "",
+  selectedPlanningResultId: null,
   selectedProjectId: null,
   selectedNodeId: null,
   status: "idle",
@@ -178,7 +196,11 @@ export const usePlanningStore = create<PlanningState>((set, get) => ({
       return;
     }
 
-    set({ errorMessage: null, status: "loading" });
+    set({
+      errorMessage: null,
+      isViewingHistoricalResult: false,
+      status: "loading",
+    });
 
     try {
       const currentRequirement = get().requirementText.trim();
@@ -219,6 +241,7 @@ export const usePlanningStore = create<PlanningState>((set, get) => ({
         selectedNodeId: null,
         status: result.nodes.length > 0 ? "ready" : "empty",
       });
+      await get().loadPlanningHistory(selectedProjectId);
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "계획 결과를 불러올 수 없습니다.";
@@ -284,19 +307,88 @@ export const usePlanningStore = create<PlanningState>((set, get) => ({
       });
     }
   },
+  async loadPlanningHistory(projectId) {
+    set({ historyErrorMessage: null, historyStatus: "loading" });
+    try {
+      const history = await listPlanningResults(projectId);
+      set({
+        historyStatus: "ready",
+        planningHistory: history,
+        selectedPlanningResultId: history[0]?.id ?? null,
+      });
+    } catch (error) {
+      set({
+        historyErrorMessage:
+          error instanceof Error
+            ? error.message
+            : "계획 생성 이력을 불러오지 못했습니다.",
+        historyStatus: "error",
+        planningHistory: [],
+        selectedPlanningResultId: null,
+      });
+    }
+  },
   resetToEmpty() {
     set({
       errorMessage: null,
+      isViewingHistoricalResult: false,
       planningBrief: initialPlanningBrief,
+      planningHistory: [],
       planningResult: null,
       requirementText: "",
       selectedNodeId: null,
+      selectedPlanningResultId: null,
       status: "empty",
     });
   },
+  async restoreSelectedPlanningResult() {
+    const state = get();
+    if (!state.selectedProjectId || !state.selectedPlanningResultId) {
+      return;
+    }
+    set({
+      errorMessage: null,
+      isViewingHistoricalResult: false,
+      status: "loading",
+    });
+    try {
+      const restored = await restorePlanningResult(
+        state.selectedProjectId,
+        state.selectedPlanningResultId,
+      );
+      set({
+        isViewingHistoricalResult: false,
+        planningBrief: toDraft(restored.planningBrief),
+        planningResult: restored.result,
+        requirementText: restored.planningBrief.requirement,
+        selectedModel:
+          restored.planningBrief.selectedModel &&
+          get().models.some(
+            (model) => model.id === restored.planningBrief.selectedModel,
+          )
+            ? restored.planningBrief.selectedModel
+            : get().selectedModel,
+        selectedNodeId: null,
+        status: restored.result.nodes.length > 0 ? "ready" : "empty",
+      });
+      await get().loadPlanningHistory(state.selectedProjectId);
+    } catch (error) {
+      set({
+        errorMessage:
+          error instanceof Error
+            ? error.message
+            : "선택한 계획 버전을 복원하지 못했습니다.",
+        status: "error",
+      });
+    }
+  },
   async saveCurrentPlanningBrief() {
     const state = get();
-    if (!state.selectedProjectId || state.projectStatus !== "ready") {
+    if (
+      !state.selectedProjectId ||
+      state.projectStatus !== "ready" ||
+      state.isViewingHistoricalResult
+    ) {
       return;
     }
     try {
@@ -323,18 +415,24 @@ export const usePlanningStore = create<PlanningState>((set, get) => ({
     }
     set({
       errorMessage: null,
+      historyErrorMessage: null,
+      historyStatus: "loading",
+      isViewingHistoricalResult: false,
+      planningHistory: [],
       planningResult: null,
       projectErrorMessage: null,
       projectStatus: "loading",
       requirementText: "",
       selectedNodeId: null,
+      selectedPlanningResultId: null,
       selectedProjectId: projectId,
       status: "loading",
     });
     try {
-      const [result, persistedBrief] = await Promise.all([
+      const [result, persistedBrief, history] = await Promise.all([
         getLatestPlanningResult(projectId),
         getProjectPlanningBrief(projectId),
+        listPlanningResults(projectId),
       ]);
       const resultModel = result?.metadata.model;
       const persistedModel = persistedBrief?.selectedModel;
@@ -346,11 +444,14 @@ export const usePlanningStore = create<PlanningState>((set, get) => ({
             : get().selectedModel;
       set({
         planningBrief: toDraft(persistedBrief),
+        planningHistory: history,
         planningResult: result,
+        historyStatus: "ready",
         projectStatus: "ready",
         requirementText:
           persistedBrief?.requirement ?? result?.requirement?.content ?? "",
         selectedModel: restorableModel,
+        selectedPlanningResultId: history[0]?.id ?? null,
         status: result && result.nodes.length > 0 ? "ready" : "empty",
       });
     } catch (error) {
@@ -361,6 +462,46 @@ export const usePlanningStore = create<PlanningState>((set, get) => ({
             : "프로젝트를 불러오지 못했습니다.",
         projectStatus: "error",
         status: "empty",
+      });
+    }
+  },
+  async selectPlanningResult(resultId) {
+    const projectId = get().selectedProjectId;
+    if (!projectId || !resultId) {
+      return;
+    }
+    set({ errorMessage: null, selectedNodeId: null, status: "loading" });
+    try {
+      const [result, historicalBrief] = await Promise.all([
+        getPlanningResult(projectId, resultId),
+        getPlanningResultBrief(projectId, resultId),
+      ]);
+      const isHistorical = resultId !== get().planningHistory[0]?.id;
+      const historicalModel =
+        historicalBrief?.selectedModel ?? result.metadata.model;
+      set({
+        isViewingHistoricalResult: isHistorical,
+        planningBrief: historicalBrief
+          ? toDraft(historicalBrief)
+          : initialPlanningBrief,
+        planningResult: result,
+        requirementText:
+          historicalBrief?.requirement ?? result.requirement?.content ?? "",
+        selectedModel:
+          historicalModel &&
+          get().models.some((model) => model.id === historicalModel)
+            ? historicalModel
+            : get().selectedModel,
+        selectedPlanningResultId: resultId,
+        status: result.nodes.length > 0 ? "ready" : "empty",
+      });
+    } catch (error) {
+      set({
+        errorMessage:
+          error instanceof Error
+            ? error.message
+            : "선택한 계획 결과를 불러오지 못했습니다.",
+        status: "error",
       });
     }
   },
@@ -377,14 +518,15 @@ export const usePlanningStore = create<PlanningState>((set, get) => ({
   },
   setPlanningBriefField(field, value) {
     set((state) => ({
+      isViewingHistoricalResult: false,
       planningBrief: { ...state.planningBrief, [field]: value },
     }));
   },
   setRequirementText(value) {
-    set({ requirementText: value });
+    set({ isViewingHistoricalResult: false, requirementText: value });
   },
   setSelectedModel(value) {
-    set({ selectedModel: value });
+    set({ isViewingHistoricalResult: false, selectedModel: value });
   },
 }));
 

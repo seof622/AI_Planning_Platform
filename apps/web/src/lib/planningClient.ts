@@ -2,6 +2,8 @@ import type {
   AIModelCatalog,
   PlanningRequest,
   PlanningResult,
+  PlanningResultHistoryItem,
+  PlanningResultRestoreResponse,
   Project,
   ProjectPlanningBrief,
 } from "@ai-planning-platform/shared";
@@ -142,4 +144,53 @@ export function saveProjectPlanningBrief(
       method: "PUT",
     },
   );
+}
+
+export function listPlanningResults(
+  projectId: string,
+): Promise<PlanningResultHistoryItem[]> {
+  return requestJson<PlanningResultHistoryItem[]>(
+    `/projects/${encodeURIComponent(projectId)}/planning-results`,
+  );
+}
+
+export function getPlanningResult(
+  projectId: string,
+  resultId: string,
+): Promise<PlanningResult> {
+  return requestJson<PlanningResult>(
+    `/projects/${encodeURIComponent(projectId)}/planning-results/${encodeURIComponent(resultId)}`,
+  );
+}
+
+export function restorePlanningResult(
+  projectId: string,
+  resultId: string,
+): Promise<PlanningResultRestoreResponse> {
+  return requestJson<PlanningResultRestoreResponse>(
+    `/projects/${encodeURIComponent(projectId)}/planning-results/${encodeURIComponent(resultId)}/restore`,
+    { method: "POST" },
+  );
+}
+
+export async function getPlanningResultBrief(
+  projectId: string,
+  resultId: string,
+): Promise<ProjectPlanningBrief | null> {
+  const path =
+    `/projects/${encodeURIComponent(projectId)}/planning-results/` +
+    `${encodeURIComponent(resultId)}/planning-brief`;
+  const response = await fetch(`${API_BASE_URL}${path}`).catch(() => {
+    throw new Error("API 서버에 연결할 수 없습니다. FastAPI 서버가 실행 중인지 확인해 주세요.");
+  });
+  if (response.status === 404) {
+    return null;
+  }
+  if (!response.ok) {
+    const errorBody = (await response.json().catch(() => null)) as {
+      detail?: string;
+    } | null;
+    throw new Error(errorBody?.detail ?? "계획 입력 스냅샷을 불러오지 못했습니다.");
+  }
+  return (await response.json()) as ProjectPlanningBrief;
 }

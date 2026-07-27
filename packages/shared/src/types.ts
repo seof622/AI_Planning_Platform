@@ -152,6 +152,21 @@ export interface PlanningResult {
   metadata: PlanningResultMetadata;
 }
 
+export interface PlanningResultHistoryItem {
+  canRestore: boolean;
+  id: string;
+  createdAt: ISODateString;
+  model?: string;
+  restoredFromResultId?: string | null;
+  workflowVersion?: string;
+  summary: string;
+}
+
+export interface PlanningResultRestoreResponse {
+  planningBrief: ProjectPlanningBrief;
+  result: PlanningResult;
+}
+
 export function isPlanningResultGraphConsistent(result: PlanningResult): boolean {
   const nodeIds = new Set(result.nodes.map((node) => node.id));
 

@@ -82,7 +82,13 @@ class PlanningResultModel(Base):
     result: Mapped[dict[str, Any]] = mapped_column(
         JSON().with_variant(JSONB, "postgresql")
     )
+    planning_brief: Mapped[dict[str, Any] | None] = mapped_column(
+        JSON().with_variant(JSONB, "postgresql"), nullable=True
+    )
     model: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    restored_from_result_id: Mapped[str | None] = mapped_column(
+        String(64), nullable=True
+    )
     workflow_version: Mapped[str | None] = mapped_column(
         String(100), nullable=True
     )

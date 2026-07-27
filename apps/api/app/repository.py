@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from copy import deepcopy
 from typing import Any
 
 from sqlalchemy import select
@@ -88,6 +89,7 @@ def save_planning_result(
     planning_brief: dict[str, Any] | None,
     selected_model: str | None,
     result: dict[str, Any],
+    restored_from_result_id: str | None = None,
 ) -> dict[str, Any]:
     now = utc_now()
     requirement = RequirementModel(
@@ -115,10 +117,14 @@ def save_planning_result(
         "createdAt": to_iso(now),
         "updatedAt": to_iso(now),
     }
+    result_metadata = deepcopy(result.get("metadata") or {})
+    if restored_from_result_id:
+        result_metadata["restoredFromResultId"] = restored_from_result_id
     persisted_result = {
         **result,
         "project": project_record,
         "requirement": requirement_record,
+        "metadata": result_metadata,
     }
     metadata = persisted_result.get("metadata") or {}
     stored_result = PlanningResultModel(
@@ -126,7 +132,9 @@ def save_planning_result(
         project_id=project.id,
         requirement_id=requirement.id,
         result=persisted_result,
+        planning_brief=planning_brief,
         model=metadata.get("model"),
+        restored_from_result_id=restored_from_result_id,
         workflow_version=metadata.get("workflowVersion"),
         created_at=now,
     )
@@ -146,3 +154,83 @@ def get_latest_planning_result(
     )
     stored_result = session.scalar(statement)
     return stored_result.result if stored_result else None
+
+
+def list_planning_results(
+    session: Session, project_id: str
+) -> list[dict[str, Any]]:
+    statement = (
+        select(PlanningResultModel)
+        .where(PlanningResultModel.project_id == project_id)
+        .order_by(PlanningResultModel.created_at.desc())
+    )
+    return [
+        {
+            "id": stored.id,
+            "createdAt": to_iso(stored.created_at),
+            "model": stored.model,
+            "workflowVersion": stored.workflow_version,
+            "summary": stored.result.get("summary", ""),
+            "canRestore": stored.planning_brief is not None,
+            "restoredFromResultId": stored.restored_from_result_id,
+        }
+        for stored in session.scalars(statement)
+    ]
+
+
+def get_planning_result(
+    session: Session, project_id: str, result_id: str
+) -> dict[str, Any] | None:
+    statement = select(PlanningResultModel).where(
+        PlanningResultModel.id == result_id,
+        PlanningResultModel.project_id == project_id,
+    )
+    stored_result = session.scalar(statement)
+    return stored_result.result if stored_result else None
+
+
+def get_planning_result_brief(
+    session: Session, project_id: str, result_id: str
+) -> dict[str, Any] | None:
+    statement = select(PlanningResultModel).where(
+        PlanningResultModel.id == result_id,
+        PlanningResultModel.project_id == project_id,
+    )
+    stored_result = session.scalar(statement)
+    if stored_result is None or stored_result.planning_brief is None:
+        return None
+    requirement = session.get(RequirementModel, stored_result.requirement_id)
+    if requirement is None:
+        return None
+    return {
+        "requirement": requirement.content,
+        "brief": stored_result.planning_brief,
+        "selectedModel": stored_result.model,
+    }
+
+
+def restore_planning_result(
+    session: Session,
+    *,
+    project: ProjectModel,
+    result_id: str,
+) -> dict[str, Any] | None:
+    statement = select(PlanningResultModel).where(
+        PlanningResultModel.id == result_id,
+        PlanningResultModel.project_id == project.id,
+    )
+    source = session.scalar(statement)
+    if source is None or source.planning_brief is None:
+        return None
+    requirement = session.get(RequirementModel, source.requirement_id)
+    if requirement is None:
+        return None
+    return save_planning_result(
+        session,
+        project=project,
+        requirement_content=requirement.content,
+        planning_brief=deepcopy(source.planning_brief),
+        selected_model=source.model,
+        result=deepcopy(source.result),
+        restored_from_result_id=source.id,
+    )

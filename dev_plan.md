@@ -292,3 +292,24 @@ Docker는 FastAPI 기본 서버가 만들어진 직후, PostgreSQL persistence�
 - 계획 생성 시에도 동일한 Brief와 실제 선택 모델을 프로젝트에 확정 저장한다.
 - Web test 6개, Shared/Web typecheck, Web production build, API test 13개 통과.
 - 실제 PostgreSQL에 `20260727_0002` migration 적용 및 API healthcheck 통과.
+
+## 진행 메모 2026-07-27 - 계획 생성 이력 조회 및 복원
+
+- 프로젝트별 계획 결과 목록과 ID 기반 상세 조회 API를 추가했다.
+- 이력에는 생성 시각, 사용 모델, workflow 버전, 결과 요약을 제공한다.
+- Web 사이드바에 최신순 생성 이력 선택 UI를 추가하고 과거 결과의 graph와
+  roadmap을 현재 Planning Brief 변경 없이 열람하도록 연결했다.
+- 새 계획 생성 후 이력 목록과 최신 선택 상태를 자동 갱신한다.
+- 각 생성 결과에 당시 Planning Brief 스냅샷을 저장한다.
+- 과거 결과 복원 시 원본을 덮어쓰지 않고 새 최신 버전을 생성하며
+  `restoredFromResultId`로 출처를 기록한다.
+- 복원된 결과와 함께 당시 계획 주제, Brief, 실제 사용 모델을 현재 Draft로
+  복원한다.
+- 이력 선택 시 해당 결과의 Brief 스냅샷도 함께 표시해 최신 제약조건 등이
+  과거 버전에 남아 보이지 않도록 한다.
+- 과거 버전 단순 열람 중에는 Brief 자동 저장을 차단하고, 사용자가 입력을
+  편집하기 시작한 경우에만 현재 Draft로 전환한다.
+- 스냅샷 도입 전에 생성된 결과는 열람만 허용하고 복원 버튼을 비활성화한다.
+- Web test 9개, Shared/Web typecheck, lint, Web production build,
+  API test 13개 통과.
+- 실제 PostgreSQL 데이터로 이력 목록 및 상세 조회 smoke test를 통과했다.

@@ -15,6 +15,8 @@ export type {
   PlanningActionItem,
   PlanningRequest,
   PlanningResult,
+  PlanningResultHistoryItem,
+  PlanningResultRestoreResponse,
   PlanningResultMetadata,
   Priority,
   Project,
