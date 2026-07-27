@@ -39,6 +39,7 @@ GENERATED_RESULT = {
     "metadata": {
         "generatedAt": "2026-07-24T00:00:00Z",
         "model": "test-model",
+        "promptVersion": "test-prompt",
         "workflowVersion": "test-workflow",
     },
 }
@@ -142,6 +143,7 @@ def test_project_planning_result_round_trip(monkeypatch) -> None:
         assert len(history) == 1
         assert history[0]["summary"] == generated["summary"]
         assert history[0]["model"] == "test-model"
+        assert history[0]["promptVersion"] == "test-prompt"
         assert history[0]["canRestore"] is True
 
         detail_response = client.get(

@@ -139,6 +139,7 @@ export interface AIModelCatalog {
 export interface PlanningResultMetadata extends Metadata {
   generatedAt: ISODateString;
   model?: string;
+  promptVersion?: string;
   workflowVersion?: string;
 }
 
@@ -157,6 +158,7 @@ export interface PlanningResultHistoryItem {
   id: string;
   createdAt: ISODateString;
   model?: string;
+  promptVersion?: string;
   restoredFromResultId?: string | null;
   workflowVersion?: string;
   summary: string;

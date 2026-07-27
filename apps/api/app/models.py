@@ -86,6 +86,9 @@ class PlanningResultModel(Base):
         JSON().with_variant(JSONB, "postgresql"), nullable=True
     )
     model: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    prompt_version: Mapped[str | None] = mapped_column(
+        String(100), nullable=True
+    )
     restored_from_result_id: Mapped[str | None] = mapped_column(
         String(64), nullable=True
     )

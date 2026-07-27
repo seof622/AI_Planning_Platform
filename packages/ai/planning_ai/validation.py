@@ -14,6 +14,7 @@ def normalize_planning_result(
     generated: GeneratedPlanningResult,
     *,
     model: str,
+    prompt_version: str,
     include_roadmap: bool,
 ) -> dict[str, Any]:
     node_ids = [node.id.strip() for node in generated.nodes]
@@ -84,6 +85,7 @@ def normalize_planning_result(
         "metadata": {
             "generatedAt": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
             "model": model,
+            "promptVersion": prompt_version,
             "workflowVersion": "langgraph-openai-v1",
         },
     }

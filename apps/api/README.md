@@ -101,6 +101,9 @@ When a history item is selected, the Web loads both its result and its brief
 snapshot. Historical browsing never autosaves that snapshot over the current
 project draft; editing a historical brief starts a new current draft.
 
+Generated metadata includes `promptVersion` in addition to model and workflow
+version. The current prompt identifier is `planning-prompt-v1`.
+
 Seed one project with the canonical mock planning result:
 
 ```bash

@@ -2,6 +2,8 @@ import json
 from typing import Any
 
 
+PROMPT_VERSION = "planning-prompt-v1"
+
 SYSTEM_PROMPT = """
 You are the planning engine for a visual planning application.
 Convert the user's request into a concise component graph and an executable roadmap.

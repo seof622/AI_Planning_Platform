@@ -71,6 +71,7 @@ def test_workflow_returns_contract_shaped_result() -> None:
 
     assert "API 계획을 생성해 주세요." in provider.last_prompt
     assert result["metadata"]["model"] == "fake-model"
+    assert result["metadata"]["promptVersion"] == "planning-prompt-v1"
     assert result["metadata"]["workflowVersion"] == "langgraph-openai-v1"
     assert result["nodes"][0]["position"] == {"x": 0, "y": 80}
     assert result["edges"][0]["target"] == "node-api"

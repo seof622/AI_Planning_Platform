@@ -1,0 +1,143 @@
+[
+  {
+    "id": "project-shopping-mvp",
+    "title": "4주 쇼핑몰 MVP",
+    "request": {
+      "requirement": "4주 안에 소규모 쇼핑몰 MVP를 출시하는 계획을 만들어줘.",
+      "brief": {
+        "actionItems": [
+          { "title": "상품 등록과 주문 기능 구현", "necessity": "required" },
+          { "title": "결제 연동", "necessity": "required" },
+          { "title": "관리자 통계", "necessity": "optional" }
+        ],
+        "context": ["개발자 2명", "신규 서비스"],
+        "planType": "project",
+        "successCriterion": "speed",
+        "constraints": "개발 기간 4주, 핵심 구매 흐름을 우선한다."
+      }
+    },
+    "expectations": {
+      "requiredTerms": ["상품", "주문", "결제"],
+      "forbiddenTerms": [],
+      "minimumNodeCount": 4,
+      "minimumRoadmapStepCount": 3
+    }
+  },
+  {
+    "id": "travel-family-jeju",
+    "title": "부모님과 제주 가족여행",
+    "request": {
+      "requirement": "부모님과 제주도 3박 4일 여행을 계획해줘.",
+      "brief": {
+        "actionItems": [
+          { "title": "숙소 예약", "necessity": "required" },
+          { "title": "관광지 선정", "necessity": "required" }
+        ],
+        "context": ["60대 부모님 두 분", "렌터카 이용"],
+        "planType": "event",
+        "successCriterion": "balance",
+        "constraints": "총예산 200만원, 하루 도보 이동 2시간 이하"
+      }
+    },
+    "expectations": {
+      "requiredTerms": ["숙소", "이동", "예산"],
+      "forbiddenTerms": ["장시간 등산"],
+      "minimumNodeCount": 4,
+      "minimumRoadmapStepCount": 3
+    }
+  },
+  {
+    "id": "learning-english-office-worker",
+    "title": "직장인 영어 학습",
+    "request": {
+      "requirement": "직장인을 위한 3개월 영어 회화 학습 계획을 만들어줘.",
+      "brief": {
+        "actionItems": [
+          { "title": "매일 회화 연습", "necessity": "required" },
+          { "title": "주간 복습", "necessity": "required" }
+        ],
+        "context": ["평일에는 출근", "초급 회화 수준"],
+        "planType": "learning",
+        "successCriterion": "consistency",
+        "constraints": "평일 하루 30분, 주말 하루 1시간"
+      }
+    },
+    "expectations": {
+      "requiredTerms": ["회화", "복습", "주간"],
+      "forbiddenTerms": [],
+      "minimumNodeCount": 4,
+      "minimumRoadmapStepCount": 3
+    }
+  },
+  {
+    "id": "daily-morning-routine",
+    "title": "아침 운동 루틴",
+    "request": {
+      "requirement": "꾸준히 유지할 수 있는 아침 운동 루틴을 계획해줘.",
+      "brief": {
+        "actionItems": [
+          { "title": "스트레칭", "necessity": "required" },
+          { "title": "유산소 운동", "necessity": "required" }
+        ],
+        "context": ["재택근무 직장인", "운동 초보"],
+        "planType": "daily",
+        "successCriterion": "consistency",
+        "constraints": "평일 오전 30분, 별도 운동기구 없음"
+      }
+    },
+    "expectations": {
+      "requiredTerms": ["스트레칭", "유산소", "30분"],
+      "forbiddenTerms": ["고강도 장시간"],
+      "minimumNodeCount": 4,
+      "minimumRoadmapStepCount": 3
+    }
+  },
+  {
+    "id": "decision-job-offers",
+    "title": "이직 제안 비교",
+    "request": {
+      "requirement": "두 회사의 이직 제안을 체계적으로 비교하고 결정하는 계획을 세워줘.",
+      "brief": {
+        "actionItems": [
+          { "title": "보상 비교", "necessity": "required" },
+          { "title": "성장 가능성 비교", "necessity": "required" },
+          { "title": "통근 조건 비교", "necessity": "required" }
+        ],
+        "context": ["현재 경력 5년", "두 회사에서 최종 제안 수령"],
+        "planType": "decision",
+        "successCriterion": "clarity",
+        "constraints": "일주일 안에 결정하고 장기 성장 가능성을 우선한다."
+      }
+    },
+    "expectations": {
+      "requiredTerms": ["보상", "성장", "통근"],
+      "forbiddenTerms": [],
+      "minimumNodeCount": 4,
+      "minimumRoadmapStepCount": 3
+    }
+  },
+  {
+    "id": "creative-youtube-channel",
+    "title": "유튜브 채널 시작",
+    "request": {
+      "requirement": "초보 개발자를 위한 유튜브 채널의 첫 한 달 콘텐츠 계획을 만들어줘.",
+      "brief": {
+        "actionItems": [
+          { "title": "콘텐츠 주제 선정", "necessity": "required" },
+          { "title": "촬영과 편집", "necessity": "required" },
+          { "title": "성과 분석", "necessity": "optional" }
+        ],
+        "context": ["1인 운영", "영상 제작 경험 없음"],
+        "planType": "creative",
+        "successCriterion": "quality",
+        "constraints": "주 1회 업로드, 주당 제작 시간 6시간 이하"
+      }
+    },
+    "expectations": {
+      "requiredTerms": ["주제", "촬영", "편집", "업로드"],
+      "forbiddenTerms": [],
+      "minimumNodeCount": 4,
+      "minimumRoadmapStepCount": 3
+    }
+  }
+]

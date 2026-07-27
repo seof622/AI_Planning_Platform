@@ -313,3 +313,15 @@ Docker는 FastAPI 기본 서버가 만들어진 직후, PostgreSQL persistence�
 - Web test 9개, Shared/Web typecheck, lint, Web production build,
   API test 13개 통과.
 - 실제 PostgreSQL 데이터로 이력 목록 및 상세 조회 smoke test를 통과했다.
+
+## 진행 메모 2026-07-27 - AI 품질 평가 기반과 Prompt 버전
+
+- AI system prompt에 `planning-prompt-v1` 식별자를 추가했다.
+- 생성 결과 metadata, PostgreSQL 결과 레코드, 생성 이력 UI에 Prompt 버전을
+  기록하고 표시한다.
+- 프로젝트, 여행, 학습, 일상, 의사결정, 창작 유형의 대표 입력 6개와
+  필수·금지 용어, 최소 graph·roadmap 조건을 정의했다.
+- API를 호출해 구조 일관성과 기대 조건을 검사하고 JSON/Markdown 보고서를
+  생성하는 `evaluate:planning` 스크립트를 추가했다.
+- OpenAI 호출 없이 데이터셋 형식만 검사하는 `evaluate:planning:check`
+  명령을 추가했다.

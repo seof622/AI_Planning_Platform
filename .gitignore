@@ -28,6 +28,8 @@ out/
 dist/
 build/
 coverage/
+tests/evaluation/reports/*
+!tests/evaluation/reports/.gitkeep
 *.tsbuildinfo
 
 # Python / backend

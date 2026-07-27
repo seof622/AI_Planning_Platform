@@ -50,9 +50,16 @@ export function PlanningHistoryPanel({
         <p>{isLoading ? "이력을 불러오는 중" : "아직 생성된 계획이 없습니다."}</p>
       )}
       {selectedResultId ? (
-        <p className="history-panel__summary">
-          {history.find((item) => item.id === selectedResultId)?.summary}
-        </p>
+        <>
+          <p className="history-panel__summary">
+            {history.find((item) => item.id === selectedResultId)?.summary}
+          </p>
+          <p>
+            Prompt:{" "}
+            {history.find((item) => item.id === selectedResultId)
+              ?.promptVersion ?? "기록 없음"}
+          </p>
+        </>
       ) : null}
       {selectedResultId && selectedResultId !== history[0]?.id ? (
         <button
