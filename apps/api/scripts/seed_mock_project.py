@@ -18,6 +18,8 @@ def main() -> None:
             session,
             project=project,
             requirement_content=requirement_data["content"],
+            planning_brief=None,
+            selected_model=fixture.get("metadata", {}).get("model"),
             result=fixture,
         )
         print(f"Seeded mock project: {project.id}")

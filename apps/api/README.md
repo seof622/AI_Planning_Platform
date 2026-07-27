@@ -79,6 +79,12 @@ Project endpoints:
 - `GET /projects/{project_id}`
 - `POST /projects/{project_id}/planning/generate`
 - `GET /projects/{project_id}/planning-results/latest`
+- `GET /projects/{project_id}/planning-brief`
+- `PUT /projects/{project_id}/planning-brief`
+
+The Web automatically saves the current requirement, planning brief fields, and
+selected model to the project planning-brief endpoint. Selecting the project
+again restores this draft independently from the latest generated result.
 
 Seed one project with the canonical mock planning result:
 

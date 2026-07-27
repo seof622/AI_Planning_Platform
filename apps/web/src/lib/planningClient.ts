@@ -3,6 +3,7 @@ import type {
   PlanningRequest,
   PlanningResult,
   Project,
+  ProjectPlanningBrief,
 } from "@ai-planning-platform/shared";
 
 const API_BASE_URL =
@@ -107,4 +108,38 @@ export async function getLatestPlanningResult(
   }
 
   return (await response.json()) as PlanningResult;
+}
+
+export async function getProjectPlanningBrief(
+  projectId: string,
+): Promise<ProjectPlanningBrief | null> {
+  const path = `/projects/${encodeURIComponent(projectId)}/planning-brief`;
+  const response = await fetch(`${API_BASE_URL}${path}`).catch(() => {
+    throw new Error("API 서버에 연결할 수 없습니다. FastAPI 서버가 실행 중인지 확인해 주세요.");
+  });
+
+  if (response.status === 404) {
+    return null;
+  }
+  if (!response.ok) {
+    const errorBody = (await response.json().catch(() => null)) as {
+      detail?: string;
+    } | null;
+    throw new Error(errorBody?.detail ?? "저장된 계획 입력을 불러오지 못했습니다.");
+  }
+  return (await response.json()) as ProjectPlanningBrief;
+}
+
+export function saveProjectPlanningBrief(
+  projectId: string,
+  planningBrief: ProjectPlanningBrief,
+): Promise<ProjectPlanningBrief> {
+  return requestJson<ProjectPlanningBrief>(
+    `/projects/${encodeURIComponent(projectId)}/planning-brief`,
+    {
+      body: JSON.stringify(planningBrief),
+      headers: { "Content-Type": "application/json" },
+      method: "PUT",
+    },
+  );
 }

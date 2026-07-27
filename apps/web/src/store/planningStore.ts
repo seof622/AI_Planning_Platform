@@ -8,6 +8,7 @@ import type {
   PlanningRequest,
   PlanningResult,
   Project,
+  ProjectPlanningBrief,
   SuccessCriterion,
 } from "@ai-planning-platform/shared";
 import {
@@ -15,7 +16,9 @@ import {
   generatePlanningResult,
   getLatestPlanningResult,
   getPlanningModels,
+  getProjectPlanningBrief,
   listProjects,
+  saveProjectPlanningBrief,
 } from "../lib/planningClient";
 
 export type PlanningStatus = "idle" | "ready" | "loading" | "error" | "empty";
@@ -56,6 +59,49 @@ function trimActionItems(values: PlanningActionItemDraft[]): PlanningActionItem[
     .filter((item) => item.title.length > 0);
 }
 
+function toPersistedBrief(
+  requirement: string,
+  planningBrief: PlanningBriefDraft,
+  selectedModel: string,
+): ProjectPlanningBrief {
+  return {
+    requirement,
+    brief: {
+      actionItems: planningBrief.actionItems.map((item) => ({
+        necessity: item.necessity,
+        title: item.text,
+      })),
+      constraints: planningBrief.constraints || undefined,
+      context: planningBrief.context,
+      planType: planningBrief.planType,
+      successCriterion: planningBrief.successCriterion,
+    },
+    selectedModel: selectedModel || null,
+  };
+}
+
+function toDraft(
+  persisted: ProjectPlanningBrief | null,
+): PlanningBriefDraft {
+  if (!persisted) {
+    return initialPlanningBrief;
+  }
+  return {
+    actionItems:
+      persisted.brief.actionItems.length > 0
+        ? persisted.brief.actionItems.map((item) => ({
+            necessity: item.necessity,
+            text: item.title,
+          }))
+        : [{ necessity: "required", text: "" }],
+    constraints: persisted.brief.constraints ?? "",
+    context:
+      persisted.brief.context.length > 0 ? persisted.brief.context : [""],
+    planType: persisted.brief.planType,
+    successCriterion: persisted.brief.successCriterion,
+  };
+}
+
 interface PlanningState {
   errorMessage: string | null;
   planningBrief: PlanningBriefDraft;
@@ -76,6 +122,7 @@ interface PlanningState {
   loadProjects: () => Promise<void>;
   loadModels: () => Promise<void>;
   resetToEmpty: () => void;
+  saveCurrentPlanningBrief: () => Promise<void>;
   selectProject: (projectId: string) => Promise<void>;
   selectNode: (nodeId: string | null) => void;
   setErrorState: (message: string) => void;
@@ -247,6 +294,29 @@ export const usePlanningStore = create<PlanningState>((set, get) => ({
       status: "empty",
     });
   },
+  async saveCurrentPlanningBrief() {
+    const state = get();
+    if (!state.selectedProjectId || state.projectStatus !== "ready") {
+      return;
+    }
+    try {
+      await saveProjectPlanningBrief(
+        state.selectedProjectId,
+        toPersistedBrief(
+          state.requirementText,
+          state.planningBrief,
+          state.selectedModel,
+        ),
+      );
+    } catch (error) {
+      set({
+        projectErrorMessage:
+          error instanceof Error
+            ? error.message
+            : "계획 입력을 저장하지 못했습니다.",
+      });
+    }
+  },
   async selectProject(projectId) {
     if (!projectId) {
       return;
@@ -262,16 +332,25 @@ export const usePlanningStore = create<PlanningState>((set, get) => ({
       status: "loading",
     });
     try {
-      const result = await getLatestPlanningResult(projectId);
+      const [result, persistedBrief] = await Promise.all([
+        getLatestPlanningResult(projectId),
+        getProjectPlanningBrief(projectId),
+      ]);
       const resultModel = result?.metadata.model;
+      const persistedModel = persistedBrief?.selectedModel;
+      const restorableModel =
+        persistedModel && get().models.some((model) => model.id === persistedModel)
+          ? persistedModel
+          : resultModel && get().models.some((model) => model.id === resultModel)
+            ? resultModel
+            : get().selectedModel;
       set({
+        planningBrief: toDraft(persistedBrief),
         planningResult: result,
         projectStatus: "ready",
-        requirementText: result?.requirement?.content ?? "",
-        selectedModel:
-          resultModel && get().models.some((model) => model.id === resultModel)
-            ? resultModel
-            : get().selectedModel,
+        requirementText:
+          persistedBrief?.requirement ?? result?.requirement?.content ?? "",
+        selectedModel: restorableModel,
         status: result && result.nodes.length > 0 ? "ready" : "empty",
       });
     } catch (error) {

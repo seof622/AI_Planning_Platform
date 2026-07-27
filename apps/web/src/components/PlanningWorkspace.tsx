@@ -33,6 +33,7 @@ export function PlanningWorkspace() {
     projectStatus,
     requirementText,
     resetToEmpty,
+    saveCurrentPlanningBrief,
     selectedNodeId,
     selectedModel,
     selectedProjectId,
@@ -48,9 +49,28 @@ export function PlanningWorkspace() {
   const selectedNode = getSelectedNode(planningResult, selectedNodeId);
 
   useEffect(() => {
-    void loadModels();
-    void loadProjects();
+    void (async () => {
+      await loadModels();
+      await loadProjects();
+    })();
   }, [loadModels, loadProjects]);
+
+  useEffect(() => {
+    if (!selectedProjectId || projectStatus !== "ready") {
+      return;
+    }
+    const timeoutId = window.setTimeout(() => {
+      void saveCurrentPlanningBrief();
+    }, 600);
+    return () => window.clearTimeout(timeoutId);
+  }, [
+    planningBrief,
+    projectStatus,
+    requirementText,
+    saveCurrentPlanningBrief,
+    selectedModel,
+    selectedProjectId,
+  ]);
 
   return (
     <main className="workspace">

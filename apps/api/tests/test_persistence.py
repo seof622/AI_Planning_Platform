@@ -87,9 +87,39 @@ def test_project_planning_result_round_trip(monkeypatch) -> None:
         project = create_response.json()
         assert project["status"] == "draft"
 
+        brief_payload = {
+            "requirement": "저장 가능한 계획을 생성해 주세요.",
+            "brief": {
+                "actionItems": [
+                    {"title": "DB 저장 검증", "necessity": "required"}
+                ],
+                "context": ["FastAPI 프로젝트"],
+                "planType": "project",
+                "successCriterion": "quality",
+                "constraints": "SQLite 테스트에서 검증",
+            },
+            "selectedModel": "gpt-5-mini",
+        }
+        save_brief_response = client.put(
+            f"/projects/{project['id']}/planning-brief",
+            json=brief_payload,
+        )
+        assert save_brief_response.status_code == 200
+        assert save_brief_response.json() == brief_payload
+
+        get_brief_response = client.get(
+            f"/projects/{project['id']}/planning-brief"
+        )
+        assert get_brief_response.status_code == 200
+        assert get_brief_response.json() == brief_payload
+
         generate_response = client.post(
             f"/projects/{project['id']}/planning/generate",
-            json={"requirement": "저장 가능한 계획을 생성해 주세요."},
+            json={
+                "requirement": brief_payload["requirement"],
+                "brief": brief_payload["brief"],
+                "options": {"model": brief_payload["selectedModel"]},
+            },
         )
         assert generate_response.status_code == 200
         generated = generate_response.json()
@@ -103,6 +133,11 @@ def test_project_planning_result_round_trip(monkeypatch) -> None:
         )
         assert latest_response.status_code == 200
         assert latest_response.json() == generated
+
+        restored_brief_response = client.get(
+            f"/projects/{project['id']}/planning-brief"
+        )
+        assert restored_brief_response.json() == brief_payload
 
         list_response = client.get("/projects")
         assert list_response.status_code == 200

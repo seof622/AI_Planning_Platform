@@ -53,11 +53,40 @@ def get_project(session: Session, project_id: str) -> ProjectModel | None:
     return session.get(ProjectModel, project_id)
 
 
+def serialize_project_planning_brief(project: ProjectModel) -> dict[str, Any] | None:
+    if project.planning_brief is None:
+        return None
+    return {
+        "requirement": project.requirement_draft,
+        "brief": project.planning_brief,
+        "selectedModel": project.selected_model,
+    }
+
+
+def save_project_planning_brief(
+    session: Session,
+    *,
+    project: ProjectModel,
+    requirement: str,
+    brief: dict[str, Any],
+    selected_model: str | None,
+) -> dict[str, Any]:
+    project.requirement_draft = requirement
+    project.planning_brief = brief
+    project.selected_model = selected_model
+    project.updated_at = utc_now()
+    session.commit()
+    session.refresh(project)
+    return serialize_project_planning_brief(project) or {}
+
+
 def save_planning_result(
     session: Session,
     *,
     project: ProjectModel,
     requirement_content: str,
+    planning_brief: dict[str, Any] | None,
+    selected_model: str | None,
     result: dict[str, Any],
 ) -> dict[str, Any]:
     now = utc_now()
@@ -72,6 +101,9 @@ def save_planning_result(
     )
 
     project.status = "generated"
+    project.requirement_draft = requirement_content
+    project.planning_brief = planning_brief
+    project.selected_model = selected_model
     project.updated_at = now
     project_record = serialize_project(project)
     requirement_record = {

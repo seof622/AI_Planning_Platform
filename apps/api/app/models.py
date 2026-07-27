@@ -24,6 +24,13 @@ class ProjectModel(Base):
     title: Mapped[str] = mapped_column(String(200))
     description: Mapped[str] = mapped_column(Text, default="")
     status: Mapped[str] = mapped_column(String(20), default="draft")
+    requirement_draft: Mapped[str] = mapped_column(Text, default="")
+    planning_brief: Mapped[dict[str, Any] | None] = mapped_column(
+        JSON().with_variant(JSONB, "postgresql"), nullable=True
+    )
+    selected_model: Mapped[str | None] = mapped_column(
+        String(100), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now
     )

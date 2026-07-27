@@ -11,6 +11,7 @@ export type {
   ISODateString,
   Metadata,
   PlanningBrief,
+  ProjectPlanningBrief,
   PlanningActionItem,
   PlanningRequest,
   PlanningResult,

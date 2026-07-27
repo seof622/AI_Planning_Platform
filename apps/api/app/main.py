@@ -25,10 +25,12 @@ from .repository import (
     get_latest_planning_result,
     get_project,
     list_projects,
+    save_project_planning_brief,
     save_planning_result,
+    serialize_project_planning_brief,
     serialize_project,
 )
-from .schemas import PlanningRequest, ProjectCreate
+from .schemas import PlanningRequest, ProjectCreate, ProjectPlanningBrief
 
 
 app = FastAPI(title="AI Planning Platform API", version="0.1.0")
@@ -121,6 +123,44 @@ def projects_get(
     return serialize_project(project)
 
 
+@app.get("/projects/{project_id}/planning-brief")
+def projects_get_planning_brief(
+    project_id: str,
+    session: Session = Depends(get_db_session),
+) -> dict:
+    project = get_project(session, project_id)
+    if project is None:
+        raise HTTPException(status_code=404, detail="Project not found.")
+    brief = serialize_project_planning_brief(project)
+    if brief is None:
+        raise HTTPException(status_code=404, detail="Planning brief not found.")
+    return brief
+
+
+@app.put("/projects/{project_id}/planning-brief")
+def projects_save_planning_brief(
+    project_id: str,
+    payload: ProjectPlanningBrief,
+    session: Session = Depends(get_db_session),
+) -> dict:
+    project = get_project(session, project_id)
+    if project is None:
+        raise HTTPException(status_code=404, detail="Project not found.")
+    selected_model = payload.selectedModel
+    if selected_model and selected_model not in get_allowed_openai_models():
+        raise HTTPException(
+            status_code=422,
+            detail=f"Unsupported planning model: {selected_model}.",
+        )
+    return save_project_planning_brief(
+        session,
+        project=project,
+        requirement=payload.requirement,
+        brief=payload.brief.model_dump(exclude_none=True),
+        selected_model=selected_model,
+    )
+
+
 @app.post("/projects/{project_id}/planning/generate")
 def projects_generate(
     project_id: str,
@@ -139,6 +179,14 @@ def projects_generate(
         session,
         project=project,
         requirement_content=request.requirement,
+        planning_brief=(
+            request.brief.model_dump(exclude_none=True) if request.brief else None
+        ),
+        selected_model=(
+            request.options.model
+            if request.options and request.options.model
+            else result.get("metadata", {}).get("model")
+        ),
         result=result,
     )
 

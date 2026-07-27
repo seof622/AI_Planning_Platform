@@ -57,3 +57,9 @@ class PlanningRequest(BaseModel):
 class ProjectCreate(BaseModel):
     title: str
     description: str = ""
+
+
+class ProjectPlanningBrief(BaseModel):
+    requirement: str = ""
+    brief: PlanningBrief
+    selectedModel: str | None = Field(default=None, min_length=1, max_length=100)

@@ -108,6 +108,12 @@ export interface PlanningBrief {
   constraints?: string;
 }
 
+export interface ProjectPlanningBrief {
+  requirement: string;
+  brief: PlanningBrief;
+  selectedModel?: string | null;
+}
+
 export interface PlanningRequest {
   requirement: string;
   brief?: PlanningBrief;

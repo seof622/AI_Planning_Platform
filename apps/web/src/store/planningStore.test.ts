@@ -46,6 +46,18 @@ const planningResult: PlanningResult = {
   summary: "Test plan",
 };
 
+const persistedBrief = {
+  brief: {
+    actionItems: [{ necessity: "required" as const, title: "Implement tests" }],
+    constraints: "Keep it focused",
+    context: ["Web application"],
+    planType: "project" as const,
+    successCriterion: "quality" as const,
+  },
+  requirement: "Build a test plan",
+  selectedModel: "gpt-5.6-luna",
+};
+
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
     headers: { "Content-Type": "application/json" },
@@ -90,7 +102,8 @@ describe("planningStore", () => {
     });
     vi.mocked(fetch)
       .mockResolvedValueOnce(jsonResponse([project]))
-      .mockResolvedValueOnce(jsonResponse(planningResult));
+      .mockResolvedValueOnce(jsonResponse(planningResult))
+      .mockResolvedValueOnce(jsonResponse(persistedBrief));
 
     await usePlanningStore.getState().loadProjects();
 
@@ -98,8 +111,36 @@ describe("planningStore", () => {
     expect(state.selectedProjectId).toBe(project.id);
     expect(state.planningResult?.summary).toBe("Test plan");
     expect(state.requirementText).toBe("Build a test plan");
+    expect(state.planningBrief.actionItems[0]?.text).toBe("Implement tests");
+    expect(state.planningBrief.constraints).toBe("Keep it focused");
     expect(state.selectedModel).toBe("gpt-5.6-luna");
     expect(state.status).toBe("ready");
+  });
+
+  it("saves the current planning brief for the selected project", async () => {
+    usePlanningStore.setState({
+      planningBrief: {
+        actionItems: [{ necessity: "required", text: "Implement tests" }],
+        constraints: "Keep it focused",
+        context: ["Web application"],
+        planType: "project",
+        successCriterion: "quality",
+      },
+      projectStatus: "ready",
+      requirementText: "Build a test plan",
+      selectedModel: "gpt-5.6-luna",
+      selectedProjectId: project.id,
+    });
+    vi.mocked(fetch).mockResolvedValueOnce(jsonResponse(persistedBrief));
+
+    await usePlanningStore.getState().saveCurrentPlanningBrief();
+
+    const [url, init] = vi.mocked(fetch).mock.calls[0]!;
+    expect(url).toBe(
+      "http://localhost:8000/projects/project-test/planning-brief",
+    );
+    expect(init?.method).toBe("PUT");
+    expect(JSON.parse(String(init?.body))).toEqual(persistedBrief);
   });
 
   it("sends the selected model through the project generation request", async () => {

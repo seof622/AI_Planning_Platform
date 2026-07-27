@@ -281,3 +281,14 @@ Docker는 FastAPI 기본 서버가 만들어진 직후, PostgreSQL persistence�
    - Web test 5개, typecheck, lint, production build 통과.
    - 현재 Next 15·16이 고정하는 PostCSS 8.4.31과 Sharp 0.34.x 관련 audit
      경고는 upstream 안전 버전 반영 후 후속 패치한다.
+
+## 진행 메모 2026-07-27 - Planning Brief 저장 및 복원
+
+- 프로젝트에 현재 계획 주제, Planning Brief 전체, 선택 모델을 저장하는 컬럼과
+  Alembic migration을 추가했다.
+- `GET/PUT /projects/{project_id}/planning-brief` API를 추가했다.
+- Web 입력 변경을 debounce 방식으로 자동 저장하고 프로젝트 선택·새로고침 시
+  최신 생성 결과와 별개로 입력 Draft를 복원한다.
+- 계획 생성 시에도 동일한 Brief와 실제 선택 모델을 프로젝트에 확정 저장한다.
+- Web test 6개, Shared/Web typecheck, Web production build, API test 13개 통과.
+- 실제 PostgreSQL에 `20260727_0002` migration 적용 및 API healthcheck 통과.
