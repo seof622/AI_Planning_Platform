@@ -53,6 +53,7 @@ VALID_RESULT = {
 
 class FakeProvider:
     model = "fake-model"
+    prompt_version = "planning-prompt-v2"
 
     def __init__(self, result: dict = VALID_RESULT) -> None:
         self.result = GeneratedPlanningResult.model_validate(result)

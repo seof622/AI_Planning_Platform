@@ -3,7 +3,7 @@ from typing import Any
 from langgraph.graph import END, START, StateGraph
 
 from .models import PlanningWorkflowState
-from .prompt import PROMPT_VERSION, build_user_prompt
+from .prompt import build_user_prompt
 from .provider import OpenAIPlanningProvider, PlanningProvider
 from .validation import normalize_planning_result
 
@@ -39,7 +39,7 @@ class PlanningWorkflow:
             "result": normalize_planning_result(
                 state["generated"],
                 model=self._provider.model,
-                prompt_version=PROMPT_VERSION,
+                prompt_version=self._provider.prompt_version,
                 include_roadmap=options.get("includeRoadmap") is not False,
             )
         }

@@ -339,3 +339,14 @@ Docker는 FastAPI 기본 서버가 만들어진 직후, PostgreSQL persistence�
   검사할 수 있도록 확장했다.
 - `--baseline <v1-report.json>` 옵션으로 동일 데이터셋의 prompt v1/v2 평균 및
   케이스별 점수 증감 비교 보고서를 생성하도록 추가했다.
+
+## 진행 메모 2026-07-29 - Prompt 버전 선택
+
+- `planning-prompt-v1`, `planning-prompt-v2` 내용을 registry로 함께 유지하고
+  `PLANNING_PROMPT_VERSION` 환경변수로 API 시작 시 버전을 선택하도록 했다.
+- 기본 버전은 v2이며, 등록되지 않은 버전은 조용히 fallback하지 않고
+  `PlanningConfigurationError`로 거부한다.
+- 실제 사용한 prompt 내용과 결과 metadata의 `promptVersion`이 동일한 provider
+  설정에서 나오도록 연결해 비교 결과의 추적 가능성을 보장했다.
+- Docker Compose와 환경변수 예시, API·평가 실행 문서를 v1 baseline 생성 후
+  v2 비교 실행 흐름에 맞게 갱신했다.

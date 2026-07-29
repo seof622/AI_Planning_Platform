@@ -6,12 +6,15 @@ from pydantic import ValidationError
 
 from .errors import PlanningConfigurationError, PlanningProviderError
 from .models import GeneratedPlanningResult
-from .prompt import SYSTEM_PROMPT
+from .prompt import resolve_system_prompt
 
 
 class PlanningProvider(Protocol):
     @property
     def model(self) -> str: ...
+
+    @property
+    def prompt_version(self) -> str: ...
 
     def generate(self, prompt: str) -> GeneratedPlanningResult: ...
 
@@ -22,9 +25,17 @@ class OpenAIPlanningProvider:
         *,
         api_key: str | None = None,
         model: str | None = None,
+        prompt_version: str | None = None,
         timeout_seconds: float | None = None,
         client: OpenAI | None = None,
     ) -> None:
+        try:
+            self._prompt_version, self._system_prompt = resolve_system_prompt(
+                prompt_version or os.getenv("PLANNING_PROMPT_VERSION")
+            )
+        except ValueError as error:
+            raise PlanningConfigurationError(str(error)) from error
+
         resolved_api_key = api_key or os.getenv("OPENAI_API_KEY")
         if client is None and not resolved_api_key:
             raise PlanningConfigurationError(
@@ -39,12 +50,16 @@ class OpenAIPlanningProvider:
     def model(self) -> str:
         return self._model
 
+    @property
+    def prompt_version(self) -> str:
+        return self._prompt_version
+
     def generate(self, prompt: str) -> GeneratedPlanningResult:
         try:
             response = self._client.responses.parse(
                 model=self._model,
                 input=[
-                    {"role": "system", "content": SYSTEM_PROMPT},
+                    {"role": "system", "content": self._system_prompt},
                     {"role": "user", "content": prompt},
                 ],
                 text_format=GeneratedPlanningResult,

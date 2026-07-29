@@ -57,6 +57,7 @@ OPENAI_API_KEY=your-api-key
 OPENAI_MODEL=gpt-5-mini
 OPENAI_ALLOWED_MODELS=gpt-5-mini,gpt-5.6-luna,gpt-5.6-terra,gpt-5.6-sol
 OPENAI_TIMEOUT_SECONDS=60
+PLANNING_PROMPT_VERSION=planning-prompt-v2
 ```
 
 `GET /planning/models` returns the configured model catalog for the Web UI.
@@ -102,7 +103,13 @@ snapshot. Historical browsing never autosaves that snapshot over the current
 project draft; editing a historical brief starts a new current draft.
 
 Generated metadata includes `promptVersion` in addition to model and workflow
-version. The current prompt identifier is `planning-prompt-v1`.
+version. `PLANNING_PROMPT_VERSION` accepts `planning-prompt-v1` or
+`planning-prompt-v2` and defaults to v2. Unsupported values fail as an API
+configuration error rather than silently falling back.
+
+For an apples-to-apples prompt comparison, run the same evaluation schema and
+case file against a v1 API first, retain its JSON report, restart the API with
+v2, and pass the v1 report through `--baseline`.
 
 Seed one project with the canonical mock planning result:
 

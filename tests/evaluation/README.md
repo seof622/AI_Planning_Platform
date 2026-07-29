@@ -35,6 +35,10 @@ baseline with this same evaluator and dataset against an API instance running
 v1; incompatible evaluation schemas are rejected. Cases absent from the
 baseline are marked as new.
 
+The API prompt is selected at startup with `PLANNING_PROMPT_VERSION`. Generate
+the baseline with `planning-prompt-v1`, then restart with
+`planning-prompt-v2` before running the comparison command.
+
 Generated JSON and Markdown reports are written to
 `tests/evaluation/reports/`. Reports are ignored by Git by default; commit only
 an intentionally selected baseline report.
