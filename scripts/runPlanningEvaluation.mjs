@@ -6,10 +6,12 @@ const DEFAULT_CASES = path.resolve(
   "tests/evaluation/cases/representative-planning-cases.json",
 );
 const DEFAULT_REPORT_DIR = path.resolve("tests/evaluation/reports");
+const EVALUATION_SCHEMA_VERSION = "planning-quality-v2";
 
 function parseArguments(argv) {
   const options = {
     baseUrl: "http://localhost:8000",
+    baselinePath: undefined,
     casesPath: DEFAULT_CASES,
     dryRun: false,
     model: undefined,
@@ -20,6 +22,8 @@ function parseArguments(argv) {
     const argument = argv[index];
     if (argument === "--dry-run") {
       options.dryRun = true;
+    } else if (argument === "--baseline") {
+      options.baselinePath = path.resolve(argv[++index]);
     } else if (argument === "--base-url") {
       options.baseUrl = argv[++index];
     } else if (argument === "--cases") {
@@ -53,12 +57,35 @@ function validateCases(cases) {
       !expectations ||
       !Array.isArray(expectations.requiredTerms) ||
       !Array.isArray(expectations.forbiddenTerms) ||
+      (expectations.requiredRoadmapTerms !== undefined &&
+        !Array.isArray(expectations.requiredRoadmapTerms)) ||
       !Number.isInteger(expectations.minimumNodeCount) ||
       !Number.isInteger(expectations.minimumRoadmapStepCount)
     ) {
       throw new Error(`Invalid expectations for case: ${item.id}`);
     }
   }
+}
+
+function normalizedLabel(label) {
+  return label.trim().toLocaleLowerCase("ko-KR").replaceAll(/\s+/g, " ");
+}
+
+function findCycle(ids, dependenciesFor) {
+  const visiting = new Set();
+  const visited = new Set();
+  function visit(id) {
+    if (visiting.has(id)) return true;
+    if (visited.has(id)) return false;
+    visiting.add(id);
+    for (const dependency of dependenciesFor(id)) {
+      if (ids.has(dependency) && visit(dependency)) return true;
+    }
+    visiting.delete(id);
+    visited.add(id);
+    return false;
+  }
+  return [...ids].some(visit);
 }
 
 function searchableText(result) {
@@ -74,12 +101,21 @@ function graphIssues(result) {
   const issues = [];
   const nodeIds = new Set(result.nodes.map((node) => node.id));
   const stepIds = new Set(result.roadmap.map((step) => step.id));
+  const nodeDependencies = new Map(
+    result.nodes.map((node) => [node.id, []]),
+  );
+  const stepDependencies = new Map(
+    result.roadmap.map((step) => [step.id, step.dependsOn]),
+  );
   for (const edge of result.edges) {
     if (!nodeIds.has(edge.source) || !nodeIds.has(edge.target)) {
       issues.push(`edge ${edge.id} references an unknown node`);
     }
     if (edge.source === edge.target) {
       issues.push(`edge ${edge.id} references itself`);
+    }
+    if (nodeDependencies.has(edge.target)) {
+      nodeDependencies.get(edge.target).push(edge.source);
     }
   }
   for (const step of result.roadmap) {
@@ -93,6 +129,12 @@ function graphIssues(result) {
         issues.push(`step ${step.id} references an unknown node`);
       }
     }
+  }
+  if (findCycle(nodeIds, (id) => nodeDependencies.get(id) ?? [])) {
+    issues.push("component graph contains a cycle");
+  }
+  if (findCycle(stepIds, (id) => stepDependencies.get(id) ?? [])) {
+    issues.push("roadmap dependency graph contains a cycle");
   }
   return issues;
 }
@@ -108,6 +150,36 @@ function evaluateResult(testCase, result) {
     term,
   }));
   const issues = graphIssues(result);
+  const roadmapText = JSON.stringify(result.roadmap).toLocaleLowerCase("ko-KR");
+  const requiredRoadmapTerms = (
+    testCase.expectations.requiredRoadmapTerms ?? []
+  ).map((term) => ({
+    passed: roadmapText.includes(term.toLocaleLowerCase("ko-KR")),
+    term,
+  }));
+  const labels = result.nodes.map((node) => normalizedLabel(node.label));
+  const uniqueLabels = new Set(labels);
+  const orders = result.roadmap.map((step) => step.order).sort((a, b) => a - b);
+  const contiguousOrders = orders.every((order, index) => order === index + 1);
+  const orderByStep = new Map(
+    result.roadmap.map((step) => [step.id, step.order]),
+  );
+  const dependenciesPrecedeSteps = result.roadmap.every((step) =>
+    step.dependsOn.every(
+      (dependency) => (orderByStep.get(dependency) ?? Infinity) < step.order,
+    ),
+  );
+  const coveredNodeIds = new Set(
+    result.roadmap.flatMap((step) => step.componentNodeIds ?? []),
+  );
+  const nodeCoverage =
+    result.roadmap.length === 0 ||
+    result.nodes.every((node) => coveredNodeIds.has(node.id));
+  const executableSteps = result.roadmap.every(
+    (step) =>
+      step.description.trim().length >= 12 &&
+      (step.componentNodeIds?.length ?? 0) > 0,
+  );
   const checks = [
     {
       name: "minimumNodeCount",
@@ -120,12 +192,21 @@ function evaluateResult(testCase, result) {
         testCase.expectations.minimumRoadmapStepCount,
     },
     { name: "graphConsistency", passed: issues.length === 0 },
+    { name: "distinctNodeLabels", passed: uniqueLabels.size === labels.length },
+    { name: "contiguousRoadmapOrders", passed: contiguousOrders },
+    { name: "dependenciesPrecedeSteps", passed: dependenciesPrecedeSteps },
+    { name: "roadmapCoversAllNodes", passed: nodeCoverage },
+    { name: "executableRoadmapSteps", passed: executableSteps },
     ...requiredTerms.map((item) => ({
       name: `requiredTerm:${item.term}`,
       passed: item.passed,
     })),
     ...forbiddenTerms.map((item) => ({
       name: `forbiddenTerm:${item.term}`,
+      passed: item.passed,
+    })),
+    ...requiredRoadmapTerms.map((item) => ({
+      name: `requiredRoadmapTerm:${item.term}`,
       passed: item.passed,
     })),
   ];
@@ -138,6 +219,39 @@ function evaluateResult(testCase, result) {
     passed: passedCount === checks.length,
     score: Number((passedCount / checks.length).toFixed(3)),
     title: testCase.title,
+  };
+}
+
+function comparisonFor(report, baseline) {
+  const baselineByCase = new Map(
+    baseline.results.map((item) => [item.caseId, item]),
+  );
+  return {
+    averageScoreDelta: Number(
+      (report.averageScore - baseline.averageScore).toFixed(3),
+    ),
+    baselineEvaluatedAt: baseline.evaluatedAt,
+    baselinePromptVersions: [
+      ...new Set(baseline.results.map((item) => item.metadata?.promptVersion)),
+    ].filter(Boolean),
+    caseDeltas: report.results.map((item) => {
+      const baselineItem = baselineByCase.get(item.caseId);
+      return {
+        caseId: item.caseId,
+        passedDelta:
+          baselineItem === undefined
+            ? "new"
+            : item.passed === baselineItem.passed
+              ? "unchanged"
+              : item.passed
+                ? "improved"
+                : "regressed",
+        scoreDelta:
+          baselineItem === undefined
+            ? null
+            : Number((item.score - baselineItem.score).toFixed(3)),
+      };
+    }),
   };
 }
 
@@ -165,6 +279,12 @@ function markdownReport(report) {
     `- Evaluated at: ${report.evaluatedAt}`,
     `- Passed: ${report.passedCount}/${report.caseCount}`,
     `- Average score: ${report.averageScore}`,
+    ...(report.comparison
+      ? [
+          `- Baseline average delta: ${report.comparison.averageScoreDelta >= 0 ? "+" : ""}${report.comparison.averageScoreDelta}`,
+          `- Baseline prompt: ${report.comparison.baselinePromptVersions.join(", ") || "unknown"}`,
+        ]
+      : []),
     "",
   ];
   for (const item of report.results) {
@@ -175,6 +295,15 @@ function markdownReport(report) {
       `- Score: ${item.score}`,
       `- Model: ${item.metadata?.model ?? "unknown"}`,
       `- Prompt: ${item.metadata?.promptVersion ?? "unknown"}`,
+      ...(report.comparison
+        ? [
+            `- Baseline delta: ${
+              report.comparison.caseDeltas.find(
+                (delta) => delta.caseId === item.caseId,
+              )?.scoreDelta ?? "new"
+            }`,
+          ]
+        : []),
       "",
       ...item.checks.map(
         (check) => `- [${check.passed ? "x" : " "}] ${check.name}`,
@@ -208,10 +337,23 @@ async function main() {
       ).toFixed(3),
     ),
     caseCount: results.length,
+    evaluationSchemaVersion: EVALUATION_SCHEMA_VERSION,
     evaluatedAt,
     passedCount: results.filter((item) => item.passed).length,
     results,
   };
+  if (options.baselinePath) {
+    const baseline = JSON.parse(await readFile(options.baselinePath, "utf8"));
+    if (!Array.isArray(baseline.results) || !Number.isFinite(baseline.averageScore)) {
+      throw new Error("Baseline must be a planning evaluation JSON report.");
+    }
+    if (baseline.evaluationSchemaVersion !== EVALUATION_SCHEMA_VERSION) {
+      throw new Error(
+        `Baseline evaluation schema must be ${EVALUATION_SCHEMA_VERSION}.`,
+      );
+    }
+    report.comparison = comparisonFor(report, baseline);
+  }
   const fileStamp = evaluatedAt.replaceAll(":", "-").replace(/\.\d{3}Z$/, "Z");
   await mkdir(options.outputDir, { recursive: true });
   const jsonPath = path.join(options.outputDir, `${fileStamp}.json`);

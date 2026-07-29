@@ -2,7 +2,7 @@ import json
 from typing import Any
 
 
-PROMPT_VERSION = "planning-prompt-v1"
+PROMPT_VERSION = "planning-prompt-v2"
 
 SYSTEM_PROMPT = """
 You are the planning engine for a visual planning application.
@@ -16,7 +16,17 @@ Requirements:
 - Return roadmap ids prefixed with "step-" and unique positive order values.
 - Every roadmap dependency must reference another roadmap id.
 - Every componentNodeIds entry must reference a node id.
-- Keep the graph acyclic when practical.
+- Keep both the component graph and roadmap dependency graph acyclic.
+- Give every node a distinct responsibility; do not create nodes with duplicate or
+  synonymous labels.
+- Make roadmap orders contiguous starting at 1 and place every dependency before
+  the step that depends on it.
+- Connect every roadmap step to at least one component node and cover every
+  component node in at least one roadmap step.
+- Make roadmap descriptions concrete and executable: state an action and its
+  expected outcome while respecting the supplied constraints.
+- Prefer the smallest graph that fully covers required action items. Do not add
+  speculative features that conflict with constraints or optional priorities.
 - Respect preferredNodeTypes when supplied, while adding other necessary types.
 - Return an empty roadmap only when includeRoadmap is explicitly false.
 - Do not include markdown or commentary outside the structured result.

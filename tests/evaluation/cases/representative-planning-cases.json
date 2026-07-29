@@ -139,5 +139,82 @@
       "minimumNodeCount": 4,
       "minimumRoadmapStepCount": 3
     }
+  },
+  {
+    "id": "edge-conflicting-event-constraints",
+    "title": "상충 제약이 있는 사내 워크숍",
+    "request": {
+      "requirement": "서울과 부산 팀이 함께하는 당일 워크숍을 계획해줘.",
+      "brief": {
+        "actionItems": [
+          { "title": "양 팀 이동 부담 조정", "necessity": "required" },
+          { "title": "협업 세션 진행", "necessity": "required" },
+          { "title": "저녁 회식", "necessity": "optional" }
+        ],
+        "context": ["서울 8명", "부산 7명", "평일 진행"],
+        "planType": "event",
+        "successCriterion": "balance",
+        "constraints": "총예산 150만원, 오전 10시 시작, 오후 6시 전 종료, 숙박 불가"
+      }
+    },
+    "expectations": {
+      "requiredTerms": ["이동", "협업", "예산"],
+      "requiredRoadmapTerms": ["10시", "6시"],
+      "forbiddenTerms": ["호텔 예약", "1박 일정"],
+      "minimumNodeCount": 4,
+      "minimumRoadmapStepCount": 3
+    }
+  },
+  {
+    "id": "edge-minimal-personal-task",
+    "title": "작은 개인 행정 업무",
+    "request": {
+      "requirement": "이번 주 안에 여권 갱신 신청을 끝내는 계획을 만들어줘.",
+      "brief": {
+        "actionItems": [
+          { "title": "필요 서류 확인", "necessity": "required" },
+          { "title": "사진 준비", "necessity": "required" },
+          { "title": "신청 접수", "necessity": "required" }
+        ],
+        "context": ["평일 직장 근무", "온라인 신청 가능 여부 미확인"],
+        "planType": "daily",
+        "successCriterion": "speed",
+        "constraints": "이번 주 금요일까지 접수 완료, 불필요한 부가 업무 제외"
+      }
+    },
+    "expectations": {
+      "requiredTerms": ["서류", "사진", "신청"],
+      "requiredRoadmapTerms": ["금요일"],
+      "forbiddenTerms": ["여행 일정", "항공권"],
+      "minimumNodeCount": 4,
+      "minimumRoadmapStepCount": 3
+    }
+  },
+  {
+    "id": "edge-optional-must-not-dominate",
+    "title": "선택 기능이 많은 독서 기록 MVP",
+    "request": {
+      "requirement": "2주 안에 개인용 독서 기록 웹앱 MVP를 만드는 계획을 세워줘.",
+      "brief": {
+        "actionItems": [
+          { "title": "책 등록", "necessity": "required" },
+          { "title": "독서 메모 저장", "necessity": "required" },
+          { "title": "소셜 팔로우", "necessity": "optional" },
+          { "title": "AI 책 추천", "necessity": "optional" },
+          { "title": "전자책 구매 연동", "necessity": "optional" }
+        ],
+        "context": ["개발자 1명", "개인 사용 목적"],
+        "planType": "project",
+        "successCriterion": "speed",
+        "constraints": "개발 기간 2주, 외부 유료 API 사용 금지, 필수 기능 우선"
+      }
+    },
+    "expectations": {
+      "requiredTerms": ["책 등록", "메모"],
+      "requiredRoadmapTerms": ["2주"],
+      "forbiddenTerms": ["Stripe", "전자책 구매"],
+      "minimumNodeCount": 4,
+      "minimumRoadmapStepCount": 3
+    }
   }
 ]

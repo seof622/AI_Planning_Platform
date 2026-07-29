@@ -325,3 +325,17 @@ Docker는 FastAPI 기본 서버가 만들어진 직후, PostgreSQL persistence�
   생성하는 `evaluate:planning` 스크립트를 추가했다.
 - OpenAI 호출 없이 데이터셋 형식만 검사하는 `evaluate:planning:check`
   명령을 추가했다.
+
+## 진행 메모 2026-07-29 - Prompt v2 및 품질 회귀 평가
+
+- AI system prompt를 `planning-prompt-v2`로 올리고 중복 책임 제거, graph·roadmap
+  비순환성, 연속된 단계 순서, dependency 선행, 전체 node 실행 단계 연결,
+  제약조건을 반영한 실행 가능한 설명 규칙을 추가했다.
+- 대표 평가 데이터에 상충 제약, 작은 개인 업무, 선택 기능 과다 입력의 경계
+  사례 3개를 추가해 총 9개로 확장했다.
+- 평가기에 component graph와 roadmap cycle, node label 중복, roadmap 순서와
+  dependency 역전, node coverage, 실행 설명 품질 검사를 추가했다.
+- `requiredRoadmapTerms`로 핵심 일정·제약이 실행 단계에 실제 반영되는지
+  검사할 수 있도록 확장했다.
+- `--baseline <v1-report.json>` 옵션으로 동일 데이터셋의 prompt v1/v2 평균 및
+  케이스별 점수 증감 비교 보고서를 생성하도록 추가했다.
