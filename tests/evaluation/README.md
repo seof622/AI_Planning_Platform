@@ -11,6 +11,16 @@ This command checks the case schema without calling OpenAI:
 npm run evaluate:planning:check
 ```
 
+## Test the evaluator
+
+Run deterministic tests for graph cycles, roadmap cycles, duplicate labels,
+ordering, node coverage, executable steps, dataset validation, and baseline
+comparison without calling OpenAI:
+
+```powershell
+npm run evaluate:planning:test
+```
+
 ## Run an evaluation
 
 Start the API, then run:

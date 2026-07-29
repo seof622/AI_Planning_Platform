@@ -1,12 +1,13 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
+import { pathToFileURL } from "node:url";
 
 const DEFAULT_CASES = path.resolve(
   "tests/evaluation/cases/representative-planning-cases.json",
 );
 const DEFAULT_REPORT_DIR = path.resolve("tests/evaluation/reports");
-const EVALUATION_SCHEMA_VERSION = "planning-quality-v2";
+export const EVALUATION_SCHEMA_VERSION = "planning-quality-v2";
 
 function parseArguments(argv) {
   const options = {
@@ -39,7 +40,7 @@ function parseArguments(argv) {
   return options;
 }
 
-function validateCases(cases) {
+export function validateCases(cases) {
   if (!Array.isArray(cases) || cases.length === 0) {
     throw new Error("Evaluation cases must be a non-empty array.");
   }
@@ -97,7 +98,7 @@ function searchableText(result) {
   }).toLocaleLowerCase("ko-KR");
 }
 
-function graphIssues(result) {
+export function graphIssues(result) {
   const issues = [];
   const nodeIds = new Set(result.nodes.map((node) => node.id));
   const stepIds = new Set(result.roadmap.map((step) => step.id));
@@ -139,7 +140,7 @@ function graphIssues(result) {
   return issues;
 }
 
-function evaluateResult(testCase, result) {
+export function evaluateResult(testCase, result) {
   const text = searchableText(result);
   const requiredTerms = testCase.expectations.requiredTerms.map((term) => ({
     passed: text.includes(term.toLocaleLowerCase("ko-KR")),
@@ -222,7 +223,7 @@ function evaluateResult(testCase, result) {
   };
 }
 
-function comparisonFor(report, baseline) {
+export function comparisonFor(report, baseline) {
   const baselineByCase = new Map(
     baseline.results.map((item) => [item.caseId, item]),
   );
@@ -253,6 +254,21 @@ function comparisonFor(report, baseline) {
       };
     }),
   };
+}
+
+export function validateBaseline(baseline) {
+  if (
+    !baseline ||
+    !Array.isArray(baseline.results) ||
+    !Number.isFinite(baseline.averageScore)
+  ) {
+    throw new Error("Baseline must be a planning evaluation JSON report.");
+  }
+  if (baseline.evaluationSchemaVersion !== EVALUATION_SCHEMA_VERSION) {
+    throw new Error(
+      `Baseline evaluation schema must be ${EVALUATION_SCHEMA_VERSION}.`,
+    );
+  }
 }
 
 async function generateResult(testCase, options) {
@@ -344,14 +360,7 @@ async function main() {
   };
   if (options.baselinePath) {
     const baseline = JSON.parse(await readFile(options.baselinePath, "utf8"));
-    if (!Array.isArray(baseline.results) || !Number.isFinite(baseline.averageScore)) {
-      throw new Error("Baseline must be a planning evaluation JSON report.");
-    }
-    if (baseline.evaluationSchemaVersion !== EVALUATION_SCHEMA_VERSION) {
-      throw new Error(
-        `Baseline evaluation schema must be ${EVALUATION_SCHEMA_VERSION}.`,
-      );
-    }
+    validateBaseline(baseline);
     report.comparison = comparisonFor(report, baseline);
   }
   const fileStamp = evaluatedAt.replaceAll(":", "-").replace(/\.\d{3}Z$/, "Z");
@@ -368,7 +377,13 @@ async function main() {
   }
 }
 
-main().catch((error) => {
-  process.stderr.write(`${error instanceof Error ? error.message : error}\n`);
-  process.exitCode = 1;
-});
+const isDirectExecution =
+  process.argv[1] &&
+  import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href;
+
+if (isDirectExecution) {
+  main().catch((error) => {
+    process.stderr.write(`${error instanceof Error ? error.message : error}\n`);
+    process.exitCode = 1;
+  });
+}

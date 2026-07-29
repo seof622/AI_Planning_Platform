@@ -13,6 +13,7 @@
     "web:test": "npm run test -w apps/web",
     "evaluate:planning": "node scripts/runPlanningEvaluation.mjs",
     "evaluate:planning:check": "node scripts/runPlanningEvaluation.mjs --dry-run",
+    "evaluate:planning:test": "node --test tests/evaluation/*.test.mjs",
     "shared:typecheck": "npm run typecheck -w packages/shared",
     "shared:validate:mock": "npm run validate:mock -w packages/shared"
   }

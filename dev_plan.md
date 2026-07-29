@@ -350,3 +350,15 @@ Docker는 FastAPI 기본 서버가 만들어진 직후, PostgreSQL persistence�
   설정에서 나오도록 연결해 비교 결과의 추적 가능성을 보장했다.
 - Docker Compose와 환경변수 예시, API·평가 실행 문서를 v1 baseline 생성 후
   v2 비교 실행 흐름에 맞게 갱신했다.
+
+## 진행 메모 2026-07-29 - 평가 엔진 자동 테스트
+
+- 평가 스크립트의 case validation, graph issue 탐지, 결과 평가, baseline 검증,
+  비교 계산 함수를 부작용 없이 import할 수 있도록 공개했다.
+- 정상 결과 전체 통과, component·roadmap cycle 탐지, node label 중복,
+  roadmap 순서 누락과 dependency 역전, node coverage·실행 설명 실패를
+  검증하는 Node 내장 test runner 기반 테스트를 추가했다.
+- 중복 case id와 잘못된 `requiredRoadmapTerms`, baseline schema 불일치,
+  v1/v2 점수 개선 계산도 고정 테스트로 추가했다.
+- `evaluate:planning:test` 명령을 추가했으며 5개 테스트와 9개 평가 case
+  dry-run 검증이 통과했다.
