@@ -15,6 +15,7 @@
     "evaluate:planning:check": "node scripts/runPlanningEvaluation.mjs --dry-run",
     "evaluate:planning:test": "node --test tests/evaluation/*.test.mjs",
     "shared:typecheck": "npm run typecheck -w packages/shared",
-    "shared:validate:mock": "npm run validate:mock -w packages/shared"
+    "shared:validate:mock": "npm run validate:mock -w packages/shared",
+    "verify:node": "npm run shared:typecheck && npm run shared:validate:mock && npm run web:typecheck && npm run web:test && npm run lint -w apps/web && npm run web:build && npm run evaluate:planning:check && npm run evaluate:planning:test"
   }
 }

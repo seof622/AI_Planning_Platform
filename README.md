@@ -117,3 +117,19 @@ http://localhost:8000/health
 ```
 
 로컬 포트, CORS origin, PostgreSQL 계정을 바꾸려면 `.env.example`을 기준으로 `.env`를 생성해 수정합니다.
+
+## 7. 검증
+
+Node 기반 Shared, Web, 계획 평가 검증 전체를 한 번에 실행합니다.
+
+```powershell
+npm run verify:node
+```
+
+API 테스트는 `apps/api`에서 실행합니다.
+
+```powershell
+uv run --frozen pytest
+```
+
+GitHub Actions는 pull request와 `main` push에서 두 검증을 병렬 실행합니다.

@@ -362,3 +362,14 @@ Docker는 FastAPI 기본 서버가 만들어진 직후, PostgreSQL persistence�
   v1/v2 점수 개선 계산도 고정 테스트로 추가했다.
 - `evaluate:planning:test` 명령을 추가했으며 5개 테스트와 9개 평가 case
   dry-run 검증이 통과했다.
+
+## 진행 메모 2026-07-30 - CI 회귀 검사
+
+- Shared typecheck·mock fixture 검증, Web typecheck·test·lint·production build,
+  평가 dataset·engine 검증을 묶은 `verify:node` 명령을 추가했다.
+- GitHub Actions에서 Node 검증과 FastAPI pytest를 별도 job으로 병렬 실행하는
+  CI workflow를 추가했다.
+- workflow는 pull request와 main push에서 실행하고 중복 실행을 취소하며,
+  `contents: read` 최소 권한과 job timeout을 적용했다.
+- Node dependency는 `npm ci`, Python dependency는 lockfile 기반
+  `uv sync --frozen --extra dev`로 재현 가능하게 설치한다.
