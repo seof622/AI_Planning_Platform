@@ -373,3 +373,23 @@ Docker는 FastAPI 기본 서버가 만들어진 직후, PostgreSQL persistence�
   `contents: read` 최소 권한과 job timeout을 적용했다.
 - Node dependency는 `npm ci`, Python dependency는 lockfile 기반
   `uv sync --frozen --extra dev`로 재현 가능하게 설치한다.
+
+## 진행 메모 2026-08-19 - 평가 재개와 timeout 복원력
+
+- 긴 Structured Output 생성을 고려해 API provider timeout 기본값을 60초에서
+  180초로 상향했다.
+- 평가 결과를 case 완료 직후 `checkpoint.json`에 저장하고 `--resume` 실행 시
+  완료된 case를 건너뛰도록 했다.
+- checkpoint의 평가 schema, 정렬된 case id, 요청 model이 현재 실행과 다르면
+  재사용을 거부해 서로 다른 평가 결과가 섞이지 않게 했다.
+- HTTP 408·429·502·503·504만 지수 backoff로 최대 2회 시도하고, 입력 오류 등
+  비일시적 실패는 즉시 반환하도록 했다.
+- 정상 완료 checkpoint도 유지해 추가 API 호출 없이 report를 재생성할 수
+  있도록 했다.
+- 개선 후 실제 `gpt-5-mini` 평가를 완료했으며 prompt v1은 7/9·평균 0.984,
+  prompt v2는 7/9·평균 0.975로 v2가 0.009 낮았다.
+- v2는 워크숍 종료 시각 `6시`와 독서 MVP 기간 `2주`를 roadmap에 반영하지
+  못했고, 선택 기능인 `전자책 구매`도 결과에 포함해 해당 case 점수가 v1보다
+  0.077 낮아졌다.
+- 완료 checkpoint에 `--resume`을 적용했을 때 9개 case를 모두 건너뛰고 API
+  재호출 없이 비교 report를 다시 생성하는 것을 확인했다.

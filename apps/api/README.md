@@ -56,7 +56,7 @@ Set these environment variables before calling it:
 OPENAI_API_KEY=your-api-key
 OPENAI_MODEL=gpt-5-mini
 OPENAI_ALLOWED_MODELS=gpt-5-mini,gpt-5.6-luna,gpt-5.6-terra,gpt-5.6-sol
-OPENAI_TIMEOUT_SECONDS=60
+OPENAI_TIMEOUT_SECONDS=180
 PLANNING_PROMPT_VERSION=planning-prompt-v2
 ```
 

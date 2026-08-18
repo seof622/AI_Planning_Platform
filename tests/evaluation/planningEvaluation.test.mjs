@@ -3,11 +3,15 @@ import test from "node:test";
 
 import {
   EVALUATION_SCHEMA_VERSION,
+  EvaluationApiError,
   comparisonFor,
+  createCheckpoint,
   evaluateResult,
   graphIssues,
+  validateCheckpoint,
   validateBaseline,
   validateCases,
+  withRetry,
 } from "../../scripts/runPlanningEvaluation.mjs";
 
 const testCase = {
@@ -158,4 +162,66 @@ test("baseline schema is enforced and comparison marks score changes", () => {
       },
     ],
   });
+});
+
+test("retry handles transient API errors and stops after success", async () => {
+  let attempts = 0;
+  const retries = [];
+  const result = await withRetry(
+    async () => {
+      attempts += 1;
+      if (attempts === 1) throw new EvaluationApiError(502, "timeout");
+      return "ok";
+    },
+    {
+      maxAttempts: 2,
+      onRetry: (error, nextAttempt) => {
+        retries.push([error.status, nextAttempt]);
+      },
+      sleep: async () => {},
+    },
+  );
+
+  assert.equal(result, "ok");
+  assert.equal(attempts, 2);
+  assert.deepEqual(retries, [[502, 2]]);
+});
+
+test("retry does not repeat non-transient API errors", async () => {
+  let attempts = 0;
+  await assert.rejects(
+    withRetry(
+      async () => {
+        attempts += 1;
+        throw new EvaluationApiError(422, "invalid request");
+      },
+      { maxAttempts: 2, sleep: async () => {} },
+    ),
+    /API 422/,
+  );
+  assert.equal(attempts, 1);
+});
+
+test("checkpoint validation protects dataset and model compatibility", () => {
+  const cases = [testCase];
+  const checkpoint = createCheckpoint({
+    cases,
+    model: "gpt-5-mini",
+    results: [evaluateResult(testCase, validResult())],
+    startedAt: "2026-08-18T00:00:00.000Z",
+  });
+
+  validateCheckpoint(checkpoint, { cases, model: "gpt-5-mini" });
+  assert.throws(
+    () => validateCheckpoint(checkpoint, { cases, model: "gpt-5.6-luna" }),
+    /model does not match/,
+  );
+  assert.throws(
+    () =>
+      validateCheckpoint(checkpoint, {
+        cases: [{ ...testCase, id: "different-case" }],
+        model: "gpt-5-mini",
+      }),
+    /cases do not match/,
+  );
 });

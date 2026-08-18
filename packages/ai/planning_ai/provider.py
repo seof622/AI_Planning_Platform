@@ -43,7 +43,7 @@ class OpenAIPlanningProvider:
             )
 
         self._model = model or os.getenv("OPENAI_MODEL", "gpt-5-mini")
-        timeout = timeout_seconds or float(os.getenv("OPENAI_TIMEOUT_SECONDS", "60"))
+        timeout = timeout_seconds or float(os.getenv("OPENAI_TIMEOUT_SECONDS", "180"))
         self._client = client or OpenAI(api_key=resolved_api_key, timeout=timeout)
 
     @property

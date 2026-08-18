@@ -1,6 +1,7 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
+import { setTimeout as delay } from "node:timers/promises";
 import { pathToFileURL } from "node:url";
 
 const DEFAULT_CASES = path.resolve(
@@ -15,8 +16,10 @@ function parseArguments(argv) {
     baselinePath: undefined,
     casesPath: DEFAULT_CASES,
     dryRun: false,
+    maxAttempts: 2,
     model: undefined,
     outputDir: DEFAULT_REPORT_DIR,
+    resume: false,
   };
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -31,11 +34,18 @@ function parseArguments(argv) {
       options.casesPath = path.resolve(argv[++index]);
     } else if (argument === "--model") {
       options.model = argv[++index];
+    } else if (argument === "--max-attempts") {
+      options.maxAttempts = Number.parseInt(argv[++index], 10);
     } else if (argument === "--output-dir") {
       options.outputDir = path.resolve(argv[++index]);
+    } else if (argument === "--resume") {
+      options.resume = true;
     } else {
       throw new Error(`Unknown argument: ${argument}`);
     }
+  }
+  if (!Number.isInteger(options.maxAttempts) || options.maxAttempts < 1) {
+    throw new Error("--max-attempts must be a positive integer.");
   }
   return options;
 }
@@ -271,6 +281,43 @@ export function validateBaseline(baseline) {
   }
 }
 
+export class EvaluationApiError extends Error {
+  constructor(status, body) {
+    super(`API ${status}: ${body.slice(0, 500)}`);
+    this.name = "EvaluationApiError";
+    this.status = status;
+  }
+}
+
+export function isRetryableError(error) {
+  return (
+    error instanceof EvaluationApiError &&
+    [408, 429, 502, 503, 504].includes(error.status)
+  );
+}
+
+export async function withRetry(
+  operation,
+  {
+    maxAttempts = 2,
+    onRetry = () => {},
+    sleep = delay,
+  } = {},
+) {
+  let lastError;
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      return await operation(attempt);
+    } catch (error) {
+      lastError = error;
+      if (attempt >= maxAttempts || !isRetryableError(error)) throw error;
+      onRetry(error, attempt + 1);
+      await sleep(2 ** (attempt - 1) * 1000);
+    }
+  }
+  throw lastError;
+}
+
 async function generateResult(testCase, options) {
   const request = structuredClone(testCase.request);
   if (options.model) {
@@ -283,9 +330,54 @@ async function generateResult(testCase, options) {
   });
   if (!response.ok) {
     const body = await response.text();
-    throw new Error(`API ${response.status}: ${body.slice(0, 500)}`);
+    throw new EvaluationApiError(response.status, body);
   }
   return response.json();
+}
+
+export function createCheckpoint({ cases, model, results = [], startedAt }) {
+  return {
+    caseIds: cases.map((item) => item.id),
+    evaluationSchemaVersion: EVALUATION_SCHEMA_VERSION,
+    model: model ?? null,
+    results,
+    startedAt: startedAt ?? new Date().toISOString(),
+  };
+}
+
+export function validateCheckpoint(checkpoint, { cases, model }) {
+  if (
+    !checkpoint ||
+    checkpoint.evaluationSchemaVersion !== EVALUATION_SCHEMA_VERSION ||
+    !Array.isArray(checkpoint.caseIds) ||
+    !Array.isArray(checkpoint.results)
+  ) {
+    throw new Error("Resume checkpoint has an incompatible evaluation schema.");
+  }
+  const expectedCaseIds = cases.map((item) => item.id);
+  if (JSON.stringify(checkpoint.caseIds) !== JSON.stringify(expectedCaseIds)) {
+    throw new Error("Resume checkpoint cases do not match the current dataset.");
+  }
+  if ((checkpoint.model ?? null) !== (model ?? null)) {
+    throw new Error("Resume checkpoint model does not match the requested model.");
+  }
+  const expectedIds = new Set(expectedCaseIds);
+  const resultIds = checkpoint.results.map((item) => item.caseId);
+  if (
+    new Set(resultIds).size !== resultIds.length ||
+    resultIds.some((id) => !expectedIds.has(id))
+  ) {
+    throw new Error("Resume checkpoint contains invalid case results.");
+  }
+}
+
+async function saveCheckpoint(checkpointPath, checkpoint) {
+  await mkdir(path.dirname(checkpointPath), { recursive: true });
+  await writeFile(
+    checkpointPath,
+    `${JSON.stringify(checkpoint, null, 2)}\n`,
+    "utf8",
+  );
 }
 
 function markdownReport(report) {
@@ -339,12 +431,52 @@ async function main() {
     return;
   }
 
-  const results = [];
-  for (const testCase of cases) {
-    process.stdout.write(`Evaluating ${testCase.id}...\n`);
-    const generated = await generateResult(testCase, options);
-    results.push(evaluateResult(testCase, generated));
+  await mkdir(options.outputDir, { recursive: true });
+  const checkpointPath = path.join(options.outputDir, "checkpoint.json");
+  let checkpoint;
+  if (options.resume) {
+    try {
+      checkpoint = JSON.parse(await readFile(checkpointPath, "utf8"));
+    } catch (error) {
+      if (error?.code === "ENOENT") {
+        throw new Error(`Resume checkpoint not found: ${checkpointPath}`);
+      }
+      throw error;
+    }
+    validateCheckpoint(checkpoint, cases.length ? { cases, model: options.model } : {});
+  } else {
+    checkpoint = createCheckpoint({ cases, model: options.model });
+    await saveCheckpoint(checkpointPath, checkpoint);
   }
+
+  const resultsByCase = new Map(
+    checkpoint.results.map((item) => [item.caseId, item]),
+  );
+  for (const testCase of cases) {
+    if (resultsByCase.has(testCase.id)) {
+      process.stdout.write(`Skipping ${testCase.id} (checkpoint).\n`);
+      continue;
+    }
+    process.stdout.write(`Evaluating ${testCase.id}...\n`);
+    const generated = await withRetry(
+      () => generateResult(testCase, options),
+      {
+        maxAttempts: options.maxAttempts,
+        onRetry: (error, nextAttempt) => {
+          process.stderr.write(
+            `${testCase.id} failed with API ${error.status}; retrying attempt ${nextAttempt}/${options.maxAttempts}.\n`,
+          );
+        },
+      },
+    );
+    const evaluated = evaluateResult(testCase, generated);
+    resultsByCase.set(testCase.id, evaluated);
+    checkpoint.results = cases
+      .filter((item) => resultsByCase.has(item.id))
+      .map((item) => resultsByCase.get(item.id));
+    await saveCheckpoint(checkpointPath, checkpoint);
+  }
+  const results = cases.map((item) => resultsByCase.get(item.id));
   const evaluatedAt = new Date().toISOString();
   const report = {
     averageScore: Number(
@@ -364,11 +496,13 @@ async function main() {
     report.comparison = comparisonFor(report, baseline);
   }
   const fileStamp = evaluatedAt.replaceAll(":", "-").replace(/\.\d{3}Z$/, "Z");
-  await mkdir(options.outputDir, { recursive: true });
   const jsonPath = path.join(options.outputDir, `${fileStamp}.json`);
   const markdownPath = path.join(options.outputDir, `${fileStamp}.md`);
   await writeFile(jsonPath, `${JSON.stringify(report, null, 2)}\n`, "utf8");
   await writeFile(markdownPath, markdownReport(report), "utf8");
+  checkpoint.completedAt = evaluatedAt;
+  checkpoint.reportPaths = { json: jsonPath, markdown: markdownPath };
+  await saveCheckpoint(checkpointPath, checkpoint);
   process.stdout.write(
     `Saved evaluation reports:\n${jsonPath}\n${markdownPath}\n`,
   );
