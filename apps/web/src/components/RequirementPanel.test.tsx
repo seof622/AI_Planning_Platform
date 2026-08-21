@@ -24,6 +24,15 @@ describe("RequirementPanel", () => {
             speed: "fast",
           },
           {
+            cost: "high",
+            description: "깊이 있는 분석 모델",
+            id: "gpt-5.6-sol",
+            label: "GPT-5.6 Sol",
+            quality: "highest",
+            recommendedFor: "중요한 의사결정",
+            speed: "deliberate",
+          },
+          {
             cost: "medium",
             description: "속도와 품질의 균형 모델",
             id: "gpt-5.6-luna",
@@ -58,6 +67,12 @@ describe("RequirementPanel", () => {
     expect(
       screen.getByRole("option", { name: "GPT-5.6 Luna" }),
     ).toBeInTheDocument();
+    expect(
+      screen.getByRole("option", { name: "GPT-5.6 Sol · 추천" }),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText("추천 모델")).toHaveTextContent(
+      "완성도를 중요 기준으로 선택해 깊이 있는 분석을 우선합니다.",
+    );
     expect(screen.getByText("빠르고 경제적인 초안 모델")).toBeInTheDocument();
     expect(screen.getByText("빠른 초안")).toBeInTheDocument();
   });

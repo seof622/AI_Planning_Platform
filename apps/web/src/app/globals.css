@@ -539,6 +539,38 @@ button {
   background: var(--surface-muted);
 }
 
+.model-recommendation {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  border: 1px solid var(--accent-soft);
+  border-radius: 8px;
+  padding: 9px 10px;
+  background: var(--accent-soft);
+}
+
+.model-recommendation__badge {
+  flex: 0 0 auto;
+  border-radius: 999px;
+  padding: 3px 7px;
+  background: var(--accent);
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.model-recommendation p {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.model-recommendation p span {
+  color: var(--text-muted);
+}
+
 .model-guidance__description,
 .model-guidance__recommendation {
   margin: 0;
