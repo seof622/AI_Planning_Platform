@@ -35,6 +35,7 @@ export type {
   ContractValidationResult,
 } from "./validation.js";
 export {
+  validateAIModelCatalog,
   validatePlanningRequest,
   validatePlanningResult,
 } from "./validation.js";

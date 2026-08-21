@@ -24,6 +24,12 @@ const criterionLabels: Record<SuccessCriterion, string> = {
   speed: "빠른 실행",
 };
 
+const modelLevelLabels = {
+  cost: { high: "높음", low: "낮음", medium: "보통" },
+  quality: { high: "높음", highest: "최고", standard: "표준" },
+  speed: { balanced: "균형", deliberate: "신중", fast: "빠름" },
+} as const;
+
 interface RequirementPanelProps {
   generatedModel?: string;
   hasSelectedProject: boolean;
@@ -78,6 +84,9 @@ export function RequirementPanel({
     requirementText.trim().length > 0 &&
     contextCount > 0 &&
     actionCount > 0;
+  const selectedModelOption = models.find(
+    (model) => model.id === selectedModel,
+  );
 
   function updateContextItem(index: number, value: string) {
     setPlanningBriefField(
@@ -160,6 +169,21 @@ export function RequirementPanel({
             <span className="form-field__error" role="alert">
               {modelErrorMessage}
             </span>
+          ) : null}
+          {selectedModelOption ? (
+            <section className="model-guidance" aria-label="선택 모델 안내">
+              <p className="model-guidance__description">
+                {selectedModelOption.description}
+              </p>
+              <dl className="model-guidance__levels">
+                <div><dt>품질</dt><dd>{modelLevelLabels.quality[selectedModelOption.quality]}</dd></div>
+                <div><dt>속도</dt><dd>{modelLevelLabels.speed[selectedModelOption.speed]}</dd></div>
+                <div><dt>비용</dt><dd>{modelLevelLabels.cost[selectedModelOption.cost]}</dd></div>
+              </dl>
+              <p className="model-guidance__recommendation">
+                <strong>추천:</strong> {selectedModelOption.recommendedFor}
+              </p>
+            </section>
           ) : null}
           {generatedModel ? (
             <span className="form-field__hint">

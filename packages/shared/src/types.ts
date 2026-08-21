@@ -127,8 +127,13 @@ export interface PlanningRequest {
 }
 
 export interface AIModelOption {
+  cost: "low" | "medium" | "high";
+  description: string;
   id: string;
   label: string;
+  quality: "standard" | "high" | "highest";
+  recommendedFor: string;
+  speed: "fast" | "balanced" | "deliberate";
 }
 
 export interface AIModelCatalog {

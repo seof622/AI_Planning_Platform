@@ -14,8 +14,24 @@ describe("RequirementPanel", () => {
         isLoading={false}
         modelErrorMessage={null}
         models={[
-          { id: "gpt-5-mini", label: "GPT-5 mini" },
-          { id: "gpt-5.6-luna", label: "GPT-5.6 Luna" },
+          {
+            cost: "low",
+            description: "빠르고 경제적인 초안 모델",
+            id: "gpt-5-mini",
+            label: "GPT-5 mini",
+            quality: "standard",
+            recommendedFor: "빠른 초안",
+            speed: "fast",
+          },
+          {
+            cost: "medium",
+            description: "속도와 품질의 균형 모델",
+            id: "gpt-5.6-luna",
+            label: "GPT-5.6 Luna",
+            quality: "high",
+            recommendedFor: "일반 프로젝트",
+            speed: "fast",
+          },
         ]}
         modelStatus="ready"
         onGenerate={vi.fn()}
@@ -42,5 +58,7 @@ describe("RequirementPanel", () => {
     expect(
       screen.getByRole("option", { name: "GPT-5.6 Luna" }),
     ).toBeInTheDocument();
+    expect(screen.getByText("빠르고 경제적인 초안 모델")).toBeInTheDocument();
+    expect(screen.getByText("빠른 초안")).toBeInTheDocument();
   });
 });
