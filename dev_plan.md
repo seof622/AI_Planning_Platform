@@ -17,6 +17,8 @@
 
 ### Phase 1. Graph 편집 — 현재 작업
 
+상태: 구현 및 기본 검증 완료, 브라우저 UI E2E 후 최종 완료 처리
+
 - 선택한 node의 label, description, category, priority를 편집한다.
 - Canvas에서 node를 이동하고 위치를 편집 결과에 반영한다.
 - AI 생성 원본과 과거 이력을 직접 덮어쓰지 않고 편집본을 새 결과 버전으로
@@ -24,6 +26,19 @@
 - 저장 전 Shared/API graph consistency 검증을 적용한다.
 - 완료 기준: 편집본 저장 후 생성 이력에 새 버전이 추가되고 새로고침 후 같은
   graph가 복원된다.
+
+진행 메모 2026-08-21:
+
+- node 이름, 설명, 분류, 우선순위 편집 UI를 추가했다.
+- React Flow drag 종료 위치를 편집 결과에 반영한다.
+- 원본 node ID 집합을 유지하도록 API에서 검증하고, 편집본을 새 planning result
+  버전으로 저장한다.
+- Shared/Web typecheck, Web test 16개, lint, production build, 관련 API test
+  9개가 통과했다.
+- 실제 PostgreSQL에서 편집본 저장, 최신 결과 조회, 이력 증가와
+  `editedFromResultId` 일치를 확인했다.
+- 브라우저에서 node 편집·drag·저장·새로고침 복원을 최종 확인한 뒤 Phase 2로
+  이동한다.
 
 ### Phase 2. Roadmap 편집
 
