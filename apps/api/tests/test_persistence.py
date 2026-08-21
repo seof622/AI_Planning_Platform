@@ -152,6 +152,49 @@ def test_project_planning_result_round_trip(monkeypatch) -> None:
         assert detail_response.status_code == 200
         assert detail_response.json() == generated
 
+        invalid_edit_response = client.post(
+            f"/projects/{project['id']}/planning-results/{history[0]['id']}/edit",
+            json={
+                "nodes": [
+                    {
+                        **generated["nodes"][0],
+                        "id": "node-added",
+                    }
+                ]
+            },
+        )
+        assert invalid_edit_response.status_code == 422
+
+        edited_node = {
+            **generated["nodes"][0],
+            "label": "편집된 계획 API",
+            "description": "사용자가 설명을 편집했습니다.",
+            "category": "Edited Backend",
+            "priority": "medium",
+            "position": {"x": 120, "y": 240},
+        }
+        edit_response = client.post(
+            f"/projects/{project['id']}/planning-results/{history[0]['id']}/edit",
+            json={"nodes": [edited_node]},
+        )
+        assert edit_response.status_code == 200
+        edited = edit_response.json()
+        assert edited["nodes"] == [edited_node]
+        assert edited["metadata"]["editedFromResultId"] == history[0]["id"]
+
+        edited_history_response = client.get(
+            f"/projects/{project['id']}/planning-results"
+        )
+        edited_history = edited_history_response.json()
+        assert len(edited_history) == 2
+        assert edited_history[0]["editedFromResultId"] == history[0]["id"]
+
+        edited_latest_response = client.get(
+            f"/projects/{project['id']}/planning-results/latest"
+        )
+        assert edited_latest_response.status_code == 200
+        assert edited_latest_response.json()["nodes"] == [edited_node]
+
         snapshot_response = client.get(
             f"/projects/{project['id']}/planning-results/"
             f"{history[0]['id']}/planning-brief"
@@ -178,7 +221,7 @@ def test_project_planning_result_round_trip(monkeypatch) -> None:
             f"/projects/{project['id']}/planning-results"
         )
         restored_history = restored_history_response.json()
-        assert len(restored_history) == 2
+        assert len(restored_history) == 3
         assert restored_history[0]["restoredFromResultId"] == history[0]["id"]
         assert restored_history[0]["canRestore"] is True
 

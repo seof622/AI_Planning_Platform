@@ -22,6 +22,8 @@ export function PlanningWorkspace() {
     createAndSelectProject,
     errorMessage,
     generateResult,
+    graphEditErrorMessage,
+    graphEditStatus,
     historyErrorMessage,
     historyStatus,
     isViewingHistoricalResult,
@@ -39,6 +41,7 @@ export function PlanningWorkspace() {
     requirementText,
     resetToEmpty,
     restoreSelectedPlanningResult,
+    saveGraphEdits,
     saveCurrentPlanningBrief,
     selectedNodeId,
     selectedModel,
@@ -52,6 +55,8 @@ export function PlanningWorkspace() {
     setRequirementText,
     setSelectedModel,
     status,
+    updateNode,
+    updateNodePosition,
   } = usePlanningStore();
 
   const selectedNode = getSelectedNode(planningResult, selectedNodeId);
@@ -127,6 +132,7 @@ export function PlanningWorkspace() {
         </div>
         <div className="workspace__canvas-area">
           <PlanningCanvas
+            onMoveNode={updateNodePosition}
             onSelectNode={selectNode}
             result={planningResult}
             selectedNodeId={selectedNodeId}
@@ -137,7 +143,17 @@ export function PlanningWorkspace() {
             roadmap={planningResult?.roadmap ?? []}
             status={status}
           />
-          <NodeDetailPanel node={selectedNode} />
+          <NodeDetailPanel
+            editErrorMessage={graphEditErrorMessage}
+            editStatus={graphEditStatus}
+            node={selectedNode}
+            onChange={(changes) => {
+              if (selectedNode) {
+                updateNode(selectedNode.id, changes);
+              }
+            }}
+            onSave={saveGraphEdits}
+          />
         </div>
       </div>
 

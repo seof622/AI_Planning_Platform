@@ -22,6 +22,7 @@ from .database import get_db_session
 from .fixtures import build_mock_planning_result
 from .repository import (
     create_project,
+    edit_planning_result,
     get_latest_planning_result,
     get_planning_result,
     get_planning_result_brief,
@@ -34,7 +35,12 @@ from .repository import (
     serialize_project_planning_brief,
     serialize_project,
 )
-from .schemas import PlanningRequest, ProjectCreate, ProjectPlanningBrief
+from .schemas import (
+    GraphEditRequest,
+    PlanningRequest,
+    ProjectCreate,
+    ProjectPlanningBrief,
+)
 
 
 app = FastAPI(title="AI Planning Platform API", version="0.1.0")
@@ -259,6 +265,51 @@ def projects_restore_planning_result(
         "planningBrief": planning_brief,
         "result": result,
     }
+
+
+@app.post("/projects/{project_id}/planning-results/{result_id}/edit")
+def projects_edit_planning_result(
+    project_id: str,
+    result_id: str,
+    payload: GraphEditRequest,
+    session: Session = Depends(get_db_session),
+) -> dict:
+    project = get_project(session, project_id)
+    if project is None:
+        raise HTTPException(status_code=404, detail="Project not found.")
+    source = get_planning_result(session, project_id, result_id)
+    if source is None:
+        raise HTTPException(status_code=404, detail="Planning result not found.")
+
+    source_ids = {node.get("id") for node in source.get("nodes", [])}
+    edited_ids = [node.id for node in payload.nodes]
+    if len(set(edited_ids)) != len(edited_ids):
+        raise HTTPException(status_code=422, detail="Node IDs must be unique.")
+    if set(edited_ids) != source_ids:
+        raise HTTPException(
+            status_code=422,
+            detail="Graph editing cannot add or remove nodes in this phase.",
+        )
+    if any(
+        not node.label.strip()
+        or not node.description.strip()
+        or not node.category.strip()
+        for node in payload.nodes
+    ):
+        raise HTTPException(
+            status_code=422,
+            detail="Node label, description, and category must not be empty.",
+        )
+
+    edited = edit_planning_result(
+        session,
+        project=project,
+        result_id=result_id,
+        nodes=[node.model_dump(exclude_none=True) for node in payload.nodes],
+    )
+    if edited is None:
+        raise HTTPException(status_code=404, detail="Planning result not found.")
+    return edited
 
 
 @app.get("/projects/{project_id}/planning-results/{result_id}/planning-brief")

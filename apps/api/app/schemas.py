@@ -17,6 +17,7 @@ ComponentNodeType = Literal[
 PlanType = Literal["daily", "project", "learning", "event", "decision", "creative"]
 SuccessCriterion = Literal["clarity", "speed", "balance", "quality", "consistency"]
 ActionItemNecessity = Literal["required", "optional"]
+Priority = Literal["low", "medium", "high"]
 
 
 class PlanningActionItem(BaseModel):
@@ -63,3 +64,25 @@ class ProjectPlanningBrief(BaseModel):
     requirement: str = ""
     brief: PlanningBrief
     selectedModel: str | None = Field(default=None, min_length=1, max_length=100)
+
+
+class CanvasPosition(BaseModel):
+    x: float
+    y: float
+
+
+class ComponentNodeEdit(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: str = Field(min_length=1, max_length=100)
+    type: ComponentNodeType
+    label: str = Field(min_length=1, max_length=200)
+    description: str = Field(min_length=1, max_length=2000)
+    category: str = Field(min_length=1, max_length=100)
+    priority: Priority
+    position: CanvasPosition
+    metadata: dict[str, Any] | None = None
+
+
+class GraphEditRequest(BaseModel):
+    nodes: list[ComponentNodeEdit] = Field(min_length=1)

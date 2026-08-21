@@ -142,6 +142,7 @@ export interface AIModelCatalog {
 }
 
 export interface PlanningResultMetadata extends Metadata {
+  editedFromResultId?: string | null;
   generatedAt: ISODateString;
   model?: string;
   promptVersion?: string;
@@ -162,6 +163,7 @@ export interface PlanningResultHistoryItem {
   canRestore: boolean;
   id: string;
   createdAt: ISODateString;
+  editedFromResultId?: string | null;
   model?: string;
   promptVersion?: string;
   restoredFromResultId?: string | null;
