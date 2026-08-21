@@ -31,6 +31,12 @@ const modelLevelLabels = {
   speed: { balanced: "균형", deliberate: "신중", fast: "빠름" },
 } as const;
 
+const complexityLabels = {
+  balanced: "보통",
+  complex: "복잡함",
+  simple: "간단함",
+} as const;
+
 interface RequirementPanelProps {
   generatedModel?: string;
   hasSelectedProject: boolean;
@@ -90,8 +96,10 @@ export function RequirementPanel({
   );
   const modelRecommendation = recommendModel(
     models,
-    planningBrief.planType,
-    planningBrief.successCriterion,
+    {
+      ...planningBrief,
+      requirementText,
+    },
   );
 
   function updateContextItem(index: number, value: string) {
@@ -182,6 +190,10 @@ export function RequirementPanel({
               <span className="model-recommendation__badge">추천</span>
               <p>
                 <strong>{modelRecommendation.model.label}</strong>
+                <span>
+                  계획 복잡도: {complexityLabels[modelRecommendation.complexity]}
+                  {" · "}{modelRecommendation.score}점
+                </span>
                 <span>{modelRecommendation.reason}</span>
               </p>
             </div>
