@@ -6,6 +6,7 @@ import type {
   SuccessCriterion,
 } from "@ai-planning-platform/shared";
 import type { PlanningBriefDraft } from "../store/planningStore";
+import { recommendModel } from "../lib/modelRecommendation";
 
 const planTypeLabels: Record<PlanType, string> = {
   creative: "창작 / 아이디어",
@@ -28,6 +29,12 @@ const modelLevelLabels = {
   cost: { high: "높음", low: "낮음", medium: "보통" },
   quality: { high: "높음", highest: "최고", standard: "표준" },
   speed: { balanced: "균형", deliberate: "신중", fast: "빠름" },
+} as const;
+
+const complexityLabels = {
+  balanced: "보통",
+  complex: "복잡함",
+  simple: "간단함",
 } as const;
 
 interface RequirementPanelProps {
@@ -86,6 +93,13 @@ export function RequirementPanel({
     actionCount > 0;
   const selectedModelOption = models.find(
     (model) => model.id === selectedModel,
+  );
+  const modelRecommendation = recommendModel(
+    models,
+    {
+      ...planningBrief,
+      requirementText,
+    },
   );
 
   function updateContextItem(index: number, value: string) {
@@ -162,6 +176,7 @@ export function RequirementPanel({
             {models.map((model) => (
               <option key={model.id} value={model.id}>
                 {model.label}
+                {model.id === modelRecommendation?.model.id ? " · 추천" : ""}
               </option>
             ))}
           </select>
@@ -169,6 +184,19 @@ export function RequirementPanel({
             <span className="form-field__error" role="alert">
               {modelErrorMessage}
             </span>
+          ) : null}
+          {modelRecommendation ? (
+            <div className="model-recommendation" aria-label="추천 모델">
+              <span className="model-recommendation__badge">추천</span>
+              <p>
+                <strong>{modelRecommendation.model.label}</strong>
+                <span>
+                  계획 복잡도: {complexityLabels[modelRecommendation.complexity]}
+                  {" · "}{modelRecommendation.score}점
+                </span>
+                <span>{modelRecommendation.reason}</span>
+              </p>
+            </div>
           ) : null}
           {selectedModelOption ? (
             <section className="model-guidance" aria-label="선택 모델 안내">
