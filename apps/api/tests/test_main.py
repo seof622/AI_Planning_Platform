@@ -21,8 +21,13 @@ def test_planning_models_returns_default_and_allowed_models() -> None:
     body = response.json()
     assert body["defaultModel"] == "gpt-5-mini"
     assert body["models"][0] == {
+        "cost": "low",
+        "description": "빠르고 경제적으로 계획 초안을 생성합니다.",
         "id": "gpt-5-mini",
         "label": "GPT-5 mini",
+        "quality": "standard",
+        "recommendedFor": "빠른 초안, 반복 탐색, 간단한 계획",
+        "speed": "fast",
     }
 
 

@@ -14,6 +14,26 @@ const project: Project = {
   updatedAt: "2026-07-26T00:00:00Z",
 };
 
+const miniModel = {
+  cost: "low" as const,
+  description: "빠르고 경제적으로 계획 초안을 생성합니다.",
+  id: "gpt-5-mini",
+  label: "GPT-5 mini",
+  quality: "standard" as const,
+  recommendedFor: "빠른 초안",
+  speed: "fast" as const,
+};
+
+const lunaModel = {
+  cost: "medium" as const,
+  description: "속도와 결과 품질의 균형을 맞춘 모델입니다.",
+  id: "gpt-5.6-luna",
+  label: "GPT-5.6 Luna",
+  quality: "high" as const,
+  recommendedFor: "일반 프로젝트",
+  speed: "fast" as const,
+};
+
 const planningResult: PlanningResult = {
   edges: [],
   metadata: {
@@ -87,8 +107,8 @@ describe("planningStore", () => {
       jsonResponse({
         defaultModel: "gpt-5-mini",
         models: [
-          { id: "gpt-5-mini", label: "GPT-5 mini" },
-          { id: "gpt-5.6-luna", label: "GPT-5.6 Luna" },
+          miniModel,
+          lunaModel,
         ],
       }),
     );
@@ -107,7 +127,7 @@ describe("planningStore", () => {
 
   it("selects the first project and restores its latest result", async () => {
     usePlanningStore.setState({
-      models: [{ id: "gpt-5.6-luna", label: "GPT-5.6 Luna" }],
+      models: [lunaModel],
       modelStatus: "ready",
       selectedModel: "gpt-5.6-luna",
     });
@@ -255,7 +275,7 @@ describe("planningStore", () => {
       ...planningHistory,
     ];
     usePlanningStore.setState({
-      models: [{ id: "gpt-5.6-luna", label: "GPT-5.6 Luna" }],
+      models: [lunaModel],
       planningHistory,
       selectedPlanningResultId: "planning-result-latest",
       selectedProjectId: project.id,

@@ -530,6 +530,48 @@ button {
   padding-top: 12px;
 }
 
+.model-guidance {
+  display: grid;
+  gap: 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px;
+  background: var(--surface-muted);
+}
+
+.model-guidance__description,
+.model-guidance__recommendation {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.model-guidance__levels {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  margin: 0;
+}
+
+.model-guidance__levels > div {
+  border-radius: 6px;
+  padding: 6px;
+  background: var(--surface);
+  text-align: center;
+}
+
+.model-guidance__levels dt {
+  color: var(--text-muted);
+  font-size: 10px;
+}
+
+.model-guidance__levels dd {
+  margin: 2px 0 0;
+  font-size: 12px;
+  font-weight: 800;
+}
+
 .requirement-summary h3 {
   margin: 0 0 9px;
   font-size: 12px;

@@ -1,4 +1,5 @@
 import type {
+  AIModelCatalog,
   ComponentNodeType,
   DependencyType,
   EffortSize,
@@ -7,6 +8,10 @@ import type {
   Priority,
   RoadmapStep,
 } from "./types.js";
+
+const modelCosts = new Set(["low", "medium", "high"]);
+const modelQualities = new Set(["standard", "high", "highest"]);
+const modelSpeeds = new Set(["fast", "balanced", "deliberate"]);
 
 export interface ContractValidationIssue {
   path: string;
@@ -110,6 +115,52 @@ export function validatePlanningRequest(
     valid: issues.length === 0,
     issues,
   };
+}
+
+export function validateAIModelCatalog(
+  catalog: AIModelCatalog,
+): ContractValidationResult {
+  const issues: ContractValidationIssue[] = [];
+  const modelIds = new Set<string>();
+
+  if (!hasText(catalog.defaultModel)) {
+    addIssue(issues, "defaultModel", "Default model must not be empty.");
+  }
+  if (catalog.models.length === 0) {
+    addIssue(issues, "models", "Model catalog must contain at least one model.");
+  }
+
+  catalog.models.forEach((model, index) => {
+    const path = `models.${index}`;
+    for (const [field, value] of [
+      ["id", model.id],
+      ["label", model.label],
+      ["description", model.description],
+      ["recommendedFor", model.recommendedFor],
+    ] as const) {
+      if (!hasText(value)) {
+        addIssue(issues, `${path}.${field}`, `${field} must not be empty.`);
+      }
+    }
+    if (modelIds.has(model.id)) {
+      addIssue(issues, `${path}.id`, `Duplicate model id: ${model.id}.`);
+    }
+    modelIds.add(model.id);
+    if (!modelCosts.has(model.cost)) {
+      addIssue(issues, `${path}.cost`, `Unsupported model cost: ${model.cost}.`);
+    }
+    if (!modelQualities.has(model.quality)) {
+      addIssue(issues, `${path}.quality`, `Unsupported model quality: ${model.quality}.`);
+    }
+    if (!modelSpeeds.has(model.speed)) {
+      addIssue(issues, `${path}.speed`, `Unsupported model speed: ${model.speed}.`);
+    }
+  });
+
+  if (hasText(catalog.defaultModel) && !modelIds.has(catalog.defaultModel)) {
+    addIssue(issues, "defaultModel", "Default model must exist in the catalog.");
+  }
+  return { valid: issues.length === 0, issues };
 }
 
 export function validatePlanningResult(
