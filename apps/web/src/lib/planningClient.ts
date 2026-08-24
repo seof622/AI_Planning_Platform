@@ -1,5 +1,6 @@
 import type {
   AIModelCatalog,
+  ComponentNode,
   PlanningRequest,
   PlanningResult,
   PlanningResultHistoryItem,
@@ -170,6 +171,21 @@ export function restorePlanningResult(
   return requestJson<PlanningResultRestoreResponse>(
     `/projects/${encodeURIComponent(projectId)}/planning-results/${encodeURIComponent(resultId)}/restore`,
     { method: "POST" },
+  );
+}
+
+export function saveGraphEdit(
+  projectId: string,
+  resultId: string,
+  nodes: ComponentNode[],
+): Promise<PlanningResult> {
+  return requestJson<PlanningResult>(
+    `/projects/${encodeURIComponent(projectId)}/planning-results/${encodeURIComponent(resultId)}/edit`,
+    {
+      body: JSON.stringify({ nodes }),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
+    },
   );
 }
 

@@ -215,6 +215,70 @@ describe("planningStore", () => {
     expect(usePlanningStore.getState().planningHistory).toEqual(planningHistory);
   });
 
+  it("saves graph edits as a new planning result version", async () => {
+    const editedResult: PlanningResult = {
+      ...planningResult,
+      metadata: {
+        ...planningResult.metadata,
+        editedFromResultId: "planning-result-latest",
+      },
+      nodes: [
+        {
+          ...planningResult.nodes[0]!,
+          label: "Edited node",
+          position: { x: 120, y: 240 },
+        },
+      ],
+    };
+    const editedHistory = [
+      {
+        ...planningHistory[0]!,
+        editedFromResultId: "planning-result-latest",
+        id: "planning-result-edited",
+      },
+      ...planningHistory,
+    ];
+    usePlanningStore.setState({
+      planningHistory,
+      planningResult,
+      selectedPlanningResultId: "planning-result-latest",
+      selectedProjectId: project.id,
+      status: "ready",
+    });
+
+    usePlanningStore.getState().updateNode("node-test", {
+      label: "Edited node",
+    });
+    usePlanningStore.getState().updateNodePosition("node-test", 120, 240);
+
+    expect(usePlanningStore.getState().graphEditStatus).toBe("dirty");
+    expect(usePlanningStore.getState().planningResult?.nodes[0]).toMatchObject({
+      label: "Edited node",
+      position: { x: 120, y: 240 },
+    });
+
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(jsonResponse(editedResult))
+      .mockResolvedValueOnce(jsonResponse(editedHistory));
+
+    await usePlanningStore.getState().saveGraphEdits();
+
+    const [url, init] = vi.mocked(fetch).mock.calls[0]!;
+    expect(url).toBe(
+      "http://localhost:8000/projects/project-test/planning-results/planning-result-latest/edit",
+    );
+    expect(init?.method).toBe("POST");
+    expect(JSON.parse(String(init?.body)).nodes[0]).toMatchObject({
+      label: "Edited node",
+      position: { x: 120, y: 240 },
+    });
+    expect(usePlanningStore.getState().graphEditStatus).toBe("idle");
+    expect(usePlanningStore.getState().planningHistory).toEqual(editedHistory);
+    expect(usePlanningStore.getState().selectedPlanningResultId).toBe(
+      "planning-result-edited",
+    );
+  });
+
   it("loads a selected historical planning result", async () => {
     const historicalResult = { ...planningResult, summary: "Older plan" };
     usePlanningStore.setState({

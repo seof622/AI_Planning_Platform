@@ -8,6 +8,7 @@ import {
   ReactFlow,
   type Node,
   type NodeMouseHandler,
+  type ReactFlowProps,
 } from "@xyflow/react";
 import type { PlanningResult } from "@ai-planning-platform/shared";
 import { ComponentNodeCard } from "./ComponentNodeCard";
@@ -17,6 +18,7 @@ import { toReactFlowEdges, toReactFlowNodes } from "../lib/reactFlowMapping";
 import type { PlanningStatus } from "../store/planningStore";
 
 interface PlanningCanvasProps {
+  onMoveNode: (nodeId: string, x: number, y: number) => void;
   onSelectNode: (nodeId: string | null) => void;
   result: PlanningResult | null;
   selectedNodeId: string | null;
@@ -37,6 +39,7 @@ type NodeStyleWithAccent = Node["style"] & {
 
 export function PlanningCanvas({
   onSelectNode,
+  onMoveNode,
   result,
   selectedNodeId,
   status,
@@ -56,6 +59,11 @@ export function PlanningCanvas({
   const handleNodeClick: NodeMouseHandler = (_event, node) => {
     onSelectNode(node.id);
   };
+  const handleNodeDragStop: NonNullable<
+    ReactFlowProps["onNodeDragStop"]
+  > = (_event, node) => {
+    onMoveNode(node.id, node.position.x, node.position.y);
+  };
 
   if (status !== "ready" || !result) {
     return (
@@ -73,6 +81,7 @@ export function PlanningCanvas({
         edgeTypes={edgeTypes}
         nodeTypes={nodeTypes}
         onNodeClick={handleNodeClick}
+        onNodeDragStop={handleNodeDragStop}
         onPaneClick={() => onSelectNode(null)}
         fitView
         fitViewOptions={{ padding: 0.2 }}

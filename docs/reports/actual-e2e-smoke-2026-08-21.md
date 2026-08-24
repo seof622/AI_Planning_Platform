@@ -22,6 +22,7 @@
 | 브라우저 새로고침 UI 복원 | 통과 |
 | 브라우저 모델 추천·수동 선택 | 통과 |
 | 브라우저 이력 선택·복원 | 통과 |
+| Graph 편집 API·DB 새 버전 저장 | 통과 |
 
 ## 모델별 생성 결과
 
@@ -69,8 +70,20 @@
 브라우저의 DOM snapshot API가 현재 환경에서 동작하지 않아, UI 검증은
 읽기 전용 page evaluate와 명시적 form control 조작으로 수행했다.
 
+## Graph 편집 후속 Smoke Test
+
+동일 E2E 프로젝트의 최신 결과에서 첫 node 이름과 x 위치를 변경한 뒤 Graph
+편집 endpoint로 저장했다.
+
+- 저장 전 이력: 6건
+- 저장 후 이력: 7건
+- 최신 node label: `요구사항 및 범위 정의 [편집 E2E]`
+- 최신 node x 위치: `20`
+- 새 결과의 `editedFromResultId`: 편집 대상 결과 ID와 일치
+- 이력 응답의 `editedFromResultId`: 편집 대상 결과 ID와 일치
+
 ## 데이터 정리 참고
 
-이번 테스트는 실제 PostgreSQL에 E2E 전용 프로젝트와 계획 결과 6건을 남겼다.
+이번 테스트는 실제 PostgreSQL에 E2E 전용 프로젝트와 계획 결과 7건을 남겼다.
 테스트 데이터 자동 정리 API가 없으므로 삭제가 필요하면 명시적인 관리 절차를
 정의한 뒤 처리한다.

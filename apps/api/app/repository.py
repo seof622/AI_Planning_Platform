@@ -90,6 +90,7 @@ def save_planning_result(
     selected_model: str | None,
     result: dict[str, Any],
     restored_from_result_id: str | None = None,
+    edited_from_result_id: str | None = None,
 ) -> dict[str, Any]:
     now = utc_now()
     requirement = RequirementModel(
@@ -120,6 +121,8 @@ def save_planning_result(
     result_metadata = deepcopy(result.get("metadata") or {})
     if restored_from_result_id:
         result_metadata["restoredFromResultId"] = restored_from_result_id
+    if edited_from_result_id:
+        result_metadata["editedFromResultId"] = edited_from_result_id
     persisted_result = {
         **result,
         "project": project_record,
@@ -175,6 +178,9 @@ def list_planning_results(
             "summary": stored.result.get("summary", ""),
             "canRestore": stored.planning_brief is not None,
             "restoredFromResultId": stored.restored_from_result_id,
+            "editedFromResultId": (
+                (stored.result.get("metadata") or {}).get("editedFromResultId")
+            ),
         }
         for stored in session.scalars(statement)
     ]
@@ -235,4 +241,35 @@ def restore_planning_result(
         selected_model=source.model,
         result=deepcopy(source.result),
         restored_from_result_id=source.id,
+    )
+
+
+def edit_planning_result(
+    session: Session,
+    *,
+    project: ProjectModel,
+    result_id: str,
+    nodes: list[dict[str, Any]],
+) -> dict[str, Any] | None:
+    statement = select(PlanningResultModel).where(
+        PlanningResultModel.id == result_id,
+        PlanningResultModel.project_id == project.id,
+    )
+    source = session.scalar(statement)
+    if source is None:
+        return None
+    requirement = session.get(RequirementModel, source.requirement_id)
+    if requirement is None:
+        return None
+
+    edited_result = deepcopy(source.result)
+    edited_result["nodes"] = nodes
+    return save_planning_result(
+        session,
+        project=project,
+        requirement_content=requirement.content,
+        planning_brief=deepcopy(source.planning_brief),
+        selected_model=source.model,
+        result=edited_result,
+        edited_from_result_id=source.id,
     )

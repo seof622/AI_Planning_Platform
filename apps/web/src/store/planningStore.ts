@@ -24,6 +24,7 @@ import {
   listProjects,
   saveProjectPlanningBrief,
   restorePlanningResult,
+  saveGraphEdit,
 } from "../lib/planningClient";
 
 export type PlanningStatus = "idle" | "ready" | "loading" | "error" | "empty";
@@ -109,6 +110,8 @@ function toDraft(
 
 interface PlanningState {
   errorMessage: string | null;
+  graphEditErrorMessage: string | null;
+  graphEditStatus: "idle" | "dirty" | "saving" | "error";
   historyErrorMessage: string | null;
   historyStatus: "idle" | "loading" | "ready" | "error";
   isViewingHistoricalResult: boolean;
@@ -134,10 +137,18 @@ interface PlanningState {
   loadPlanningHistory: (projectId: string) => Promise<void>;
   resetToEmpty: () => void;
   restoreSelectedPlanningResult: () => Promise<void>;
+  saveGraphEdits: () => Promise<void>;
   saveCurrentPlanningBrief: () => Promise<void>;
   selectProject: (projectId: string) => Promise<void>;
   selectPlanningResult: (resultId: string) => Promise<void>;
   selectNode: (nodeId: string | null) => void;
+  updateNode: (
+    nodeId: string,
+    changes: Partial<
+      Pick<ComponentNode, "label" | "description" | "category" | "priority">
+    >,
+  ) => void;
+  updateNodePosition: (nodeId: string, x: number, y: number) => void;
   setErrorState: (message: string) => void;
   setPlanningBriefField: <K extends keyof PlanningBriefDraft>(
     field: K,
@@ -149,6 +160,8 @@ interface PlanningState {
 
 export const usePlanningStore = create<PlanningState>((set, get) => ({
   errorMessage: null,
+  graphEditErrorMessage: null,
+  graphEditStatus: "idle",
   historyErrorMessage: null,
   historyStatus: "idle",
   isViewingHistoricalResult: false,
@@ -232,6 +245,8 @@ export const usePlanningStore = create<PlanningState>((set, get) => ({
 
       set({
         planningResult: result,
+        graphEditErrorMessage: null,
+        graphEditStatus: "idle",
         projects: get().projects.map((item) =>
           item.id === result.project?.id && result.project
             ? result.project
@@ -331,6 +346,8 @@ export const usePlanningStore = create<PlanningState>((set, get) => ({
   resetToEmpty() {
     set({
       errorMessage: null,
+      graphEditErrorMessage: null,
+      graphEditStatus: "idle",
       isViewingHistoricalResult: false,
       planningBrief: initialPlanningBrief,
       planningHistory: [],
@@ -348,6 +365,8 @@ export const usePlanningStore = create<PlanningState>((set, get) => ({
     }
     set({
       errorMessage: null,
+      graphEditErrorMessage: null,
+      graphEditStatus: "idle",
       isViewingHistoricalResult: false,
       status: "loading",
     });
@@ -360,6 +379,8 @@ export const usePlanningStore = create<PlanningState>((set, get) => ({
         isViewingHistoricalResult: false,
         planningBrief: toDraft(restored.planningBrief),
         planningResult: restored.result,
+        graphEditErrorMessage: null,
+        graphEditStatus: "idle",
         requirementText: restored.planningBrief.requirement,
         selectedModel:
           restored.planningBrief.selectedModel &&
@@ -409,12 +430,49 @@ export const usePlanningStore = create<PlanningState>((set, get) => ({
       });
     }
   },
+  async saveGraphEdits() {
+    const state = get();
+    if (
+      !state.selectedProjectId ||
+      !state.selectedPlanningResultId ||
+      !state.planningResult ||
+      state.graphEditStatus !== "dirty"
+    ) {
+      return;
+    }
+    set({ graphEditErrorMessage: null, graphEditStatus: "saving" });
+    try {
+      const result = await saveGraphEdit(
+        state.selectedProjectId,
+        state.selectedPlanningResultId,
+        state.planningResult.nodes,
+      );
+      set({
+        graphEditErrorMessage: null,
+        graphEditStatus: "idle",
+        isViewingHistoricalResult: false,
+        planningResult: result,
+        status: result.nodes.length > 0 ? "ready" : "empty",
+      });
+      await get().loadPlanningHistory(state.selectedProjectId);
+    } catch (error) {
+      set({
+        graphEditErrorMessage:
+          error instanceof Error
+            ? error.message
+            : "Graph 편집본을 저장하지 못했습니다.",
+        graphEditStatus: "error",
+      });
+    }
+  },
   async selectProject(projectId) {
     if (!projectId) {
       return;
     }
     set({
       errorMessage: null,
+      graphEditErrorMessage: null,
+      graphEditStatus: "idle",
       historyErrorMessage: null,
       historyStatus: "loading",
       isViewingHistoricalResult: false,
@@ -481,6 +539,8 @@ export const usePlanningStore = create<PlanningState>((set, get) => ({
         historicalBrief?.selectedModel ?? result.metadata.model;
       set({
         isViewingHistoricalResult: isHistorical,
+        graphEditErrorMessage: null,
+        graphEditStatus: "idle",
         planningBrief: historicalBrief
           ? toDraft(historicalBrief)
           : initialPlanningBrief,
@@ -507,6 +567,42 @@ export const usePlanningStore = create<PlanningState>((set, get) => ({
   },
   selectNode(nodeId) {
     set({ selectedNodeId: nodeId });
+  },
+  updateNode(nodeId, changes) {
+    set((state) => {
+      if (!state.planningResult) {
+        return state;
+      }
+      return {
+        graphEditErrorMessage: null,
+        graphEditStatus: "dirty",
+        planningResult: {
+          ...state.planningResult,
+          nodes: state.planningResult.nodes.map((node) =>
+            node.id === nodeId ? { ...node, ...changes } : node,
+          ),
+        },
+      };
+    });
+  },
+  updateNodePosition(nodeId, x, y) {
+    set((state) => {
+      if (!state.planningResult) {
+        return state;
+      }
+      return {
+        graphEditErrorMessage: null,
+        graphEditStatus: "dirty",
+        planningResult: {
+          ...state.planningResult,
+          nodes: state.planningResult.nodes.map((node) =>
+            node.id === nodeId
+              ? { ...node, position: { x, y } }
+              : node,
+          ),
+        },
+      };
+    });
   },
   setErrorState(message) {
     set({
