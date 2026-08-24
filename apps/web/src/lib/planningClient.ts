@@ -7,6 +7,7 @@ import type {
   PlanningResultRestoreResponse,
   Project,
   ProjectPlanningBrief,
+  RoadmapStep,
 } from "@ai-planning-platform/shared";
 
 const API_BASE_URL =
@@ -178,11 +179,12 @@ export function saveGraphEdit(
   projectId: string,
   resultId: string,
   nodes: ComponentNode[],
+  roadmap: RoadmapStep[],
 ): Promise<PlanningResult> {
   return requestJson<PlanningResult>(
     `/projects/${encodeURIComponent(projectId)}/planning-results/${encodeURIComponent(resultId)}/edit`,
     {
-      body: JSON.stringify({ nodes }),
+      body: JSON.stringify({ nodes, roadmap }),
       headers: { "Content-Type": "application/json" },
       method: "POST",
     },

@@ -160,7 +160,8 @@ def test_project_planning_result_round_trip(monkeypatch) -> None:
                         **generated["nodes"][0],
                         "id": "node-added",
                     }
-                ]
+                ],
+                "roadmap": generated["roadmap"],
             },
         )
         assert invalid_edit_response.status_code == 422
@@ -173,14 +174,37 @@ def test_project_planning_result_round_trip(monkeypatch) -> None:
             "priority": "medium",
             "position": {"x": 120, "y": 240},
         }
+        edited_roadmap = [
+            {
+                **generated["roadmap"][0],
+                "title": "편집된 API 구현",
+                "description": "편집된 순서에 따라 API를 구현합니다.",
+                "estimatedEffort": "large",
+            }
+        ]
         edit_response = client.post(
             f"/projects/{project['id']}/planning-results/{history[0]['id']}/edit",
-            json={"nodes": [edited_node]},
+            json={"nodes": [edited_node], "roadmap": edited_roadmap},
         )
         assert edit_response.status_code == 200
         edited = edit_response.json()
         assert edited["nodes"] == [edited_node]
+        assert edited["roadmap"] == edited_roadmap
         assert edited["metadata"]["editedFromResultId"] == history[0]["id"]
+
+        invalid_dependency_response = client.post(
+            f"/projects/{project['id']}/planning-results/{history[0]['id']}/edit",
+            json={
+                "nodes": [edited_node],
+                "roadmap": [
+                    {
+                        **edited_roadmap[0],
+                        "dependsOn": ["step-missing"],
+                    }
+                ],
+            },
+        )
+        assert invalid_dependency_response.status_code == 422
 
         edited_history_response = client.get(
             f"/projects/{project['id']}/planning-results"

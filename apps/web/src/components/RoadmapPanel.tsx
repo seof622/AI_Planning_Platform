@@ -5,20 +5,56 @@ import { effortLabels, priorityLabels } from "../lib/planningLabels";
 import type { PlanningStatus } from "../store/planningStore";
 
 interface RoadmapPanelProps {
+  editErrorMessage: string | null;
+  editStatus: "idle" | "dirty" | "saving" | "error";
   errorMessage: string | null;
+  onChange: (
+    stepId: string,
+    changes: Partial<Pick<RoadmapStep, "title" | "description" | "estimatedEffort">>,
+  ) => void;
+  onMove: (stepId: string, direction: -1 | 1) => void;
+  onSave: () => Promise<void>;
   roadmap: RoadmapStep[];
   status: PlanningStatus;
 }
 
-export function RoadmapPanel({ errorMessage, roadmap, status }: RoadmapPanelProps) {
+export function RoadmapPanel({
+  editErrorMessage,
+  editStatus,
+  errorMessage,
+  onChange,
+  onMove,
+  onSave,
+  roadmap,
+  status,
+}: RoadmapPanelProps) {
   const sortedRoadmap = [...roadmap].sort((left, right) => left.order - right.order);
+  const canSave =
+    editStatus === "dirty" &&
+    sortedRoadmap.every(
+      (step) => step.title.trim() && step.description.trim(),
+    );
 
   return (
     <section className="roadmap" aria-label="계획 로드맵">
       <div className="roadmap__header">
         <h2 className="roadmap__title">로드맵</h2>
-        <span className="pill">{sortedRoadmap.length}단계</span>
+        <div className="roadmap__actions">
+          <span className="pill">{sortedRoadmap.length}단계</span>
+          <button
+            className="button button--primary roadmap__save"
+            disabled={!canSave}
+            type="button"
+            onClick={() => void onSave()}
+          >
+            {editStatus === "saving" ? "저장 중" : "로드맵 새 버전 저장"}
+          </button>
+        </div>
       </div>
+
+      {editErrorMessage ? (
+        <p className="form-field__error" role="alert">{editErrorMessage}</p>
+      ) : null}
 
       {status === "error" ? (
         <StatusViewCopy
@@ -40,16 +76,30 @@ export function RoadmapPanel({ errorMessage, roadmap, status }: RoadmapPanelProp
 
       {status === "ready" ? (
         <ol className="roadmap__steps">
-          {sortedRoadmap.map((step) => (
+          {sortedRoadmap.map((step, index) => (
             <li className="roadmap-step" key={step.id}>
               <div className="roadmap-step__topline">
                 <span className="roadmap-step__order">{step.order}</span>
-                <span className={`pill pill--${step.priority}`}>
-                  {priorityLabels[step.priority]} / {effortLabels[step.estimatedEffort]}
-                </span>
+                <div className="roadmap-step__move-actions">
+                  <button aria-label={`${step.title} 앞으로 이동`} disabled={index === 0} type="button" onClick={() => onMove(step.id, -1)}>←</button>
+                  <button aria-label={`${step.title} 뒤로 이동`} disabled={index === sortedRoadmap.length - 1} type="button" onClick={() => onMove(step.id, 1)}>→</button>
+                </div>
               </div>
-              <h3 className="roadmap-step__title">{step.title}</h3>
-              <p className="roadmap-step__description">{step.description}</p>
+              <label className="form-field">
+                <span className="form-field__label">단계 제목</span>
+                <input aria-label={`${step.order}단계 제목`} value={step.title} onChange={(event) => onChange(step.id, { title: event.target.value })} />
+              </label>
+              <label className="form-field">
+                <span className="form-field__label">단계 설명</span>
+                <textarea aria-label={`${step.order}단계 설명`} value={step.description} onChange={(event) => onChange(step.id, { description: event.target.value })} />
+              </label>
+              <label className="form-field">
+                <span className="form-field__label">예상 작업량</span>
+                <select aria-label={`${step.order}단계 예상 작업량`} value={step.estimatedEffort} onChange={(event) => onChange(step.id, { estimatedEffort: event.target.value as RoadmapStep["estimatedEffort"] })}>
+                  {Object.entries(effortLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                </select>
+              </label>
+              <span className={`pill pill--${step.priority}`}>{priorityLabels[step.priority]}</span>
             </li>
           ))}
         </ol>

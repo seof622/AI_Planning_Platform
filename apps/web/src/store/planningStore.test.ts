@@ -268,15 +268,62 @@ describe("planningStore", () => {
       "http://localhost:8000/projects/project-test/planning-results/planning-result-latest/edit",
     );
     expect(init?.method).toBe("POST");
-    expect(JSON.parse(String(init?.body)).nodes[0]).toMatchObject({
+    const editBody = JSON.parse(String(init?.body));
+    expect(editBody.nodes[0]).toMatchObject({
       label: "Edited node",
       position: { x: 120, y: 240 },
     });
+    expect(editBody.roadmap).toEqual(planningResult.roadmap);
     expect(usePlanningStore.getState().graphEditStatus).toBe("idle");
     expect(usePlanningStore.getState().planningHistory).toEqual(editedHistory);
     expect(usePlanningStore.getState().selectedPlanningResultId).toBe(
       "planning-result-edited",
     );
+  });
+
+  it("edits roadmap fields and rejects an order that breaks dependencies", () => {
+    const resultWithRoadmap: PlanningResult = {
+      ...planningResult,
+      roadmap: [
+        {
+          dependsOn: [],
+          description: "First",
+          estimatedEffort: "small",
+          id: "step-one",
+          order: 1,
+          priority: "high",
+          title: "First step",
+        },
+        {
+          dependsOn: ["step-one"],
+          description: "Second",
+          estimatedEffort: "large",
+          id: "step-two",
+          order: 2,
+          priority: "medium",
+          title: "Second step",
+        },
+      ],
+    };
+    usePlanningStore.setState({
+      graphEditErrorMessage: null,
+      graphEditStatus: "idle",
+      planningResult: resultWithRoadmap,
+    });
+
+    usePlanningStore.getState().updateRoadmapStep("step-one", {
+      estimatedEffort: "medium",
+      title: "Edited first step",
+    });
+    expect(usePlanningStore.getState().planningResult?.roadmap[0]).toMatchObject({
+      estimatedEffort: "medium",
+      title: "Edited first step",
+    });
+    expect(usePlanningStore.getState().graphEditStatus).toBe("dirty");
+
+    usePlanningStore.getState().moveRoadmapStep("step-one", 1);
+    expect(usePlanningStore.getState().planningResult?.roadmap[0]?.id).toBe("step-one");
+    expect(usePlanningStore.getState().graphEditErrorMessage).toContain("선행 단계");
   });
 
   it("loads a selected historical planning result", async () => {

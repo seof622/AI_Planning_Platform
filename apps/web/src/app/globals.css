@@ -889,6 +889,32 @@ button {
   font-weight: 750;
 }
 
+.roadmap__actions,
+.roadmap-step__move-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.roadmap__save {
+  padding: 7px 10px;
+  font-size: 12px;
+}
+
+.roadmap-step__move-actions button {
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  cursor: pointer;
+}
+
+.roadmap-step__move-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
 .roadmap__steps {
   display: grid;
   grid-auto-columns: minmax(220px, 280px);
@@ -923,6 +949,16 @@ button {
   border-radius: 8px;
   padding: 11px;
   background: #fbfcfd;
+}
+
+.roadmap-step .form-field {
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.roadmap-step textarea {
+  min-height: 62px;
+  resize: vertical;
 }
 
 .roadmap-step__topline {

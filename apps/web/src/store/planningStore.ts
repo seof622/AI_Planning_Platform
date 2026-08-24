@@ -10,6 +10,7 @@ import type {
   PlanningResultHistoryItem,
   Project,
   ProjectPlanningBrief,
+  RoadmapStep,
   SuccessCriterion,
 } from "@ai-planning-platform/shared";
 import {
@@ -149,6 +150,11 @@ interface PlanningState {
     >,
   ) => void;
   updateNodePosition: (nodeId: string, x: number, y: number) => void;
+  updateRoadmapStep: (
+    stepId: string,
+    changes: Partial<Pick<RoadmapStep, "title" | "description" | "estimatedEffort">>,
+  ) => void;
+  moveRoadmapStep: (stepId: string, direction: -1 | 1) => void;
   setErrorState: (message: string) => void;
   setPlanningBriefField: <K extends keyof PlanningBriefDraft>(
     field: K,
@@ -446,6 +452,7 @@ export const usePlanningStore = create<PlanningState>((set, get) => ({
         state.selectedProjectId,
         state.selectedPlanningResultId,
         state.planningResult.nodes,
+        state.planningResult.roadmap,
       );
       set({
         graphEditErrorMessage: null,
@@ -601,6 +608,59 @@ export const usePlanningStore = create<PlanningState>((set, get) => ({
               : node,
           ),
         },
+      };
+    });
+  },
+  updateRoadmapStep(stepId, changes) {
+    set((state) => {
+      if (!state.planningResult) {
+        return state;
+      }
+      return {
+        graphEditErrorMessage: null,
+        graphEditStatus: "dirty",
+        planningResult: {
+          ...state.planningResult,
+          roadmap: state.planningResult.roadmap.map((step) =>
+            step.id === stepId ? { ...step, ...changes } : step,
+          ),
+        },
+      };
+    });
+  },
+  moveRoadmapStep(stepId, direction) {
+    set((state) => {
+      if (!state.planningResult) {
+        return state;
+      }
+      const roadmap = [...state.planningResult.roadmap].sort(
+        (left, right) => left.order - right.order,
+      );
+      const index = roadmap.findIndex((step) => step.id === stepId);
+      const targetIndex = index + direction;
+      if (index < 0 || targetIndex < 0 || targetIndex >= roadmap.length) {
+        return state;
+      }
+      [roadmap[index], roadmap[targetIndex]] = [roadmap[targetIndex]!, roadmap[index]!];
+      const reordered = roadmap.map((step, stepIndex) => ({
+        ...step,
+        order: stepIndex + 1,
+      }));
+      const orderById = new Map(reordered.map((step) => [step.id, step.order]));
+      const hasInvalidDependency = reordered.some((step) =>
+        step.dependsOn.some(
+          (dependencyId) => (orderById.get(dependencyId) ?? Infinity) >= step.order,
+        ),
+      );
+      if (hasInvalidDependency) {
+        return {
+          graphEditErrorMessage: "선행 단계보다 앞이나 같은 위치로 이동할 수 없습니다.",
+        };
+      }
+      return {
+        graphEditErrorMessage: null,
+        graphEditStatus: "dirty",
+        planningResult: { ...state.planningResult, roadmap: reordered },
       };
     });
   },

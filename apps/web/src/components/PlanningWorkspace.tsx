@@ -57,6 +57,8 @@ export function PlanningWorkspace() {
     status,
     updateNode,
     updateNodePosition,
+    updateRoadmapStep,
+    moveRoadmapStep,
   } = usePlanningStore();
 
   const selectedNode = getSelectedNode(planningResult, selectedNodeId);
@@ -139,7 +141,12 @@ export function PlanningWorkspace() {
             status={status}
           />
           <RoadmapPanel
+            editErrorMessage={graphEditErrorMessage}
+            editStatus={graphEditStatus}
             errorMessage={errorMessage}
+            onChange={updateRoadmapStep}
+            onMove={moveRoadmapStep}
+            onSave={saveGraphEdits}
             roadmap={planningResult?.roadmap ?? []}
             status={status}
           />

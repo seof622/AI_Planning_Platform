@@ -18,6 +18,7 @@ PlanType = Literal["daily", "project", "learning", "event", "decision", "creativ
 SuccessCriterion = Literal["clarity", "speed", "balance", "quality", "consistency"]
 ActionItemNecessity = Literal["required", "optional"]
 Priority = Literal["low", "medium", "high"]
+EffortSize = Literal["small", "medium", "large"]
 
 
 class PlanningActionItem(BaseModel):
@@ -84,5 +85,19 @@ class ComponentNodeEdit(BaseModel):
     metadata: dict[str, Any] | None = None
 
 
-class GraphEditRequest(BaseModel):
+class RoadmapStepEdit(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: str = Field(min_length=1, max_length=100)
+    title: str = Field(min_length=1, max_length=200)
+    description: str = Field(min_length=1, max_length=2000)
+    order: int = Field(gt=0)
+    priority: Priority
+    estimatedEffort: EffortSize
+    dependsOn: list[str]
+    componentNodeIds: list[str] | None = None
+
+
+class PlanningResultEditRequest(BaseModel):
     nodes: list[ComponentNodeEdit] = Field(min_length=1)
+    roadmap: list[RoadmapStepEdit]

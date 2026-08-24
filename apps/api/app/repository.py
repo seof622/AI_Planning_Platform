@@ -250,6 +250,7 @@ def edit_planning_result(
     project: ProjectModel,
     result_id: str,
     nodes: list[dict[str, Any]],
+    roadmap: list[dict[str, Any]],
 ) -> dict[str, Any] | None:
     statement = select(PlanningResultModel).where(
         PlanningResultModel.id == result_id,
@@ -264,6 +265,7 @@ def edit_planning_result(
 
     edited_result = deepcopy(source.result)
     edited_result["nodes"] = nodes
+    edited_result["roadmap"] = roadmap
     return save_planning_result(
         session,
         project=project,

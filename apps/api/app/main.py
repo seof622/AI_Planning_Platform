@@ -36,7 +36,7 @@ from .repository import (
     serialize_project,
 )
 from .schemas import (
-    GraphEditRequest,
+    PlanningResultEditRequest,
     PlanningRequest,
     ProjectCreate,
     ProjectPlanningBrief,
@@ -271,7 +271,7 @@ def projects_restore_planning_result(
 def projects_edit_planning_result(
     project_id: str,
     result_id: str,
-    payload: GraphEditRequest,
+    payload: PlanningResultEditRequest,
     session: Session = Depends(get_db_session),
 ) -> dict:
     project = get_project(session, project_id)
@@ -301,11 +301,48 @@ def projects_edit_planning_result(
             detail="Node label, description, and category must not be empty.",
         )
 
+    source_roadmap_ids = {step.get("id") for step in source.get("roadmap", [])}
+    edited_roadmap_ids = [step.id for step in payload.roadmap]
+    if len(set(edited_roadmap_ids)) != len(edited_roadmap_ids):
+        raise HTTPException(status_code=422, detail="Roadmap step IDs must be unique.")
+    if set(edited_roadmap_ids) != source_roadmap_ids:
+        raise HTTPException(
+            status_code=422,
+            detail="Roadmap editing cannot add or remove steps in this phase.",
+        )
+    orders = [step.order for step in payload.roadmap]
+    if sorted(orders) != list(range(1, len(payload.roadmap) + 1)):
+        raise HTTPException(
+            status_code=422,
+            detail="Roadmap orders must be unique and contiguous from 1.",
+        )
+    order_by_id = {step.id: step.order for step in payload.roadmap}
+    if any(
+        dependency_id not in order_by_id
+        or order_by_id[dependency_id] >= step.order
+        for step in payload.roadmap
+        for dependency_id in step.dependsOn
+    ):
+        raise HTTPException(
+            status_code=422,
+            detail="Roadmap dependencies must reference an earlier step.",
+        )
+    if any(
+        node_id not in source_ids
+        for step in payload.roadmap
+        for node_id in (step.componentNodeIds or [])
+    ):
+        raise HTTPException(
+            status_code=422,
+            detail="Roadmap steps must reference existing component nodes.",
+        )
+
     edited = edit_planning_result(
         session,
         project=project,
         result_id=result_id,
         nodes=[node.model_dump(exclude_none=True) for node in payload.nodes],
+        roadmap=[step.model_dump(exclude_none=True) for step in payload.roadmap],
     )
     if edited is None:
         raise HTTPException(status_code=404, detail="Planning result not found.")
