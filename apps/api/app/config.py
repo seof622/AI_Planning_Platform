@@ -21,6 +21,43 @@ OPENAI_MODEL_LABELS = {
     "gpt-5.6-terra": "GPT-5.6 Terra",
     "gpt-5.6-sol": "GPT-5.6 Sol",
 }
+DEFAULT_MODEL_GUIDANCE = {
+    "description": "범용 계획 생성에 사용할 수 있는 모델입니다.",
+    "quality": "high",
+    "speed": "balanced",
+    "cost": "medium",
+    "recommendedFor": "일반적인 계획 초안과 구조화 작업",
+}
+OPENAI_MODEL_GUIDANCE = {
+    "gpt-5-mini": {
+        "description": "빠르고 경제적으로 계획 초안을 생성합니다.",
+        "quality": "standard",
+        "speed": "fast",
+        "cost": "low",
+        "recommendedFor": "빠른 초안, 반복 탐색, 간단한 계획",
+    },
+    "gpt-5.6-luna": {
+        "description": "속도와 결과 품질의 균형을 맞춘 모델입니다.",
+        "quality": "high",
+        "speed": "fast",
+        "cost": "medium",
+        "recommendedFor": "일반 프로젝트, 학습 및 일상 계획",
+    },
+    "gpt-5.6-terra": {
+        "description": "복잡한 요구사항을 더 깊이 분석하는 모델입니다.",
+        "quality": "high",
+        "speed": "balanced",
+        "cost": "medium",
+        "recommendedFor": "복잡한 프로젝트와 의사결정 계획",
+    },
+    "gpt-5.6-sol": {
+        "description": "완성도와 세밀한 추론을 우선하는 모델입니다.",
+        "quality": "highest",
+        "speed": "deliberate",
+        "cost": "high",
+        "recommendedFor": "중요한 설계, 고난도 계획, 최종안 작성",
+    },
+}
 
 
 @lru_cache
@@ -72,6 +109,7 @@ def get_openai_model_catalog() -> dict:
             {
                 "id": model,
                 "label": OPENAI_MODEL_LABELS.get(model, model),
+                **OPENAI_MODEL_GUIDANCE.get(model, DEFAULT_MODEL_GUIDANCE),
             }
             for model in get_allowed_openai_models()
         ],
