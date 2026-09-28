@@ -48,11 +48,13 @@ describe("RoadmapPanel", () => {
 
     await user.clear(screen.getByLabelText("1단계 제목"));
     await user.type(screen.getByLabelText("1단계 제목"), "범위 정의");
+    await user.selectOptions(screen.getByLabelText("1단계 우선순위"), "low");
     await user.selectOptions(screen.getByLabelText("1단계 예상 작업량"), "medium");
     await user.click(screen.getByRole("button", { name: "요구사항 정리 뒤로 이동" }));
     await user.click(screen.getByRole("button", { name: "로드맵 새 버전 저장" }));
 
     expect(onChange).toHaveBeenCalledWith("step-one", { title: "" });
+    expect(onChange).toHaveBeenCalledWith("step-one", { priority: "low" });
     expect(onChange).toHaveBeenCalledWith("step-one", { estimatedEffort: "medium" });
     expect(onMove).toHaveBeenCalledWith("step-one", 1);
     expect(onSave).toHaveBeenCalledOnce();

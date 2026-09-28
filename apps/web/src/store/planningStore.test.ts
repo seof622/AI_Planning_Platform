@@ -313,10 +313,12 @@ describe("planningStore", () => {
 
     usePlanningStore.getState().updateRoadmapStep("step-one", {
       estimatedEffort: "medium",
+      priority: "low",
       title: "Edited first step",
     });
     expect(usePlanningStore.getState().planningResult?.roadmap[0]).toMatchObject({
       estimatedEffort: "medium",
+      priority: "low",
       title: "Edited first step",
     });
     expect(usePlanningStore.getState().graphEditStatus).toBe("dirty");

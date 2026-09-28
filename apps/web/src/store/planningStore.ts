@@ -152,7 +152,9 @@ interface PlanningState {
   updateNodePosition: (nodeId: string, x: number, y: number) => void;
   updateRoadmapStep: (
     stepId: string,
-    changes: Partial<Pick<RoadmapStep, "title" | "description" | "estimatedEffort">>,
+    changes: Partial<
+      Pick<RoadmapStep, "title" | "description" | "priority" | "estimatedEffort">
+    >,
   ) => void;
   moveRoadmapStep: (stepId: string, direction: -1 | 1) => void;
   setErrorState: (message: string) => void;

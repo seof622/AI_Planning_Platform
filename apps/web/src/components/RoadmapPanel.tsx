@@ -10,7 +10,9 @@ interface RoadmapPanelProps {
   errorMessage: string | null;
   onChange: (
     stepId: string,
-    changes: Partial<Pick<RoadmapStep, "title" | "description" | "estimatedEffort">>,
+    changes: Partial<
+      Pick<RoadmapStep, "title" | "description" | "priority" | "estimatedEffort">
+    >,
   ) => void;
   onMove: (stepId: string, direction: -1 | 1) => void;
   onSave: () => Promise<void>;
@@ -94,12 +96,17 @@ export function RoadmapPanel({
                 <textarea aria-label={`${step.order}단계 설명`} value={step.description} onChange={(event) => onChange(step.id, { description: event.target.value })} />
               </label>
               <label className="form-field">
+                <span className="form-field__label">우선순위</span>
+                <select aria-label={`${step.order}단계 우선순위`} value={step.priority} onChange={(event) => onChange(step.id, { priority: event.target.value as RoadmapStep["priority"] })}>
+                  {Object.entries(priorityLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                </select>
+              </label>
+              <label className="form-field">
                 <span className="form-field__label">예상 작업량</span>
                 <select aria-label={`${step.order}단계 예상 작업량`} value={step.estimatedEffort} onChange={(event) => onChange(step.id, { estimatedEffort: event.target.value as RoadmapStep["estimatedEffort"] })}>
                   {Object.entries(effortLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
                 </select>
               </label>
-              <span className={`pill pill--${step.priority}`}>{priorityLabels[step.priority]}</span>
             </li>
           ))}
         </ol>

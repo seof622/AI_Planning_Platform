@@ -179,6 +179,7 @@ def test_project_planning_result_round_trip(monkeypatch) -> None:
                 **generated["roadmap"][0],
                 "title": "편집된 API 구현",
                 "description": "편집된 순서에 따라 API를 구현합니다.",
+                "priority": "low",
                 "estimatedEffort": "large",
             }
         ]

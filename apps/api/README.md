@@ -82,6 +82,7 @@ Project endpoints:
 - `GET /projects/{project_id}/planning-results/latest`
 - `GET /projects/{project_id}/planning-results`
 - `GET /projects/{project_id}/planning-results/{result_id}`
+- `POST /projects/{project_id}/planning-results/{result_id}/edit`
 - `GET /projects/{project_id}/planning-results/{result_id}/planning-brief`
 - `POST /projects/{project_id}/planning-results/{result_id}/restore`
 - `GET /projects/{project_id}/planning-brief`

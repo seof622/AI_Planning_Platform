@@ -9,15 +9,15 @@
 - 다른 환경이나 브랜치에서 진행 중인 작업은 동기화하기 전까지 중복 수정하지
   않는다.
 
-## 현재 제품 로드맵 2026-08-21
+## 현재 제품 로드맵 2026-09-28
 
 핵심 Planning 생성, 모델 선택·추천, PostgreSQL persistence, 생성 이력·복원,
 실제 환경 E2E까지 완료했다. 이제 AI가 만든 결과를 사용자가 직접 다듬고,
 편집 결과를 안전하게 저장하는 제품 단계로 진행한다.
 
-### Phase 1. Graph 편집 — 현재 작업
+### Phase 1. Graph 편집
 
-상태: 구현 및 기본 검증 완료, 브라우저 UI E2E 후 최종 완료 처리
+상태: 구현, 자동 검증, 실제 PostgreSQL 저장 검증 완료. 브라우저 UI E2E 대기
 
 - 선택한 node의 label, description, category, priority를 편집한다.
 - Canvas에서 node를 이동하고 위치를 편집 결과에 반영한다.
@@ -37,14 +37,28 @@
   9개가 통과했다.
 - 실제 PostgreSQL에서 편집본 저장, 최신 결과 조회, 이력 증가와
   `editedFromResultId` 일치를 확인했다.
-- 브라우저에서 node 편집·drag·저장·새로고침 복원을 최종 확인한 뒤 Phase 2로
-  이동한다.
+- 브라우저에서 node 편집·drag·저장·새로고침 복원을 최종 확인해야 한다.
 
-### Phase 2. Roadmap 편집
+### Phase 2. Roadmap 편집 — 현재 작업
+
+상태: 구현, 자동 검증, 실제 PostgreSQL 저장 검증 완료. 브라우저 UI E2E 대기
 
 - 단계 내용, 우선순위, 예상 effort와 순서를 편집한다.
 - dependency와 component node reference 일관성을 유지한다.
 - Graph 편집과 동일한 새 버전 저장 원칙을 사용한다.
+
+진행 메모 2026-09-28:
+
+- 단계 제목, 설명, 우선순위, 예상 effort 편집 UI와 단계 순서 변경을 추가했다.
+- 순서 변경 시 dependency가 선행 단계를 가리키는지 Web과 API에서 검증한다.
+- 원본 roadmap step ID 집합, 연속된 order, component node reference를 API에서
+  검증하고 편집본을 새 planning result 버전으로 저장한다.
+- Web test 18개, Shared/Web typecheck, lint, production build, 평가 검증과
+  API test 15개가 통과했다.
+- 실제 PostgreSQL에서 roadmap 제목과 우선순위 편집본 저장, 최신 결과 복원,
+  이력 증가와 `editedFromResultId` 일치를 확인했다.
+- 브라우저에서 Graph와 Roadmap 편집·저장·새로고침 복원을 함께 최종 확인한 뒤
+  Phase 3으로 이동한다.
 
 ### Phase 3. 편집 버전 관리 완성
 
