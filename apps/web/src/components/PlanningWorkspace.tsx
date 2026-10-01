@@ -132,7 +132,7 @@ export function PlanningWorkspace() {
             setSelectedModel={setSelectedModel}
           />
         </div>
-        <div className="workspace__canvas-area">
+        <div className={`workspace__canvas-area${selectedNode ? " workspace__canvas-area--node-selected" : ""}`}>
           <PlanningCanvas
             onMoveNode={updateNodePosition}
             onSelectNode={selectNode}
@@ -154,6 +154,7 @@ export function PlanningWorkspace() {
             editErrorMessage={graphEditErrorMessage}
             editStatus={graphEditStatus}
             node={selectedNode}
+            onClose={() => selectNode(null)}
             onChange={(changes) => {
               if (selectedNode) {
                 updateNode(selectedNode.id, changes);

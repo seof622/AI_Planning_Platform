@@ -7,6 +7,7 @@ interface NodeDetailPanelProps {
   editErrorMessage: string | null;
   editStatus: "idle" | "dirty" | "saving" | "error";
   node: ComponentNode | null;
+  onClose: () => void;
   onChange: (
     changes: Partial<
       Pick<ComponentNode, "label" | "description" | "category" | "priority">
@@ -23,6 +24,7 @@ export function NodeDetailPanel({
   editErrorMessage,
   editStatus,
   node,
+  onClose,
   onChange,
   onSave,
 }: NodeDetailPanelProps) {
@@ -39,7 +41,12 @@ export function NodeDetailPanel({
 
   return (
     <aside className="detail-drawer detail-drawer--open">
-      <h2 className="panel__title">Node 편집</h2>
+      <div className="detail-drawer__header">
+        <h2 className="panel__title">Node 편집</h2>
+        <button type="button" aria-label="Node 편집 닫기" onClick={onClose}>
+          닫기
+        </button>
+      </div>
       <div className="detail-list">
         <label className="form-field">
           <span className="form-field__label">이름</span>

@@ -9,7 +9,7 @@
 - 다른 환경이나 브랜치에서 진행 중인 작업은 동기화하기 전까지 중복 수정하지
   않는다.
 
-## 현재 제품 로드맵 2026-09-28
+## 현재 제품 로드맵 2026-10-01
 
 핵심 Planning 생성, 모델 선택·추천, PostgreSQL persistence, 생성 이력·복원,
 실제 환경 E2E까지 완료했다. 이제 AI가 만든 결과를 사용자가 직접 다듬고,
@@ -17,7 +17,7 @@
 
 ### Phase 1. Graph 편집
 
-상태: 구현, 자동 검증, 실제 PostgreSQL 저장 검증 완료. 브라우저 UI E2E 대기
+상태: 구현, 자동 검증, 실제 PostgreSQL 저장 검증, 브라우저 UI E2E 완료
 
 - 선택한 node의 label, description, category, priority를 편집한다.
 - Canvas에서 node를 이동하고 위치를 편집 결과에 반영한다.
@@ -37,11 +37,11 @@
   9개가 통과했다.
 - 실제 PostgreSQL에서 편집본 저장, 최신 결과 조회, 이력 증가와
   `editedFromResultId` 일치를 확인했다.
-- 브라우저에서 node 편집·drag·저장·새로고침 복원을 최종 확인해야 한다.
+- 브라우저에서 node 편집·drag·저장·새로고침 복원을 2026-10-01 후속 E2E에서 확인했다.
 
-### Phase 2. Roadmap 편집 — 현재 작업
+### Phase 2. Roadmap 편집
 
-상태: 구현, 자동 검증, 실제 PostgreSQL 저장 검증 완료. 브라우저 UI E2E 대기
+상태: 구현, 자동 검증, 실제 PostgreSQL 저장 검증, 브라우저 UI E2E 완료
 
 - 단계 내용, 우선순위, 예상 effort와 순서를 편집한다.
 - dependency와 component node reference 일관성을 유지한다.
@@ -57,10 +57,21 @@
   API test 15개가 통과했다.
 - 실제 PostgreSQL에서 roadmap 제목과 우선순위 편집본 저장, 최신 결과 복원,
   이력 증가와 `editedFromResultId` 일치를 확인했다.
-- 브라우저에서 Graph와 Roadmap 편집·저장·새로고침 복원을 함께 최종 확인한 뒤
-  Phase 3으로 이동한다.
+- 브라우저에서 Graph와 Roadmap 편집·저장·새로고침 복원을 2026-10-01 후속 E2E에서 함께 확인했다.
 
-### Phase 3. 편집 버전 관리 완성
+진행 메모 2026-10-01:
+
+- Playwright Chromium과 실제 API·PostgreSQL을 연결한 편집 E2E를 추가했다.
+- node 이름·설명·분류·우선순위와 drag 위치의 새로고침 복원을 확인했다.
+- roadmap 제목·설명·우선순위·effort와 유효한 순서 변경의 복원을 확인했다.
+- dependency 위반 이동 차단, Graph·Roadmap 동시 저장, 원본과 중간 버전 보존,
+  과거 원본의 새 최신 버전 복원을 확인했다.
+- Node 패널이 로드맵 저장 버튼을 가리는 문제를 수정하고 패널 닫기 버튼을 추가했다.
+- 브라우저 E2E, Web test 18개, typecheck, lint, production build가 통과했다.
+- 증빙과 실행 안내는 `docs/reports/browser-editing-e2e-2026-10-01.md`와
+  `tests/e2e/README.md`에 기록했다.
+
+### Phase 3. 편집 버전 관리 완성 — 다음 작업
 
 - AI 생성 원본, 복원본, 사용자 편집본의 출처를 구분한다.
 - 버전 비교, 복원, 충돌 및 변경 이력 UX를 정리한다.

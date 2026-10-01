@@ -24,6 +24,7 @@ describe("NodeDetailPanel", () => {
         editErrorMessage={null}
         editStatus="dirty"
         node={node}
+        onClose={vi.fn()}
         onChange={onChange}
         onSave={onSave}
       />,

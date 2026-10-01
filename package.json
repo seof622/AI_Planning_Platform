@@ -7,6 +7,7 @@
     "packages/*"
   ],
   "scripts": {
+    "test:e2e": "playwright test",
     "web:dev": "npm run dev -w apps/web",
     "web:build": "npm run build -w apps/web",
     "web:typecheck": "npm run typecheck -w apps/web",
@@ -17,5 +18,8 @@
     "shared:typecheck": "npm run typecheck -w packages/shared",
     "shared:validate:mock": "npm run validate:mock -w packages/shared",
     "verify:node": "npm run shared:typecheck && npm run shared:validate:mock && npm run web:typecheck && npm run web:test && npm run lint -w apps/web && npm run web:build && npm run evaluate:planning:check && npm run evaluate:planning:test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.63.0"
   }
 }

@@ -133,3 +133,14 @@ uv run --frozen pytest
 ```
 
 GitHub Actions는 pull request와 `main` push에서 두 검증을 병렬 실행합니다.
+
+Graph·Roadmap 편집의 실제 브라우저 검증은 로컬 API와 PostgreSQL을 실행한 뒤 수행합니다.
+
+```powershell
+docker compose up -d --build api postgres
+npx playwright install chromium
+npm run test:e2e
+```
+
+테스트는 웹 서버를 자동으로 시작하고 E2E 전용 프로젝트를 생성합니다.
+검증 범위와 테스트 데이터 안내는 `tests/e2e/README.md`를 참고하세요.

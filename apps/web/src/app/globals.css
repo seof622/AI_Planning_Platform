@@ -859,6 +859,35 @@ button {
   transform: translateX(0);
 }
 
+.detail-drawer__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+  padding-right: 90px;
+}
+
+.detail-drawer__header .panel__title {
+  margin: 0;
+}
+
+.detail-drawer__header button {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text-muted);
+  padding: 6px 10px;
+}
+
+@media (min-width: 1181px) {
+  .workspace__canvas-area--node-selected .roadmap {
+    left: 18px;
+    width: min(calc(100% - 396px), 1040px);
+    transform: none;
+  }
+}
+
 .roadmap {
   position: absolute;
   top: 18px;
