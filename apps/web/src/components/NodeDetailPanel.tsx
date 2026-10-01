@@ -4,6 +4,7 @@ import type { ComponentNode } from "@ai-planning-platform/shared";
 import { nodeTypeLabels, priorityLabels } from "../lib/planningLabels";
 
 interface NodeDetailPanelProps {
+  saveBlocked?: boolean;
   editErrorMessage: string | null;
   editStatus: "idle" | "dirty" | "saving" | "error";
   node: ComponentNode | null;
@@ -21,6 +22,7 @@ const metadataLabels: Record<string, string> = {
 };
 
 export function NodeDetailPanel({
+  saveBlocked = false,
   editErrorMessage,
   editStatus,
   node,
@@ -34,7 +36,7 @@ export function NodeDetailPanel({
 
   const metadataEntries = Object.entries(node.metadata ?? {});
   const canSave =
-    editStatus === "dirty" &&
+    !saveBlocked && (editStatus === "dirty" || editStatus === "error") &&
     node.label.trim().length > 0 &&
     node.description.trim().length > 0 &&
     node.category.trim().length > 0;
@@ -52,6 +54,7 @@ export function NodeDetailPanel({
           <span className="form-field__label">이름</span>
           <input
             aria-label="Node 이름"
+            disabled={editStatus === "saving"}
             value={node.label}
             onChange={(event) => onChange({ label: event.target.value })}
           />
@@ -60,6 +63,7 @@ export function NodeDetailPanel({
           <span className="form-field__label">설명</span>
           <textarea
             aria-label="Node 설명"
+            disabled={editStatus === "saving"}
             value={node.description}
             onChange={(event) => onChange({ description: event.target.value })}
           />
@@ -72,6 +76,7 @@ export function NodeDetailPanel({
           <span className="form-field__label">분류</span>
           <input
             aria-label="Node 분류"
+            disabled={editStatus === "saving"}
             value={node.category}
             onChange={(event) => onChange({ category: event.target.value })}
           />
@@ -80,6 +85,7 @@ export function NodeDetailPanel({
           <span className="form-field__label">우선순위</span>
           <select
             aria-label="Node 우선순위"
+            disabled={editStatus === "saving"}
             value={node.priority}
             onChange={(event) =>
               onChange({ priority: event.target.value as ComponentNode["priority"] })

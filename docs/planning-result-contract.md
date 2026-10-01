@@ -170,6 +170,32 @@ Minimum mock requirements:
 - `metadata.model` should be `mock`.
 - `metadata.workflowVersion` should identify the current contract version.
 
+## Persisted Result Versions
+
+- Persisted result responses include `metadata.resultId`, the immutable result
+  record ID. Legacy stored JSON receives this ID on read without rewriting history.
+- A newly saved version records exactly its own operation: `editedFromResultId`
+  for edits, `restoredFromResultId` for restores, neither for AI originals.
+- Provenance fields inherited from the source are removed before setting the new
+  direct source. History responses expose those sources separately.
+- `POST /projects/{projectId}/planning-results/{resultId}/edit` accepts
+  `{ nodes, roadmap, expectedLatestResultId }`. Omitting the head ID defaults to
+  `resultId`, so stale legacy edits are rejected. An intentional historical branch
+  supplies the observed latest ID while keeping the historical ID in the URL.
+- `POST /projects/{projectId}/planning-results/{resultId}/restore` accepts
+  `{ expectedLatestResultId }`. Web always supplies it. Bodyless legacy restore
+  calls remain compatible and do not perform optimistic concurrency checking.
+- A conflicting observed head returns HTTP 409 with
+  `{ detail: { code: "planning_version_conflict", message, latestResultId } }`.
+  It creates no new result or requirement record.
+- PostgreSQL result writers lock the project row before checking the observed
+  head and keep the lock until the new result transaction commits. AI generation,
+  editing and restoration all use this serialization boundary.
+- Web retains local edits on conflict. Saving the local snapshot as a new head
+  requires a separate user confirmation; it does not merge other versions.
+- Version comparison covers result content rather than storage timestamps or
+  model/prompt metadata. It compares nodes, edges, roadmap, requirement and summary.
+
 ## Validation Strategy
 
 Short term:

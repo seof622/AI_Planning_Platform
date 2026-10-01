@@ -101,3 +101,8 @@ class RoadmapStepEdit(BaseModel):
 class PlanningResultEditRequest(BaseModel):
     nodes: list[ComponentNodeEdit] = Field(min_length=1)
     roadmap: list[RoadmapStepEdit]
+    expectedLatestResultId: str | None = Field(default=None, min_length=1, max_length=100)
+
+
+class PlanningResultRestoreRequest(BaseModel):
+    expectedLatestResultId: str = Field(min_length=1, max_length=100)

@@ -26,6 +26,7 @@ import {
   saveProjectPlanningBrief,
   restorePlanningResult,
   saveGraphEdit,
+  PlanningVersionConflictError,
 } from "../lib/planningClient";
 
 export type PlanningStatus = "idle" | "ready" | "loading" | "error" | "empty";
@@ -110,6 +111,10 @@ function toDraft(
 }
 
 interface PlanningState {
+  expectedLatestResultId: string | null;
+  versionConflict: "edit" | "restore" | null;
+  conflictLatestResultId: string | null;
+  resolveVersionConflict: (keepEdits: boolean) => Promise<void>;
   errorMessage: string | null;
   graphEditErrorMessage: string | null;
   graphEditStatus: "idle" | "dirty" | "saving" | "error";
@@ -167,6 +172,20 @@ interface PlanningState {
 }
 
 export const usePlanningStore = create<PlanningState>((set, get) => ({
+  expectedLatestResultId: null,
+  versionConflict: null,
+  conflictLatestResultId: null,
+  async resolveVersionConflict(keepEdits) {
+    const state = get();
+    if (!state.selectedProjectId || !state.versionConflict) return;
+    if (!keepEdits) {
+      await get().selectProject(state.selectedProjectId);
+      return;
+    }
+    if (state.versionConflict !== "edit") return;
+    set({ versionConflict: null, graphEditStatus: "dirty", expectedLatestResultId: state.conflictLatestResultId });
+    await get().saveGraphEdits();
+  },
   errorMessage: null,
   graphEditErrorMessage: null,
   graphEditStatus: "idle",
@@ -221,6 +240,8 @@ export const usePlanningStore = create<PlanningState>((set, get) => ({
       errorMessage: null,
       isViewingHistoricalResult: false,
       status: "loading",
+      versionConflict: null,
+      conflictLatestResultId: null,
     });
 
     try {
@@ -334,10 +355,13 @@ export const usePlanningStore = create<PlanningState>((set, get) => ({
     set({ historyErrorMessage: null, historyStatus: "loading" });
     try {
       const history = await listPlanningResults(projectId);
+      const actualResultId = get().planningResult?.metadata.resultId ?? history[0]?.id ?? null;
       set({
         historyStatus: "ready",
         planningHistory: history,
-        selectedPlanningResultId: history[0]?.id ?? null,
+        selectedPlanningResultId: actualResultId,
+        expectedLatestResultId: actualResultId,
+        isViewingHistoricalResult: actualResultId !== history[0]?.id,
       });
     } catch (error) {
       set({
@@ -353,6 +377,9 @@ export const usePlanningStore = create<PlanningState>((set, get) => ({
   },
   resetToEmpty() {
     set({
+      expectedLatestResultId: null,
+      versionConflict: null,
+      conflictLatestResultId: null,
       errorMessage: null,
       graphEditErrorMessage: null,
       graphEditStatus: "idle",
@@ -373,17 +400,20 @@ export const usePlanningStore = create<PlanningState>((set, get) => ({
     }
     set({
       errorMessage: null,
-      graphEditErrorMessage: null,
-      graphEditStatus: "idle",
-      isViewingHistoricalResult: false,
+      historyErrorMessage: null,
+      historyStatus: "loading",
       status: "loading",
     });
     try {
       const restored = await restorePlanningResult(
         state.selectedProjectId,
         state.selectedPlanningResultId,
+        (state.versionConflict === "restore" ? state.conflictLatestResultId : null)
+          ?? state.expectedLatestResultId ?? state.planningHistory[0]?.id ?? state.selectedPlanningResultId,
       );
       set({
+        versionConflict: null,
+        conflictLatestResultId: null,
         isViewingHistoricalResult: false,
         planningBrief: toDraft(restored.planningBrief),
         planningResult: restored.result,
@@ -403,12 +433,20 @@ export const usePlanningStore = create<PlanningState>((set, get) => ({
       await get().loadPlanningHistory(state.selectedProjectId);
     } catch (error) {
       set({
-        errorMessage:
+        historyErrorMessage:
           error instanceof Error
             ? error.message
             : "선택한 계획 버전을 복원하지 못했습니다.",
-        status: "error",
+        historyStatus: "ready",
+        status: state.planningResult?.nodes.length ? "ready" : "empty",
       });
+      if (error instanceof PlanningVersionConflictError) {
+        set({ versionConflict: "restore", conflictLatestResultId: error.latestResultId });
+        try {
+          const history = await listPlanningResults(state.selectedProjectId);
+          if (get().selectedProjectId === state.selectedProjectId) set({ planningHistory: history });
+        } catch { /* Preserve the selected result if refreshing history fails. */ }
+      }
     }
   },
   async saveCurrentPlanningBrief() {
@@ -444,7 +482,8 @@ export const usePlanningStore = create<PlanningState>((set, get) => ({
       !state.selectedProjectId ||
       !state.selectedPlanningResultId ||
       !state.planningResult ||
-      state.graphEditStatus !== "dirty"
+      state.versionConflict ||
+      (state.graphEditStatus !== "dirty" && state.graphEditStatus !== "error")
     ) {
       return;
     }
@@ -455,8 +494,11 @@ export const usePlanningStore = create<PlanningState>((set, get) => ({
         state.selectedPlanningResultId,
         state.planningResult.nodes,
         state.planningResult.roadmap,
+        state.expectedLatestResultId ?? state.planningHistory[0]?.id ?? state.selectedPlanningResultId,
       );
       set({
+        versionConflict: null,
+        conflictLatestResultId: null,
         graphEditErrorMessage: null,
         graphEditStatus: "idle",
         isViewingHistoricalResult: false,
@@ -472,6 +514,13 @@ export const usePlanningStore = create<PlanningState>((set, get) => ({
             : "Graph 편집본을 저장하지 못했습니다.",
         graphEditStatus: "error",
       });
+      if (error instanceof PlanningVersionConflictError) {
+        set({ versionConflict: "edit", conflictLatestResultId: error.latestResultId });
+        try {
+          const history = await listPlanningResults(state.selectedProjectId);
+          if (get().selectedProjectId === state.selectedProjectId) set({ planningHistory: history });
+        } catch { /* Preserve local edits if refreshing history fails. */ }
+      }
     }
   },
   async selectProject(projectId) {
@@ -479,6 +528,9 @@ export const usePlanningStore = create<PlanningState>((set, get) => ({
       return;
     }
     set({
+      expectedLatestResultId: null,
+      versionConflict: null,
+      conflictLatestResultId: null,
       errorMessage: null,
       graphEditErrorMessage: null,
       graphEditStatus: "idle",
@@ -496,11 +548,15 @@ export const usePlanningStore = create<PlanningState>((set, get) => ({
       status: "loading",
     });
     try {
-      const [result, persistedBrief, history] = await Promise.all([
+      const [loadedResult, persistedBrief, history] = await Promise.all([
         getLatestPlanningResult(projectId),
         getProjectPlanningBrief(projectId),
         listPlanningResults(projectId),
       ]);
+      // Read that exact immutable version if the head advanced between requests.
+      const result = history[0] && (!loadedResult || (loadedResult.metadata.resultId && loadedResult.metadata.resultId !== history[0].id))
+        ? await getPlanningResult(projectId, history[0].id)
+        : loadedResult;
       const resultModel = result?.metadata.model;
       const persistedModel = persistedBrief?.selectedModel;
       const restorableModel =
@@ -518,7 +574,8 @@ export const usePlanningStore = create<PlanningState>((set, get) => ({
         requirementText:
           persistedBrief?.requirement ?? result?.requirement?.content ?? "",
         selectedModel: restorableModel,
-        selectedPlanningResultId: history[0]?.id ?? null,
+        selectedPlanningResultId: result?.metadata.resultId ?? history[0]?.id ?? null,
+        expectedLatestResultId: result?.metadata.resultId ?? history[0]?.id ?? null,
         status: result && result.nodes.length > 0 ? "ready" : "empty",
       });
     } catch (error) {
@@ -547,6 +604,8 @@ export const usePlanningStore = create<PlanningState>((set, get) => ({
       const historicalModel =
         historicalBrief?.selectedModel ?? result.metadata.model;
       set({
+        versionConflict: null,
+        conflictLatestResultId: null,
         isViewingHistoricalResult: isHistorical,
         graphEditErrorMessage: null,
         graphEditStatus: "idle",
@@ -562,6 +621,7 @@ export const usePlanningStore = create<PlanningState>((set, get) => ({
             ? historicalModel
             : get().selectedModel,
         selectedPlanningResultId: resultId,
+        expectedLatestResultId: get().planningHistory[0]?.id ?? resultId,
         status: result.nodes.length > 0 ? "ready" : "empty",
       });
     } catch (error) {

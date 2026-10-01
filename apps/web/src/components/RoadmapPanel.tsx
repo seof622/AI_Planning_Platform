@@ -5,6 +5,7 @@ import { effortLabels, priorityLabels } from "../lib/planningLabels";
 import type { PlanningStatus } from "../store/planningStore";
 
 interface RoadmapPanelProps {
+  saveBlocked?: boolean;
   editErrorMessage: string | null;
   editStatus: "idle" | "dirty" | "saving" | "error";
   errorMessage: string | null;
@@ -21,6 +22,7 @@ interface RoadmapPanelProps {
 }
 
 export function RoadmapPanel({
+  saveBlocked = false,
   editErrorMessage,
   editStatus,
   errorMessage,
@@ -32,7 +34,7 @@ export function RoadmapPanel({
 }: RoadmapPanelProps) {
   const sortedRoadmap = [...roadmap].sort((left, right) => left.order - right.order);
   const canSave =
-    editStatus === "dirty" &&
+    !saveBlocked && (editStatus === "dirty" || editStatus === "error") &&
     sortedRoadmap.every(
       (step) => step.title.trim() && step.description.trim(),
     );
@@ -77,6 +79,7 @@ export function RoadmapPanel({
       ) : null}
 
       {status === "ready" ? (
+        <fieldset className="roadmap__fields" disabled={editStatus === "saving"}>
         <ol className="roadmap__steps">
           {sortedRoadmap.map((step, index) => (
             <li className="roadmap-step" key={step.id}>
@@ -110,6 +113,7 @@ export function RoadmapPanel({
             </li>
           ))}
         </ol>
+        </fieldset>
       ) : null}
     </section>
   );

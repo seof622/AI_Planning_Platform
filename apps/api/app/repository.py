@@ -92,6 +92,7 @@ def save_planning_result(
     restored_from_result_id: str | None = None,
     edited_from_result_id: str | None = None,
 ) -> dict[str, Any]:
+    lock_project_results(session, project.id)
     now = utc_now()
     requirement = RequirementModel(
         id=new_id("requirement"),
@@ -119,6 +120,10 @@ def save_planning_result(
         "updatedAt": to_iso(now),
     }
     result_metadata = deepcopy(result.get("metadata") or {})
+    result_id = new_id("planning-result")
+    result_metadata["resultId"] = result_id
+    result_metadata.pop("restoredFromResultId", None)
+    result_metadata.pop("editedFromResultId", None)
     if restored_from_result_id:
         result_metadata["restoredFromResultId"] = restored_from_result_id
     if edited_from_result_id:
@@ -131,7 +136,7 @@ def save_planning_result(
     }
     metadata = persisted_result.get("metadata") or {}
     stored_result = PlanningResultModel(
-        id=new_id("planning-result"),
+        id=result_id,
         project_id=project.id,
         requirement_id=requirement.id,
         result=persisted_result,
@@ -157,7 +162,7 @@ def get_latest_planning_result(
         .limit(1)
     )
     stored_result = session.scalar(statement)
-    return stored_result.result if stored_result else None
+    return result_with_id(stored_result) if stored_result else None
 
 
 def list_planning_results(
@@ -194,7 +199,7 @@ def get_planning_result(
         PlanningResultModel.project_id == project_id,
     )
     stored_result = session.scalar(statement)
-    return stored_result.result if stored_result else None
+    return result_with_id(stored_result) if stored_result else None
 
 
 def get_planning_result_brief(
@@ -222,7 +227,10 @@ def restore_planning_result(
     *,
     project: ProjectModel,
     result_id: str,
+    expected_latest_result_id: str | None = None,
 ) -> dict[str, Any] | None:
+    lock_project_results(session, project.id)
+    check_latest_result(session, project.id, expected_latest_result_id)
     statement = select(PlanningResultModel).where(
         PlanningResultModel.id == result_id,
         PlanningResultModel.project_id == project.id,
@@ -251,7 +259,10 @@ def edit_planning_result(
     result_id: str,
     nodes: list[dict[str, Any]],
     roadmap: list[dict[str, Any]],
+    expected_latest_result_id: str | None = None,
 ) -> dict[str, Any] | None:
+    lock_project_results(session, project.id)
+    check_latest_result(session, project.id, expected_latest_result_id or result_id)
     statement = select(PlanningResultModel).where(
         PlanningResultModel.id == result_id,
         PlanningResultModel.project_id == project.id,
@@ -275,3 +286,37 @@ def edit_planning_result(
         result=edited_result,
         edited_from_result_id=source.id,
     )
+
+
+class PlanningVersionConflict(Exception):
+    def __init__(self, latest_result_id: str | None):
+        self.latest_result_id = latest_result_id
+        super().__init__("다른 탭에서 새 버전이 저장되었습니다. 최신 버전과 비교한 후 다시 저장해 주세요.")
+
+
+def result_with_id(stored_result: PlanningResultModel) -> dict[str, Any]:
+    result = deepcopy(stored_result.result)
+    result.setdefault("metadata", {})["resultId"] = stored_result.id
+    return result
+
+
+def lock_project_results(session: Session, project_id: str) -> None:
+    # Serialize all result writers, including AI generation, on PostgreSQL.
+    session.execute(
+        select(ProjectModel.id).where(ProjectModel.id == project_id).with_for_update()
+    ).scalar_one()
+
+
+def check_latest_result(
+    session: Session, project_id: str, expected_latest_result_id: str | None
+) -> None:
+    if expected_latest_result_id is None:
+        return  # Compatibility for legacy restore requests without a body.
+    latest_result_id = session.scalar(
+        select(PlanningResultModel.id)
+        .where(PlanningResultModel.project_id == project_id)
+        .order_by(PlanningResultModel.created_at.desc())
+        .limit(1)
+    )
+    if latest_result_id != expected_latest_result_id:
+        raise PlanningVersionConflict(latest_result_id)

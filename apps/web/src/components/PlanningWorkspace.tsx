@@ -24,6 +24,9 @@ export function PlanningWorkspace() {
     generateResult,
     graphEditErrorMessage,
     graphEditStatus,
+    versionConflict,
+    conflictLatestResultId,
+    resolveVersionConflict,
     historyErrorMessage,
     historyStatus,
     isViewingHistoricalResult,
@@ -62,6 +65,18 @@ export function PlanningWorkspace() {
   } = usePlanningStore();
 
   const selectedNode = getSelectedNode(planningResult, selectedNodeId);
+  const hasUnsavedEdits = graphEditStatus !== "idle";
+  const isBusy = status === "loading" || graphEditStatus === "saving";
+  function confirmDiscardEdits(): boolean {
+    return !hasUnsavedEdits || window.confirm("미저장 편집이 있습니다. 변경 내용을 버리고 이동할까요?");
+  }
+
+  useEffect(() => {
+    if (!hasUnsavedEdits) return;
+    const handler = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = ""; };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [hasUnsavedEdits]);
 
   useEffect(() => {
     void (async () => {
@@ -98,29 +113,35 @@ export function PlanningWorkspace() {
         <div className="workspace__sidebar">
           <ProjectPanel
             errorMessage={projectErrorMessage}
-            isLoading={projectStatus === "loading"}
-            onCreate={createAndSelectProject}
-            onSelect={selectProject}
+            isLoading={projectStatus === "loading" || isBusy}
+            onCreate={async (title) => { if (confirmDiscardEdits()) await createAndSelectProject(title); }}
+            onSelect={async (id) => { if (confirmDiscardEdits()) await selectProject(id); }}
             projects={projects}
             selectedProjectId={selectedProjectId}
           />
           <PlanningHistoryPanel
             errorMessage={historyErrorMessage}
             history={planningHistory}
-            isLoading={historyStatus === "loading" || status === "loading"}
+            isLoading={historyStatus === "loading" || isBusy}
             onRestore={restoreSelectedPlanningResult}
-            onSelect={selectPlanningResult}
+            onSelect={async (id) => { if (confirmDiscardEdits()) await selectPlanningResult(id); }}
             selectedResultId={selectedPlanningResultId}
+            projectId={selectedProjectId}
+            result={planningResult}
+            hasUnsavedEdits={hasUnsavedEdits}
+            versionConflict={versionConflict}
+            conflictLatestResultId={conflictLatestResultId}
+            onResolveConflict={resolveVersionConflict}
           />
           <RequirementPanel
             generatedModel={planningResult?.metadata.model}
             hasSelectedProject={selectedProjectId !== null}
-            isLoading={status === "loading"}
+            isLoading={isBusy}
             modelErrorMessage={modelErrorMessage}
             models={models}
             modelStatus={modelStatus}
-            onGenerate={generateResult}
-            onReset={resetToEmpty}
+            onGenerate={async () => { if (confirmDiscardEdits()) await generateResult(); }}
+            onReset={() => { if (confirmDiscardEdits()) resetToEmpty(); }}
             onShowError={() =>
               setErrorState("AI 계획 결과를 생성하지 못했습니다.")
             }
@@ -141,6 +162,7 @@ export function PlanningWorkspace() {
             status={status}
           />
           <RoadmapPanel
+            saveBlocked={versionConflict !== null}
             editErrorMessage={graphEditErrorMessage}
             editStatus={graphEditStatus}
             errorMessage={errorMessage}
@@ -151,6 +173,7 @@ export function PlanningWorkspace() {
             status={status}
           />
           <NodeDetailPanel
+            saveBlocked={versionConflict !== null}
             editErrorMessage={graphEditErrorMessage}
             editStatus={graphEditStatus}
             node={selectedNode}

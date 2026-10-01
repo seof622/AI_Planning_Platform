@@ -407,7 +407,7 @@ describe("planningStore", () => {
     expect(fetch).toHaveBeenNthCalledWith(
       1,
       "http://localhost:8000/projects/project-test/planning-results/planning-result-latest/restore",
-      { method: "POST" },
+      { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ expectedLatestResultId: "planning-result-latest" }) },
     );
     const state = usePlanningStore.getState();
     expect(state.requirementText).toBe(persistedBrief.requirement);
@@ -428,5 +428,67 @@ describe("planningStore", () => {
     expect(state.modelErrorMessage).toBe("Model catalog unavailable.");
     expect(state.selectedModel).toBe("");
     expect(state.status).toBe("idle");
+  });
+
+  it("preserves local edits on conflict and retries against the observed head only after resolution", async () => {
+    usePlanningStore.setState({ planningHistory, planningResult, selectedPlanningResultId: "planning-result-latest", selectedProjectId: project.id, status: "ready" });
+    usePlanningStore.getState().updateNode("node-test", { label: "Local draft" });
+    const concurrentHistory = [{ ...planningHistory[0]!, id: "concurrent-head" }, ...planningHistory];
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(jsonResponse({ detail: { code: "planning_version_conflict", message: "Version conflict", latestResultId: "concurrent-head" } }, 409))
+      .mockResolvedValueOnce(jsonResponse(concurrentHistory));
+    await usePlanningStore.getState().saveGraphEdits();
+    expect(usePlanningStore.getState().planningResult?.nodes[0]?.label).toBe("Local draft");
+    expect(usePlanningStore.getState().selectedPlanningResultId).toBe("planning-result-latest");
+    expect(usePlanningStore.getState().versionConflict).toBe("edit");
+    await usePlanningStore.getState().saveGraphEdits();
+    expect(fetch).toHaveBeenCalledTimes(2);
+    const draft = usePlanningStore.getState().planningResult;
+    vi.mocked(fetch).mockResolvedValueOnce(jsonResponse(draft)).mockResolvedValueOnce(jsonResponse([{ ...planningHistory[0]!, id: "saved-draft" }, ...concurrentHistory]));
+    await usePlanningStore.getState().resolveVersionConflict(true);
+    const retry = vi.mocked(fetch).mock.calls[2]!;
+    expect(JSON.parse(String(retry[1]?.body))).toMatchObject({ expectedLatestResultId: "concurrent-head", nodes: [expect.objectContaining({ label: "Local draft" })] });
+    expect(usePlanningStore.getState().versionConflict).toBeNull();
+  });
+
+  it("preserves the historical preview when restore conflicts", async () => {
+    usePlanningStore.setState({ planningHistory, planningResult, selectedPlanningResultId: "old-source", selectedProjectId: project.id, isViewingHistoricalResult: true, status: "ready" });
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(jsonResponse({ detail: { code: "planning_version_conflict", message: "Version conflict", latestResultId: "new-head" } }, 409))
+      .mockResolvedValueOnce(jsonResponse([{ ...planningHistory[0]!, id: "new-head" }, ...planningHistory]));
+    await usePlanningStore.getState().restoreSelectedPlanningResult();
+    expect(usePlanningStore.getState().planningResult).toEqual(planningResult);
+    expect(usePlanningStore.getState().selectedPlanningResultId).toBe("old-source");
+    expect(usePlanningStore.getState().status).toBe("ready");
+    expect(usePlanningStore.getState().isViewingHistoricalResult).toBe(true);
+    expect(usePlanningStore.getState().versionConflict).toBe("restore");
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(jsonResponse({ planningBrief: persistedBrief, result: planningResult }))
+      .mockResolvedValueOnce(jsonResponse([{ ...planningHistory[0]!, id: "restored-head" }]));
+    await usePlanningStore.getState().restoreSelectedPlanningResult();
+    expect(JSON.parse(String(vi.mocked(fetch).mock.calls[2]![1]?.body))).toEqual({ expectedLatestResultId: "new-head" });
+    expect(usePlanningStore.getState().versionConflict).toBeNull();
+  });
+
+  it("loads the exact history version when the head advances between initial requests", async () => {
+    const first = { ...planningResult, metadata: { ...planningResult.metadata, resultId: "first-head" } };
+    const newer = { ...planningResult, summary: "Concurrent result", metadata: { ...planningResult.metadata, resultId: "second-head" } };
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(jsonResponse(first))
+      .mockResolvedValueOnce(jsonResponse(persistedBrief))
+      .mockResolvedValueOnce(jsonResponse([{ ...planningHistory[0]!, id: "second-head" }]))
+      .mockResolvedValueOnce(jsonResponse(newer));
+    await usePlanningStore.getState().selectProject(project.id);
+    expect(usePlanningStore.getState().planningResult?.summary).toBe("Concurrent result");
+    expect(usePlanningStore.getState().selectedPlanningResultId).toBe("second-head");
+    expect(usePlanningStore.getState().expectedLatestResultId).toBe("second-head");
+  });
+
+  it("keeps the saved snapshot as its concurrency token even if another save precedes the history refresh", async () => {
+    usePlanningStore.setState({ planningResult: { ...planningResult, metadata: { ...planningResult.metadata, resultId: "my-saved-version" } } });
+    vi.mocked(fetch).mockResolvedValueOnce(jsonResponse([{ ...planningHistory[0]!, id: "other-saved-version" }, { ...planningHistory[0]!, id: "my-saved-version" }]));
+    await usePlanningStore.getState().loadPlanningHistory(project.id);
+    expect(usePlanningStore.getState().selectedPlanningResultId).toBe("my-saved-version");
+    expect(usePlanningStore.getState().expectedLatestResultId).toBe("my-saved-version");
   });
 });

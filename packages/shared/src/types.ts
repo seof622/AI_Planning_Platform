@@ -142,7 +142,9 @@ export interface AIModelCatalog {
 }
 
 export interface PlanningResultMetadata extends Metadata {
+  resultId?: string;
   editedFromResultId?: string | null;
+  restoredFromResultId?: string | null;
   generatedAt: ISODateString;
   model?: string;
   promptVersion?: string;

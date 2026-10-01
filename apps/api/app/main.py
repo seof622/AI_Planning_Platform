@@ -1,6 +1,7 @@
 from functools import lru_cache
 
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from planning_ai import (
     PlanningConfigurationError,
@@ -21,6 +22,7 @@ from .config import (
 from .database import get_db_session
 from .fixtures import build_mock_planning_result
 from .repository import (
+    PlanningVersionConflict,
     create_project,
     edit_planning_result,
     get_latest_planning_result,
@@ -37,6 +39,7 @@ from .repository import (
 )
 from .schemas import (
     PlanningResultEditRequest,
+    PlanningResultRestoreRequest,
     PlanningRequest,
     ProjectCreate,
     ProjectPlanningBrief,
@@ -44,6 +47,15 @@ from .schemas import (
 
 
 app = FastAPI(title="AI Planning Platform API", version="0.1.0")
+
+
+@app.exception_handler(PlanningVersionConflict)
+async def version_conflict_handler(_request: Request, error: PlanningVersionConflict) -> JSONResponse:
+    return JSONResponse(status_code=409, content={"detail": {
+        "code": "planning_version_conflict",
+        "message": str(error),
+        "latestResultId": error.latest_result_id,
+    }})
 
 app.add_middleware(
     CORSMiddleware,
@@ -243,6 +255,7 @@ def projects_planning_result(
 def projects_restore_planning_result(
     project_id: str,
     result_id: str,
+    payload: PlanningResultRestoreRequest | None = None,
     session: Session = Depends(get_db_session),
 ) -> dict:
     project = get_project(session, project_id)
@@ -254,6 +267,7 @@ def projects_restore_planning_result(
         session,
         project=project,
         result_id=result_id,
+        expected_latest_result_id=payload.expectedLatestResultId if payload else None,
     )
     if result is None:
         raise HTTPException(
@@ -343,6 +357,7 @@ def projects_edit_planning_result(
         result_id=result_id,
         nodes=[node.model_dump(exclude_none=True) for node in payload.nodes],
         roadmap=[step.model_dump(exclude_none=True) for step in payload.roadmap],
+        expected_latest_result_id=payload.expectedLatestResultId,
     )
     if edited is None:
         raise HTTPException(status_code=404, detail="Planning result not found.")

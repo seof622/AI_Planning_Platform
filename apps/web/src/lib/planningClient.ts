@@ -63,7 +63,12 @@ async function requestJson<T>(
     const errorBody = (await response.json().catch(() => null)) as {
       detail?: string;
     } | null;
-    throw new Error(errorBody?.detail ?? "API 요청을 처리하지 못했습니다.");
+    const detail: unknown = errorBody?.detail;
+    if (response.status === 409 && detail && typeof detail === "object" && "code" in detail && detail.code === "planning_version_conflict") {
+      const conflict = detail as { message?: string; latestResultId?: string | null };
+      throw new PlanningVersionConflictError(conflict.message ?? "최신 버전이 변경되었습니다.", conflict.latestResultId ?? null);
+    }
+    throw new Error(typeof detail === "string" ? detail : "API 요청을 처리하지 못했습니다.");
   }
 
   return (await response.json()) as T;
@@ -168,10 +173,11 @@ export function getPlanningResult(
 export function restorePlanningResult(
   projectId: string,
   resultId: string,
+  expectedLatestResultId: string,
 ): Promise<PlanningResultRestoreResponse> {
   return requestJson<PlanningResultRestoreResponse>(
     `/projects/${encodeURIComponent(projectId)}/planning-results/${encodeURIComponent(resultId)}/restore`,
-    { method: "POST" },
+    { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ expectedLatestResultId }) },
   );
 }
 
@@ -180,11 +186,12 @@ export function saveGraphEdit(
   resultId: string,
   nodes: ComponentNode[],
   roadmap: RoadmapStep[],
+  expectedLatestResultId: string,
 ): Promise<PlanningResult> {
   return requestJson<PlanningResult>(
     `/projects/${encodeURIComponent(projectId)}/planning-results/${encodeURIComponent(resultId)}/edit`,
     {
-      body: JSON.stringify({ nodes, roadmap }),
+      body: JSON.stringify({ nodes, roadmap, expectedLatestResultId }),
       headers: { "Content-Type": "application/json" },
       method: "POST",
     },
@@ -211,4 +218,11 @@ export async function getPlanningResultBrief(
     throw new Error(errorBody?.detail ?? "계획 입력 스냅샷을 불러오지 못했습니다.");
   }
   return (await response.json()) as ProjectPlanningBrief;
+}
+
+export class PlanningVersionConflictError extends Error {
+  constructor(message: string, public readonly latestResultId: string | null) {
+    super(message);
+    this.name = "PlanningVersionConflictError";
+  }
 }
