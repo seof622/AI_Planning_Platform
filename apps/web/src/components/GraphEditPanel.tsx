@@ -18,7 +18,7 @@ export function GraphEditPanel({ edgeCount, connectionType, onConnectionTypeChan
   return (
     <section className="graph-edit-panel" aria-label="그래프 구조 편집">
       <div className="project-panel__header">
-        <h2 className="panel__title">Graph 편집</h2>
+        <h2 className="panel__title">그래프 도구</h2>
         <button className="button" type="button" disabled={disabled} onClick={onAddNode}>노드 추가</button>
       </div>
       <label className="form-field">

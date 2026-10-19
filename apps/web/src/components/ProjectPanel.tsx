@@ -36,8 +36,8 @@ export function ProjectPanel({
     <section className="project-panel" aria-label="프로젝트 관리">
       <div className="project-panel__header">
         <div>
-          <p className="project-panel__eyebrow">WORKSPACE</p>
-          <h1 className="project-panel__title">AI Planning</h1>
+          <p className="project-panel__eyebrow">MY PROJECTS</p>
+          <h2 className="project-panel__title">프로젝트</h2>
         </div>
         <span className="project-panel__count">{projects.length}</span>
       </div>

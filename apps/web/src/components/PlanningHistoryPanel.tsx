@@ -66,12 +66,12 @@ export function PlanningHistoryPanel({
           <p className="history-panel__summary">
             {history.find((item) => item.id === selectedResultId)?.summary}
           </p>
-          <p>
+          <details className="history-panel__metadata"><summary>생성 정보</summary><p>
             모델: {selected?.model ?? "기록 없음"} ·{" "}
             Prompt:{" "}
             {history.find((item) => item.id === selectedResultId)
               ?.promptVersion ?? "기록 없음"}
-          </p>
+          </p></details>
         </>
       ) : null}
       {versionConflict ? (

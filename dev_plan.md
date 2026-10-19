@@ -116,6 +116,17 @@
 - Web test 36개, API test 39개, 브라우저 E2E 5개와 타입·린트·production build를 통과했다.
 - 사용법과 검증 범위는 `docs/reports/roadmap-structure-editing-implementation-report.md`에 기록한다.
 
+### 후속 기능. 작업 화면 UI 정리
+
+상태: 2026-10-19 구현 및 기능·화면 배치 검증 완료
+
+- Pretendard 글꼴을 앱에 포함하고 제목·본문·라벨의 크기와 굵기, 여백을 정리한다.
+- 입력창·선택창·버튼·카드를 공통 스타일로 통일하고 밝은 배경과 차분한 그린 포인트를 사용한다.
+- 화면 높이에 맞춘 작업 공간, 독립 스크롤 사이드바, 분리된 그래프·로드맵과 노드 편집 영역을 제공한다.
+- 패널 크기 변경 시 그래프를 다시 맞추고 미니맵은 필요할 때 표시한다.
+- Web test 36개, 브라우저 E2E 7개, 타입·린트·production build를 통과하고 데스크톱·모바일 배치를 확인했다.
+- 상세 내역은 `docs/reports/workspace-ui-refresh-implementation-report.md`에 기록한다.
+
 ### Phase 4. 사용자 인증과 프로젝트 소유권 — 보류
 
 상태: 2026-10-19 사용자 결정으로 개인 전용 사용 범위에서 제외

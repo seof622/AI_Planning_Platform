@@ -185,6 +185,8 @@ export function RequirementPanel({
               {modelErrorMessage}
             </span>
           ) : null}
+          <details className="model-details">
+          <summary>모델 선택 안내</summary>
           {modelRecommendation ? (
             <div className="model-recommendation" aria-label="추천 모델">
               <span className="model-recommendation__badge">추천</span>
@@ -218,6 +220,7 @@ export function RequirementPanel({
               최근 결과 모델: {generatedModel}
             </span>
           ) : null}
+          </details>
         </label>
 
         <label className="form-field">

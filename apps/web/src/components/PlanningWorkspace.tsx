@@ -119,6 +119,19 @@ export function PlanningWorkspace() {
 
   return (
     <main className="workspace">
+      <header className="workspace__header">
+        <div className="workspace__brand">
+          <span className="workspace__brand-mark" aria-hidden="true">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M6 6h12M6 6v12m0 0h12" stroke="currentColor" strokeWidth="1.5"/><rect x="3" y="3" width="6" height="6" rx="2" fill="currentColor"/><rect x="15" y="3" width="6" height="6" rx="2" fill="currentColor"/><rect x="3" y="15" width="6" height="6" rx="2" fill="currentColor"/><rect x="15" y="15" width="6" height="6" rx="2" fill="currentColor"/></svg>
+          </span>
+          <div><h1>플랜노트</h1><span>생각에서 실행까지</span></div>
+        </div>
+        <div className="workspace__breadcrumb"><span>내 작업 공간</span><span aria-hidden="true">/</span><strong>{projects.find((project) => project.id === selectedProjectId)?.title ?? "새로운 계획"}</strong></div>
+        <div className="workspace__header-status">
+          {planningResult ? <span className={`workspace__save-state${hasUnsavedEdits ? " workspace__save-state--dirty" : ""}`}>{graphEditStatus === "saving" ? "저장 중…" : hasUnsavedEdits ? "저장하지 않은 변경" : "저장된 상태"}</span> : null}
+          <span className={`workspace__status workspace__status--${status}`}><span aria-hidden="true" />{statusLabels[status]}</span>
+        </div>
+      </header>
       <div className="workspace__body">
         <div className="workspace__sidebar">
           <ProjectPanel
@@ -225,9 +238,6 @@ export function PlanningWorkspace() {
         </div>
       </div>
 
-      <div className={`workspace__status workspace__status--${status}`}>
-        {statusLabels[status]}
-      </div>
     </main>
   );
 }

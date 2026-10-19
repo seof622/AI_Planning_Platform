@@ -54,14 +54,26 @@ export function PlanningCanvas({
   status,
 }: PlanningCanvasProps) {
   const [flow, setFlow] = useState<ReactFlowInstance | null>(null);
+  const [showMiniMap, setShowMiniMap] = useState(false);
+  const shellRef = useRef<HTMLElement>(null);
   const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
   const reconnectingEdgeId = useRef<string | null>(null);
   const nodes = useMemo(() => (result ? toReactFlowNodes(result) : []), [result]);
   const edges = useMemo(() => (result ? toReactFlowEdges(result) : []), [result]);
   useEffect(() => {
-    const frame = requestAnimationFrame(() => { void flow?.fitView({ padding: 0.2 }); });
+    const frame = requestAnimationFrame(() => { void flow?.fitView({ padding: 0.14 }); });
     return () => cancelAnimationFrame(frame);
   }, [flow, nodes.length]);
+  useEffect(() => {
+    if (!flow || !shellRef.current) return;
+    let frame = 0;
+    const observer = new ResizeObserver(() => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => { void flow.fitView({ padding: 0.14 }); });
+    });
+    observer.observe(shellRef.current);
+    return () => { observer.disconnect(); cancelAnimationFrame(frame); };
+  }, [flow]);
 
   const selectedNodes = useMemo(
     () =>
@@ -100,14 +112,22 @@ export function PlanningCanvas({
 
   if (status !== "ready" || !result) {
     return (
-      <section className="canvas-shell">
+      <section className="canvas-shell" ref={shellRef}>
         <StatusView status={status} />
       </section>
     );
   }
 
   return (
-    <section className="canvas-shell" aria-label="계획 의존성 그래프">
+    <section className="canvas-shell" ref={shellRef} aria-label="계획 의존성 그래프">
+      <div className="canvas-heading">
+        <div><span className="canvas-heading__eyebrow">PLAN OVERVIEW</span><h2>구조 캔버스</h2></div>
+        <div className="canvas-heading__tools">
+          <span className="canvas-heading__count">{result.nodes.length}개 노드<span aria-hidden="true"> · </span>{result.edges.length}개 연결</span>
+          <button className="canvas-heading__map-toggle" type="button" aria-label={showMiniMap ? "미니맵 숨기기" : "미니맵 표시"} aria-pressed={showMiniMap}
+            onClick={() => setShowMiniMap((value) => !value)}>미니맵</button>
+        </div>
+      </div>
       <ReactFlow
         onInit={setFlow}
         nodesDraggable={!disabled}
@@ -133,13 +153,15 @@ export function PlanningCanvas({
         onNodeDragStop={handleNodeDragStop}
         onPaneClick={() => { onSelectNode(null); setSelectedEdgeId(null); }}
         fitView
-        fitViewOptions={{ padding: 0.2 }}
-        minZoom={0.45}
+        fitViewOptions={{ padding: 0.14 }}
+        minZoom={0.25}
         maxZoom={1.4}
       >
-        <Background gap={20} size={1} color="#d9e0e7" />
+        <Background gap={24} size={1} color="#cfd8d2" />
         <Controls position="bottom-left" />
-        <MiniMap
+        {showMiniMap ? <MiniMap
+          style={{ width: 128, height: 80 }}
+          maskColor="rgba(242, 245, 241, 0.6)"
           nodeColor={(node) => {
             const style = node.style as NodeStyleWithAccent | undefined;
 
@@ -149,7 +171,7 @@ export function PlanningCanvas({
           }}
           pannable
           zoomable
-        />
+        /> : null}
       </ReactFlow>
     </section>
   );

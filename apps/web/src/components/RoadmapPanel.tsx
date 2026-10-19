@@ -143,6 +143,7 @@ export function RoadmapPanel({
                 <span className="form-field__label">단계 설명</span>
                 <textarea aria-label={`${step.order}단계 설명`} value={step.description} onChange={(event) => onChange(step.id, { description: event.target.value })} />
               </label>
+              <div className="roadmap-step__attributes">
               <label className="form-field">
                 <span className="form-field__label">우선순위</span>
                 <select aria-label={`${step.order}단계 우선순위`} value={step.priority} onChange={(event) => onChange(step.id, { priority: event.target.value as RoadmapStep["priority"] })}>
@@ -155,6 +156,7 @@ export function RoadmapPanel({
                   {Object.entries(effortLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
                 </select>
               </label>
+              </div>
             </li>
           ))}
         </ol>

@@ -48,7 +48,7 @@ export function NodeDetailPanel({
   return (
     <aside className="detail-drawer detail-drawer--open">
       <div className="detail-drawer__header">
-        <h2 className="panel__title">Node 편집</h2>
+        <h2 className="panel__title">노드 편집</h2>
         <button type="button" aria-label="Node 편집 닫기" onClick={onClose}>
           닫기
         </button>
