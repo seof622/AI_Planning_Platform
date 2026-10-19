@@ -146,3 +146,70 @@ def test_invalid_graph_changes_do_not_create_versions(version_project, invalid):
     assert response.status_code == 422
     assert len(client.get(prefix).json()) == 1
     assert client.get(f"{prefix}/latest").json() == original
+
+
+def test_roadmap_structure_and_empty_roadmap_round_trip(version_project):
+    client, prefix, original, original_id = version_project
+    draft = deepcopy(original)
+    new_step = {
+        **draft["roadmap"][0], "id": "step-added", "title": "User step",
+        "order": len(draft["roadmap"]) + 1, "dependsOn": [draft["roadmap"][-1]["id"]],
+        "componentNodeIds": [draft["nodes"][0]["id"]],
+    }
+    draft["roadmap"].append(new_step)
+    response = edit(client, prefix, original_id, draft, original_id)
+    assert response.status_code == 200
+    added_id = response.json()["metadata"]["resultId"]
+    assert client.get(f"{prefix}/latest").json()["roadmap"] == draft["roadmap"]
+    removed_id = draft["roadmap"][0]["id"]
+    draft["roadmap"] = [step for step in draft["roadmap"] if step["id"] != removed_id]
+    for index, step in enumerate(draft["roadmap"]):
+        step["order"] = index + 1
+        step["dependsOn"] = [item for item in step["dependsOn"] if item != removed_id]
+    draft["roadmap"][-1]["componentNodeIds"] = []
+    response = edit(client, prefix, added_id, draft, added_id)
+    assert response.status_code == 200
+    deleted_id = response.json()["metadata"]["resultId"]
+    assert client.get(f"{prefix}/latest").json()["roadmap"] == draft["roadmap"]
+    draft["roadmap"] = []
+    response = edit(client, prefix, deleted_id, draft, deleted_id)
+    assert response.status_code == 200
+    empty_id = response.json()["metadata"]["resultId"]
+    assert client.get(f"{prefix}/latest").json()["roadmap"] == []
+    assert client.get(f"{prefix}/{original_id}").json() == original
+    restore = client.post(f"{prefix}/{original_id}/restore", json={"expectedLatestResultId": empty_id})
+    assert restore.status_code == 200
+    assert restore.json()["result"]["roadmap"] == original["roadmap"]
+    assert len(client.get(prefix).json()) == 5
+
+
+@pytest.mark.parametrize("invalid", ["duplicate-id", "order-gap", "cycle", "self", "missing-dependency", "duplicate-dependency", "duplicate-node", "missing-node", "blank-title", "blank-description"])
+def test_invalid_roadmap_structure_does_not_create_versions(version_project, invalid):
+    client, prefix, original, original_id = version_project
+    draft = deepcopy(original)
+    first, second = draft["roadmap"][:2]
+    if invalid == "duplicate-id":
+        second["id"] = first["id"]
+    elif invalid == "order-gap":
+        first["order"] = 100
+    elif invalid == "cycle":
+        first["dependsOn"] = [second["id"]]
+        second["dependsOn"] = [first["id"]]
+    elif invalid == "self":
+        first["dependsOn"] = [first["id"]]
+    elif invalid == "missing-dependency":
+        first["dependsOn"] = ["deleted-step"]
+    elif invalid == "duplicate-dependency":
+        second["dependsOn"] = [first["id"], first["id"]]
+    elif invalid == "duplicate-node":
+        first["componentNodeIds"] = [draft["nodes"][0]["id"]] * 2
+    elif invalid == "missing-node":
+        first["componentNodeIds"] = ["missing-node"]
+    elif invalid == "blank-title":
+        first["title"] = "   "
+    else:
+        first["description"] = "   "
+    response = edit(client, prefix, original_id, draft, original_id)
+    assert response.status_code == 422
+    assert len(client.get(prefix).json()) == 1
+    assert client.get(f"{prefix}/latest").json() == original

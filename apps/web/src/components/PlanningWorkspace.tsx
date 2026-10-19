@@ -70,6 +70,8 @@ export function PlanningWorkspace() {
     updateNodePosition,
     updateRoadmapStep,
     moveRoadmapStep,
+    addRoadmapStep,
+    removeRoadmapStep,
   } = usePlanningStore();
 
   const selectedNode = getSelectedNode(planningResult, selectedNodeId);
@@ -180,6 +182,17 @@ export function PlanningWorkspace() {
             status={status}
           />
           <RoadmapPanel
+            nodes={planningResult?.nodes ?? []}
+            onAdd={addRoadmapStep}
+            onDelete={(stepId) => {
+              const step = planningResult?.roadmap.find((item) => item.id === stepId);
+              if (!step) return;
+              const dependents = planningResult?.roadmap.filter((item) => item.dependsOn.includes(stepId)) ?? [];
+              const impact = dependents.length > 0
+                ? `\n다음 단계의 선행 조건에서 이 단계가 제거됩니다: ${dependents.map((item) => item.title).join(", ")}`
+                : "";
+              if (window.confirm(`“${step.title}” 단계를 삭제할까요?${impact}\n남은 단계 번호를 다시 매깁니다. 과거 버전은 유지됩니다.`)) removeRoadmapStep(stepId);
+            }}
             saveBlocked={versionConflict !== null}
             editErrorMessage={graphEditErrorMessage}
             editStatus={graphEditStatus}

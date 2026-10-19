@@ -1,6 +1,7 @@
-import { render, screen } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
+import { mockPlanningResult } from "@ai-planning-platform/shared";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { RoadmapPanel } from "./RoadmapPanel";
 
 const roadmap = [
@@ -27,6 +28,7 @@ const roadmap = [
 ];
 
 describe("RoadmapPanel", () => {
+  afterEach(cleanup);
   it("edits, reorders, and saves roadmap steps", async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
@@ -38,6 +40,9 @@ describe("RoadmapPanel", () => {
         editErrorMessage={null}
         editStatus="dirty"
         errorMessage={null}
+        nodes={mockPlanningResult.nodes}
+        onAdd={vi.fn()}
+        onDelete={vi.fn()}
         onChange={onChange}
         onMove={onMove}
         onSave={onSave}
@@ -58,5 +63,33 @@ describe("RoadmapPanel", () => {
     expect(onChange).toHaveBeenCalledWith("step-one", { estimatedEffort: "medium" });
     expect(onMove).toHaveBeenCalledWith("step-one", 1);
     expect(onSave).toHaveBeenCalledOnce();
+  });
+
+  it("adds and deletes steps and edits node and dependency references", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    const onAdd = vi.fn();
+    const onDelete = vi.fn();
+    render(<RoadmapPanel nodes={mockPlanningResult.nodes} roadmap={roadmap} status="ready" editStatus="idle"
+      editErrorMessage={null} errorMessage={null} onChange={onChange} onMove={vi.fn()} onSave={vi.fn()} onAdd={onAdd} onDelete={onDelete} />);
+    await user.click(screen.getByRole("button", { name: "단계 추가" }));
+    expect(onAdd).toHaveBeenCalledOnce();
+    const card = within(screen.getAllByRole("listitem")[0]!);
+    await user.click(card.getByText(/관련 노드 ·/));
+    await user.click(card.getByLabelText(`1단계 관련 노드: ${mockPlanningResult.nodes[0]!.label}`));
+    expect(onChange).toHaveBeenCalledWith("step-one", { componentNodeIds: ["node-api", mockPlanningResult.nodes[0]!.id] });
+    await user.click(card.getByText(/선행 단계 ·/));
+    await user.click(card.getByLabelText("1단계 선행 단계: API 구현"));
+    expect(onChange).toHaveBeenCalledWith("step-one", { dependsOn: ["step-two"] });
+    await user.click(card.getByRole("button", { name: "요구사항 정리 단계 삭제" }));
+    expect(onDelete).toHaveBeenCalledWith("step-one");
+  });
+
+  it("can save an empty roadmap and add its first step", () => {
+    render(<RoadmapPanel nodes={[]} roadmap={[]} status="ready" editStatus="dirty" editErrorMessage={null}
+      errorMessage={null} onChange={vi.fn()} onMove={vi.fn()} onSave={vi.fn()} onAdd={vi.fn()} onDelete={vi.fn()} />);
+    expect(screen.getByText(/단계가 없습니다/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "단계 추가" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "로드맵 새 버전 저장" })).toBeEnabled();
   });
 });

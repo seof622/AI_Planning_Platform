@@ -329,15 +329,20 @@ def projects_edit_planning_result(
             raise HTTPException(status_code=422, detail="Duplicate connections are not allowed.")
         connections.add(connection)
 
-    source_roadmap_ids = {step.get("id") for step in source.get("roadmap", [])}
     edited_roadmap_ids = [step.id for step in payload.roadmap]
     if len(set(edited_roadmap_ids)) != len(edited_roadmap_ids):
         raise HTTPException(status_code=422, detail="Roadmap step IDs must be unique.")
-    if set(edited_roadmap_ids) != source_roadmap_ids:
+    if any(not step.title.strip() or not step.description.strip() for step in payload.roadmap):
         raise HTTPException(
             status_code=422,
-            detail="Roadmap editing cannot add or remove steps in this phase.",
+            detail="Roadmap title and description must not be empty.",
         )
+    if any(
+        len(set(step.dependsOn)) != len(step.dependsOn)
+        or len(set(step.componentNodeIds or [])) != len(step.componentNodeIds or [])
+        for step in payload.roadmap
+    ):
+        raise HTTPException(status_code=422, detail="Roadmap references must not contain duplicates.")
     orders = [step.order for step in payload.roadmap]
     if sorted(orders) != list(range(1, len(payload.roadmap) + 1)):
         raise HTTPException(

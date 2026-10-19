@@ -414,6 +414,7 @@ describe("planningStore", () => {
       graphEditErrorMessage: null,
       graphEditStatus: "idle",
       planningResult: resultWithRoadmap,
+      status: "ready",
     });
 
     usePlanningStore.getState().updateRoadmapStep("step-one", {
@@ -431,6 +432,67 @@ describe("planningStore", () => {
     usePlanningStore.getState().moveRoadmapStep("step-one", 1);
     expect(usePlanningStore.getState().planningResult?.roadmap[0]?.id).toBe("step-one");
     expect(usePlanningStore.getState().graphEditErrorMessage).toContain("선행 단계");
+  });
+
+  it("adds, links, topologically orders and deletes roadmap steps without mutating history", () => {
+    const source = structuredClone(mockPlanningResult);
+    source.roadmap = [];
+    const original = structuredClone(source);
+    usePlanningStore.setState({ planningResult: source, status: "ready" });
+    const state = usePlanningStore.getState();
+    state.addRoadmapStep();
+    state.addRoadmapStep();
+    const [first, second] = usePlanningStore.getState().planningResult!.roadmap;
+    expect(first!.id).not.toBe(second!.id);
+    state.updateRoadmapStep(first!.id, { componentNodeIds: [source.nodes[0]!.id], dependsOn: [second!.id] });
+    const reordered = usePlanningStore.getState().planningResult!;
+    expect(reordered.roadmap.map((step) => step.id)).toEqual([second!.id, first!.id]);
+    expect(reordered.roadmap.map((step) => step.order)).toEqual([1, 2]);
+    expect(validatePlanningResult(reordered).valid).toBe(true);
+    state.updateRoadmapStep(second!.id, { dependsOn: [first!.id] });
+    expect(usePlanningStore.getState().planningResult).toBe(reordered);
+    expect(usePlanningStore.getState().graphEditErrorMessage).toContain("순환 의존성");
+    state.updateRoadmapStep(first!.id, { componentNodeIds: ["missing-node"] });
+    expect(usePlanningStore.getState().planningResult).toBe(reordered);
+    state.updateRoadmapStep(first!.id, { dependsOn: [second!.id, second!.id] });
+    expect(usePlanningStore.getState().planningResult).toBe(reordered);
+    state.removeRoadmapStep(second!.id);
+    expect(usePlanningStore.getState().planningResult!.roadmap).toEqual([expect.objectContaining({ id: first!.id, order: 1, dependsOn: [] })]);
+    state.updateRoadmapStep(first!.id, { componentNodeIds: [] });
+    expect(usePlanningStore.getState().planningResult!.roadmap[0]!.componentNodeIds).toEqual([]);
+    state.removeRoadmapStep(first!.id);
+    expect(usePlanningStore.getState().planningResult!.roadmap).toEqual([]);
+    expect(validatePlanningResult(usePlanningStore.getState().planningResult!).valid).toBe(true);
+    state.addRoadmapStep();
+    expect(usePlanningStore.getState().planningResult!.roadmap[0]!.order).toBe(1);
+    expect(source).toEqual(original);
+  });
+
+  it("keeps roadmap edits unchanged during saving and ignores missing steps", () => {
+    const result = structuredClone(mockPlanningResult);
+    usePlanningStore.setState({ planningResult: result, status: "ready", graphEditStatus: "saving" });
+    const state = usePlanningStore.getState();
+    state.addRoadmapStep();
+    state.removeRoadmapStep(result.roadmap[0]!.id);
+    state.updateRoadmapStep(result.roadmap[0]!.id, { title: "Blocked" });
+    state.moveRoadmapStep(result.roadmap[0]!.id, 1);
+    expect(usePlanningStore.getState().planningResult).toBe(result);
+    usePlanningStore.setState({ graphEditStatus: "idle" });
+    state.removeRoadmapStep("missing");
+    state.updateRoadmapStep("missing", { title: "Unknown" });
+    expect(usePlanningStore.getState().graphEditStatus).toBe("idle");
+  });
+
+  it("rejects roadmap cycles, noncontiguous order and duplicate references in the shared contract", () => {
+    const result = structuredClone(mockPlanningResult);
+    result.roadmap[0]!.dependsOn = [result.roadmap[1]!.id];
+    expect(validatePlanningResult(result).valid).toBe(false);
+    result.roadmap[0]!.dependsOn = [];
+    result.roadmap[0]!.componentNodeIds = [result.nodes[0]!.id, result.nodes[0]!.id];
+    expect(validatePlanningResult(result).valid).toBe(false);
+    result.roadmap[0]!.componentNodeIds = [];
+    result.roadmap[0]!.order = 100;
+    expect(validatePlanningResult(result).valid).toBe(false);
   });
 
   it("loads a selected historical planning result", async () => {

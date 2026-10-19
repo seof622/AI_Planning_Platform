@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { sortRoadmapByDependencies } from "../lib/roadmapEditing";
 import type {
   ActionItemNecessity,
   AIModelOption,
@@ -161,10 +162,12 @@ interface PlanningState {
     >,
   ) => void;
   updateNodePosition: (nodeId: string, x: number, y: number) => void;
+  addRoadmapStep: () => void;
+  removeRoadmapStep: (stepId: string) => void;
   updateRoadmapStep: (
     stepId: string,
     changes: Partial<
-      Pick<RoadmapStep, "title" | "description" | "priority" | "estimatedEffort">
+      Pick<RoadmapStep, "title" | "description" | "priority" | "estimatedEffort" | "dependsOn" | "componentNodeIds">
     >,
   ) => void;
   moveRoadmapStep: (stepId: string, direction: -1 | 1) => void;
@@ -770,26 +773,55 @@ export const usePlanningStore = create<PlanningState>((set, get) => ({
       };
     });
   },
+  addRoadmapStep() {
+    set((state) => {
+      const result = state.planningResult;
+      if (!result || state.status !== "ready" || state.graphEditStatus === "saving") return state;
+      const step: RoadmapStep = {
+        id: `step-${crypto.randomUUID()}`, title: "새 단계", description: "단계 설명을 입력하세요.",
+        priority: "medium", estimatedEffort: "medium", order: result.roadmap.length + 1,
+        dependsOn: [], componentNodeIds: [],
+      };
+      return { graphEditErrorMessage: null, graphEditStatus: "dirty",
+        planningResult: { ...result, roadmap: [...result.roadmap, step] } };
+    });
+  },
+  removeRoadmapStep(stepId) {
+    set((state) => {
+      const result = state.planningResult;
+      if (!result || state.status !== "ready" || state.graphEditStatus === "saving"
+        || !result.roadmap.some((step) => step.id === stepId)) return state;
+      const roadmap = [...result.roadmap].sort((left, right) => left.order - right.order)
+        .filter((step) => step.id !== stepId)
+        .map((step, index) => ({ ...step, order: index + 1, dependsOn: step.dependsOn.filter((id) => id !== stepId) }));
+      return { graphEditErrorMessage: null, graphEditStatus: "dirty", planningResult: { ...result, roadmap } };
+    });
+  },
   updateRoadmapStep(stepId, changes) {
     set((state) => {
-      if (!state.planningResult) {
-        return state;
+      const result = state.planningResult;
+      if (!result || state.status !== "ready" || state.graphEditStatus === "saving"
+        || !result.roadmap.some((step) => step.id === stepId)) return state;
+      if (changes.componentNodeIds && (new Set(changes.componentNodeIds).size !== changes.componentNodeIds.length
+        || changes.componentNodeIds.some((id) => !result.nodes.some((node) => node.id === id)))) {
+        return { graphEditErrorMessage: "관련 노드는 중복 없이 현재 Graph의 노드에서 선택해 주세요." };
       }
+      const updated = result.roadmap.map((step) => step.id === stepId ? { ...step, ...changes } : step);
+      const roadmap = changes.dependsOn ? sortRoadmapByDependencies(updated) : updated;
+      if (!roadmap) return { graphEditErrorMessage: "순환 의존성이 생기거나 존재하지 않는 선행 단계는 선택할 수 없습니다." };
       return {
         graphEditErrorMessage: null,
         graphEditStatus: "dirty",
         planningResult: {
-          ...state.planningResult,
-          roadmap: state.planningResult.roadmap.map((step) =>
-            step.id === stepId ? { ...step, ...changes } : step,
-          ),
+          ...result,
+          roadmap,
         },
       };
     });
   },
   moveRoadmapStep(stepId, direction) {
     set((state) => {
-      if (!state.planningResult) {
+      if (!state.planningResult || state.graphEditStatus === "saving" || state.status !== "ready") {
         return state;
       }
       const roadmap = [...state.planningResult.roadmap].sort(

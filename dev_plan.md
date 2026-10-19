@@ -14,7 +14,7 @@
 핵심 Planning 생성, 모델 선택·추천, PostgreSQL persistence, 생성 이력·복원,
 실제 환경 E2E, Graph·Roadmap 편집과 편집 버전 관리까지 완료했다.
 개인 전용 사용을 기준으로 인증·소유권과 배포 준비는 보류한다.
-2026-10-19 후속 기능 작업은 Graph 노드·연결 추가/삭제로 확정했다.
+2026-10-19 후속 기능으로 Graph 노드·연결 편집과 Roadmap 단계·참조 편집까지 구현했다.
 
 ### Phase 1. Graph 편집
 
@@ -102,6 +102,19 @@
 - Graph 구조 변경을 새 결과 버전으로 저장하며 과거 버전과 저장 충돌 처리를 유지한다.
 - Web test 31개, API test 28개, 브라우저 E2E 4개, 타입 검사·린트·production build를 통과했다.
 - 검증 범위와 사용법은 `docs/reports/graph-structure-editing-implementation-report.md`에 기록한다.
+
+### 후속 기능. Roadmap 단계·참조 편집
+
+상태: 2026-10-19 구현 및 자동·브라우저·PostgreSQL 저장 검증 완료
+
+- 로드맵 단계를 추가·삭제하고 마지막 단계까지 삭제한 빈 로드맵도 저장한다.
+- 각 단계의 관련 Graph 노드를 연결·해제하고 선행 단계를 설정한다.
+- 선행 단계가 뒤에 있으면 의존성을 만족하는 순서로 자동 정렬하고 번호를 다시 매긴다.
+- 순환·자기 참조, 존재하지 않는 단계·노드, 중복 참조와 잘못된 순서를 Web·Shared·API에서 차단한다.
+- 단계 삭제 시 영향을 받는 단계를 확인한 뒤 해당 선행 참조를 해제하고 남은 순서를 정리한다.
+- Graph 편집과 같은 새 버전 저장·비교·복원·저장 충돌 처리를 사용한다.
+- Web test 36개, API test 39개, 브라우저 E2E 5개와 타입·린트·production build를 통과했다.
+- 사용법과 검증 범위는 `docs/reports/roadmap-structure-editing-implementation-report.md`에 기록한다.
 
 ### Phase 4. 사용자 인증과 프로젝트 소유권 — 보류
 

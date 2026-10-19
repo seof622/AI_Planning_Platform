@@ -73,9 +73,10 @@
 
 ### 계획 결과 편집
 
-2026-10-19까지 Graph 노드·연결 추가/삭제, drag 위치 저장, Roadmap 편집과
-순서 변경, 버전 비교·복원·저장 충돌 처리를 완료했다. 완료 내역은 `dev_plan.md`와
-`docs/reports/graph-structure-editing-implementation-report.md`에서 관리한다.
+2026-10-19까지 Graph 노드·연결 추가/삭제, drag 위치 저장, Roadmap 단계 추가/삭제,
+관련 노드 연결·해제, 선행 단계 설정·자동 정렬, 버전 비교·복원·저장 충돌 처리를 완료했다.
+완료 내역은 `dev_plan.md`, `docs/reports/graph-structure-editing-implementation-report.md`와
+`docs/reports/roadmap-structure-editing-implementation-report.md`에서 관리한다.
 
 - 이미지, PDF, Markdown 내보내기
 - 고급 편집이 필요할 때 tldraw SDK 도입 검토

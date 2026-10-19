@@ -121,10 +121,12 @@ Each `RoadmapStep` must have:
 Rules:
 
 - Step ids must be unique.
-- `order` values should be unique and sortable.
+- `order` values must be unique and contiguous from 1.
 - Every `dependsOn` id must exist in `roadmap`.
 - Every `componentNodeIds` id must exist in `nodes`.
-- Dependency cycles should be avoided. The first API version may only validate references; AI workflow can add cycle checks later.
+- Every dependency must precede the current step by `order`, which also rejects self references and cycles.
+- Dependency and component node reference lists must not contain duplicates.
+- Edited roadmaps may be empty. Web can add the first step again without regenerating the graph.
 
 ## Empty And Error States
 
@@ -187,7 +189,11 @@ Minimum mock requirements:
   Self connections and duplicate `(source, target)` connections, regardless of dependency type,
   are rejected. Web removes incident edges and roadmap component references when
   deleting a node; the API rejects dangling references instead of silently
-  changing the submitted snapshot. Roadmap step IDs remain unchanged.
+  changing the submitted snapshot. Roadmap steps may also be added or removed.
+  Web detaches references to a deleted step and renumbers the remaining steps.
+  Selecting a prerequisite automatically sorts the draft by dependency while
+  retaining the previous order whenever possible; cycles leave the draft unchanged.
+  The API validates the submitted order and references without silently reordering.
   Omitting the head ID defaults to
   `resultId`, so stale legacy edits are rejected. An intentional historical branch
   supplies the observed latest ID while keeping the historical ID in the URL.

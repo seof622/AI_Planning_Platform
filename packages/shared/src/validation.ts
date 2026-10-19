@@ -174,14 +174,6 @@ export function validatePlanningResult(
     addIssue(issues, "nodes", "Planning result should contain at least one node.");
   }
 
-  if (result.roadmap.length === 0) {
-    addIssue(
-      issues,
-      "roadmap",
-      "Planning result should contain at least one roadmap step.",
-    );
-  }
-
   if (!hasText(result.summary)) {
     addIssue(issues, "summary", "Summary must not be empty.");
   }
@@ -311,6 +303,10 @@ function validateRoadmapSteps(
   issues: ContractValidationIssue[],
 ) {
   const seenOrders = new Set<number>();
+  const orderById = new Map(roadmap.map((step) => [step.id, step.order]));
+  if ([...roadmap].sort((a, b) => a.order - b.order).some((step, index) => step.order !== index + 1)) {
+    addIssue(issues, "roadmap", "Roadmap orders must be contiguous from 1.");
+  }
 
   roadmap.forEach((step, index) => {
     const path = `roadmap.${index}`;
@@ -361,6 +357,10 @@ function validateRoadmapSteps(
       );
     }
 
+    if (new Set(step.dependsOn).size !== step.dependsOn.length ||
+        new Set(step.componentNodeIds ?? []).size !== (step.componentNodeIds ?? []).length) {
+      addIssue(issues, path, "Roadmap references must not contain duplicates.");
+    }
     step.dependsOn.forEach((dependencyId, dependencyIndex) => {
       if (!roadmapStepIds.has(dependencyId)) {
         addIssue(
@@ -368,6 +368,9 @@ function validateRoadmapSteps(
           `${path}.dependsOn.${dependencyIndex}`,
           `Roadmap dependency does not exist: ${dependencyId}.`,
         );
+      }
+      if (roadmapStepIds.has(dependencyId) && (orderById.get(dependencyId) ?? Infinity) >= step.order) {
+        addIssue(issues, `${path}.dependsOn.${dependencyIndex}`, "Roadmap dependencies must reference an earlier step.");
       }
     });
 
