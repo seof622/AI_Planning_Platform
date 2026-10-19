@@ -258,6 +258,7 @@ def edit_planning_result(
     project: ProjectModel,
     result_id: str,
     nodes: list[dict[str, Any]],
+    edges: list[dict[str, Any]],
     roadmap: list[dict[str, Any]],
     expected_latest_result_id: str | None = None,
 ) -> dict[str, Any] | None:
@@ -276,6 +277,7 @@ def edit_planning_result(
 
     edited_result = deepcopy(source.result)
     edited_result["nodes"] = nodes
+    edited_result["edges"] = edges
     edited_result["roadmap"] = roadmap
     return save_planning_result(
         session,

@@ -3,6 +3,7 @@ import type {
   ActionItemNecessity,
   AIModelOption,
   ComponentNode,
+  DependencyEdge,
   PlanType,
   PlanningActionItem,
   PlanningRequest,
@@ -148,10 +149,15 @@ interface PlanningState {
   selectProject: (projectId: string) => Promise<void>;
   selectPlanningResult: (resultId: string) => Promise<void>;
   selectNode: (nodeId: string | null) => void;
+  addNode: () => void;
+  removeNode: (nodeId: string) => void;
+  addEdge: (source: string, target: string, dependencyType: DependencyEdge["dependencyType"]) => void;
+  removeEdge: (edgeId: string) => void;
+  updateEdge: (edgeId: string, changes: Partial<Pick<DependencyEdge, "source" | "target" | "dependencyType">>) => void;
   updateNode: (
     nodeId: string,
     changes: Partial<
-      Pick<ComponentNode, "label" | "description" | "category" | "priority">
+      Pick<ComponentNode, "label" | "description" | "category" | "priority" | "type">
     >,
   ) => void;
   updateNodePosition: (nodeId: string, x: number, y: number) => void;
@@ -495,6 +501,7 @@ export const usePlanningStore = create<PlanningState>((set, get) => ({
         state.planningResult.nodes,
         state.planningResult.roadmap,
         state.expectedLatestResultId ?? state.planningHistory[0]?.id ?? state.selectedPlanningResultId,
+        state.planningResult.edges,
       );
       set({
         versionConflict: null,
@@ -636,6 +643,96 @@ export const usePlanningStore = create<PlanningState>((set, get) => ({
   },
   selectNode(nodeId) {
     set({ selectedNodeId: nodeId });
+  },
+  addNode() {
+    set((state) => {
+      const result = state.planningResult;
+      if (!result || state.status !== "ready" || state.graphEditStatus === "saving") return state;
+      const anchor = result.nodes.find((node) => node.id === state.selectedNodeId)
+        ?? result.nodes[result.nodes.length - 1];
+      const node: ComponentNode = {
+        id: `node-${crypto.randomUUID()}`,
+        type: "feature", label: "새 노드", description: "노드 설명을 입력하세요.",
+        category: "사용자 추가", priority: "medium",
+        position: { x: (anchor?.position.x ?? 0) + 320, y: (anchor?.position.y ?? 0) + 100 },
+      };
+      return {
+        graphEditErrorMessage: null, graphEditStatus: "dirty", selectedNodeId: node.id,
+        planningResult: { ...result, nodes: [...result.nodes, node] },
+      };
+    });
+  },
+  removeNode(nodeId) {
+    set((state) => {
+      const result = state.planningResult;
+      if (!result || state.status !== "ready" || state.graphEditStatus === "saving"
+        || !result.nodes.some((node) => node.id === nodeId)) return state;
+      if (result.nodes.length === 1) {
+        return { graphEditErrorMessage: "마지막 노드는 삭제할 수 없습니다." };
+      }
+      return {
+        graphEditErrorMessage: null, graphEditStatus: "dirty",
+        selectedNodeId: state.selectedNodeId === nodeId ? null : state.selectedNodeId,
+        planningResult: {
+          ...result,
+          nodes: result.nodes.filter((node) => node.id !== nodeId),
+          edges: result.edges.filter((edge) => edge.source !== nodeId && edge.target !== nodeId),
+          roadmap: result.roadmap.map((step) => ({
+            ...step,
+            ...(step.componentNodeIds ? { componentNodeIds: step.componentNodeIds.filter((id) => id !== nodeId) } : {}),
+          })),
+        },
+      };
+    });
+  },
+  addEdge(source, target, dependencyType) {
+    set((state) => {
+      const result = state.planningResult;
+      if (!result || state.status !== "ready" || state.graphEditStatus === "saving") return state;
+      if (!result.nodes.some((node) => node.id === source) || !result.nodes.some((node) => node.id === target)) {
+        return { graphEditErrorMessage: "연결할 노드를 선택해 주세요." };
+      }
+      if (source === target) return { graphEditErrorMessage: "자기 자신에게 연결할 수 없습니다." };
+      if (result.edges.some((edge) => edge.source === source && edge.target === target)) {
+        return { graphEditErrorMessage: "같은 시작·끝 노드의 연결이 이미 있습니다." };
+      }
+      const edge: DependencyEdge = { id: `edge-${crypto.randomUUID()}`, source, target, dependencyType, label: "" };
+      return {
+        graphEditErrorMessage: null, graphEditStatus: "dirty",
+        planningResult: { ...result, edges: [...result.edges, edge] },
+      };
+    });
+  },
+  updateEdge(edgeId, changes) {
+    set((state) => {
+      const result = state.planningResult;
+      const original = result?.edges.find((edge) => edge.id === edgeId);
+      if (!result || !original || state.status !== "ready" || state.graphEditStatus === "saving") return state;
+      const updated = { ...original, ...changes };
+      if (!result.nodes.some((node) => node.id === updated.source) || !result.nodes.some((node) => node.id === updated.target)) {
+        return { graphEditErrorMessage: "연결할 노드를 선택해 주세요." };
+      }
+      if (updated.source === updated.target) return { graphEditErrorMessage: "자기 자신에게 연결할 수 없습니다." };
+      if (result.edges.some((edge) => edge.id !== edgeId && edge.source === updated.source && edge.target === updated.target)) {
+        return { graphEditErrorMessage: "같은 시작·끝 노드의 연결이 이미 있습니다." };
+      }
+      if (updated.source === original.source && updated.target === original.target && updated.dependencyType === original.dependencyType) return state;
+      return {
+        graphEditErrorMessage: null, graphEditStatus: "dirty",
+        planningResult: { ...result, edges: result.edges.map((edge) => edge.id === edgeId ? updated : edge) },
+      };
+    });
+  },
+  removeEdge(edgeId) {
+    set((state) => {
+      const result = state.planningResult;
+      if (!result || state.status !== "ready" || state.graphEditStatus === "saving"
+        || !result.edges.some((edge) => edge.id === edgeId)) return state;
+      return {
+        graphEditErrorMessage: null, graphEditStatus: "dirty",
+        planningResult: { ...result, edges: result.edges.filter((edge) => edge.id !== edgeId) },
+      };
+    });
   },
   updateNode(nodeId, changes) {
     set((state) => {

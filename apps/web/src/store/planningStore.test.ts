@@ -4,6 +4,7 @@ import type {
 } from "@ai-planning-platform/shared";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { usePlanningStore } from "./planningStore";
+import { validatePlanningResult, mockPlanningResult } from "@ai-planning-platform/shared";
 
 const project: Project = {
   createdAt: "2026-07-26T00:00:00Z",
@@ -279,6 +280,110 @@ describe("planningStore", () => {
     expect(usePlanningStore.getState().selectedPlanningResultId).toBe(
       "planning-result-edited",
     );
+  });
+
+  it("adds unique nodes and deletes their connections and roadmap references without mutating the source", () => {
+    const source = structuredClone(mockPlanningResult);
+    const snapshot = structuredClone(source);
+    usePlanningStore.setState({ planningResult: source, status: "ready" });
+    usePlanningStore.getState().addNode();
+    const addedId = usePlanningStore.getState().selectedNodeId!;
+    usePlanningStore.getState().addNode();
+    expect(usePlanningStore.getState().selectedNodeId).not.toBe(addedId);
+    usePlanningStore.getState().addEdge(source.nodes[0]!.id, addedId, "requires");
+    expect(validatePlanningResult(usePlanningStore.getState().planningResult!).valid).toBe(true);
+    usePlanningStore.getState().selectNode(source.nodes[0]!.id);
+    usePlanningStore.getState().removeNode(source.nodes[0]!.id);
+    const state = usePlanningStore.getState();
+    expect(state.selectedNodeId).toBeNull();
+    expect(state.graphEditStatus).toBe("dirty");
+    expect(validatePlanningResult(state.planningResult!).valid).toBe(true);
+    expect(state.planningResult!.edges.every((edge) => edge.source !== source.nodes[0]!.id && edge.target !== source.nodes[0]!.id)).toBe(true);
+    expect(state.planningResult!.roadmap.every((step) => !step.componentNodeIds?.includes(source.nodes[0]!.id))).toBe(true);
+    expect(source).toEqual(snapshot);
+  });
+
+  it("rejects the last node deletion, self connections, duplicate connections and missing endpoints", () => {
+    usePlanningStore.setState({ planningResult: structuredClone(planningResult), status: "ready" });
+    const state = usePlanningStore.getState();
+    state.removeNode("node-test");
+    expect(usePlanningStore.getState().planningResult!.nodes).toHaveLength(1);
+    expect(usePlanningStore.getState().graphEditStatus).toBe("idle");
+    state.addEdge("node-test", "node-test", "requires");
+    expect(usePlanningStore.getState().graphEditErrorMessage).toContain("자기 자신");
+    state.addEdge("node-test", "missing", "requires");
+    expect(usePlanningStore.getState().planningResult!.edges).toHaveLength(0);
+    state.addNode();
+    const id = usePlanningStore.getState().selectedNodeId!;
+    state.addEdge("node-test", id, "requires");
+    state.addEdge("node-test", id, "requires");
+    state.addEdge("node-test", id, "feeds");
+    expect(usePlanningStore.getState().planningResult!.edges).toHaveLength(1);
+    expect(usePlanningStore.getState().graphEditErrorMessage).toContain("이미");
+    state.removeEdge(usePlanningStore.getState().planningResult!.edges[0]!.id);
+    expect(usePlanningStore.getState().planningResult!.edges).toHaveLength(0);
+    state.removeNode(id);
+    expect(usePlanningStore.getState().planningResult!.nodes).toHaveLength(1);
+  });
+
+  it("saves graph structure and prevents structural edits while a save is in flight", async () => {
+    usePlanningStore.setState({ planningResult: structuredClone(planningResult), status: "ready",
+      selectedProjectId: project.id, selectedPlanningResultId: "source", expectedLatestResultId: "source" });
+    usePlanningStore.getState().addNode();
+    const id = usePlanningStore.getState().selectedNodeId!;
+    usePlanningStore.getState().addEdge("node-test", id, "feeds");
+    const draft = usePlanningStore.getState().planningResult!;
+    let finish!: (response: Response) => void;
+    vi.mocked(fetch).mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }))
+      .mockResolvedValueOnce(jsonResponse([{ ...planningHistory[0], id: "saved" }]));
+    const save = usePlanningStore.getState().saveGraphEdits();
+    usePlanningStore.getState().addNode();
+    usePlanningStore.getState().removeNode(id);
+    usePlanningStore.getState().removeEdge(draft.edges[0]!.id);
+    expect(usePlanningStore.getState().planningResult).toBe(draft);
+    const body = JSON.parse(vi.mocked(fetch).mock.calls[0]![1]!.body as string);
+    expect(body).toMatchObject({ nodes: draft.nodes, edges: draft.edges, expectedLatestResultId: "source" });
+    finish(jsonResponse({ ...draft, metadata: { ...draft.metadata, resultId: "saved" } }));
+    await save;
+    expect(usePlanningStore.getState().graphEditStatus).toBe("idle");
+    expect(usePlanningStore.getState().planningResult!.edges).toEqual(draft.edges);
+  });
+
+  it("reconnects an edge without changing its ID and rejects invalid or duplicate updates", () => {
+    usePlanningStore.setState({ planningResult: structuredClone(mockPlanningResult), status: "ready" });
+    const state = usePlanningStore.getState();
+    state.addNode();
+    const newId = usePlanningStore.getState().selectedNodeId!;
+    const edge = mockPlanningResult.edges[0]!;
+    state.updateEdge(edge.id, { target: newId, dependencyType: "related" });
+    expect(usePlanningStore.getState().planningResult!.edges.find((item) => item.id === edge.id))
+      .toMatchObject({ id: edge.id, source: edge.source, target: newId, dependencyType: "related" });
+    const updated = usePlanningStore.getState().planningResult;
+    state.updateEdge(edge.id, { target: edge.source });
+    state.updateEdge(edge.id, { target: "missing" });
+    expect(usePlanningStore.getState().planningResult).toBe(updated);
+    state.addEdge(edge.source, newId, "requires");
+    expect(usePlanningStore.getState().graphEditErrorMessage).toContain("이미");
+    const occupied = mockPlanningResult.edges[1]!;
+    state.updateEdge(edge.id, { source: occupied.source, target: occupied.target, dependencyType: "related" });
+    expect(usePlanningStore.getState().graphEditErrorMessage).toContain("이미");
+    expect(usePlanningStore.getState().planningResult!.edges.find((item) => item.id === edge.id)!.dependencyType).toBe("related");
+    // A single existing edge can still change its own type.
+    state.updateEdge(edge.id, { dependencyType: "requires" });
+    expect(usePlanningStore.getState().planningResult!.edges.find((item) => item.id === edge.id)!.dependencyType).toBe("requires");
+    usePlanningStore.setState({ graphEditStatus: "saving" });
+    const saving = usePlanningStore.getState().planningResult;
+    state.updateEdge(edge.id, { target: edge.target });
+    expect(usePlanningStore.getState().planningResult).toBe(saving);
+  });
+
+  it("rejects parallel edges of different types in the shared contract", () => {
+    const result = structuredClone(mockPlanningResult);
+    const edge = result.edges[0]!;
+    result.edges.push({ ...edge, id: "parallel-edge", dependencyType: edge.dependencyType === "related" ? "feeds" : "related" });
+    const validation = validatePlanningResult(result);
+    expect(validation.valid).toBe(false);
+    expect(validation.issues).toContainEqual(expect.objectContaining({ message: "Duplicate connections are not allowed." }));
   });
 
   it("edits roadmap fields and rejects an order that breaks dependencies", () => {

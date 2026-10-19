@@ -103,6 +103,7 @@ Rules:
 - Edge ids must be unique.
 - `source` and `target` must exist in `nodes`.
 - Self-referencing edges are discouraged and should be rejected unless a future workflow explicitly needs them.
+- Each ordered `(source, target)` pair can have only one edge, regardless of dependency type.
 
 ## Roadmap Steps
 
@@ -179,7 +180,15 @@ Minimum mock requirements:
 - Provenance fields inherited from the source are removed before setting the new
   direct source. History responses expose those sources separately.
 - `POST /projects/{projectId}/planning-results/{resultId}/edit` accepts
-  `{ nodes, roadmap, expectedLatestResultId }`. Omitting the head ID defaults to
+  `{ nodes, edges?, roadmap, expectedLatestResultId }`. Omitting `edges` preserves
+  the source edges for legacy clients. Nodes and edges may be added or removed;
+  at least one node must remain. Node and edge IDs must be unique. All edge
+  endpoints and roadmap component references must exist in the edited nodes.
+  Self connections and duplicate `(source, target)` connections, regardless of dependency type,
+  are rejected. Web removes incident edges and roadmap component references when
+  deleting a node; the API rejects dangling references instead of silently
+  changing the submitted snapshot. Roadmap step IDs remain unchanged.
+  Omitting the head ID defaults to
   `resultId`, so stale legacy edits are rejected. An intentional historical branch
   supplies the observed latest ID while keeping the historical ID in the URL.
 - `POST /projects/{projectId}/planning-results/{resultId}/restore` accepts

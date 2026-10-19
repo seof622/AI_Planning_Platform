@@ -295,15 +295,10 @@ def projects_edit_planning_result(
     if source is None:
         raise HTTPException(status_code=404, detail="Planning result not found.")
 
-    source_ids = {node.get("id") for node in source.get("nodes", [])}
     edited_ids = [node.id for node in payload.nodes]
     if len(set(edited_ids)) != len(edited_ids):
         raise HTTPException(status_code=422, detail="Node IDs must be unique.")
-    if set(edited_ids) != source_ids:
-        raise HTTPException(
-            status_code=422,
-            detail="Graph editing cannot add or remove nodes in this phase.",
-        )
+    node_ids = set(edited_ids)
     if any(
         not node.label.strip()
         or not node.description.strip()
@@ -314,6 +309,25 @@ def projects_edit_planning_result(
             status_code=422,
             detail="Node label, description, and category must not be empty.",
         )
+
+    edges = (
+        [edge.model_dump(exclude_none=True) for edge in payload.edges]
+        if payload.edges is not None
+        else source.get("edges", [])
+    )
+    edge_ids = [edge["id"] for edge in edges]
+    if len(set(edge_ids)) != len(edge_ids):
+        raise HTTPException(status_code=422, detail="Edge IDs must be unique.")
+    connections = set()
+    for edge in edges:
+        if edge["source"] not in node_ids or edge["target"] not in node_ids:
+            raise HTTPException(status_code=422, detail="Edges must reference existing nodes.")
+        if edge["source"] == edge["target"]:
+            raise HTTPException(status_code=422, detail="Self-referencing edges are not allowed.")
+        connection = (edge["source"], edge["target"])
+        if connection in connections:
+            raise HTTPException(status_code=422, detail="Duplicate connections are not allowed.")
+        connections.add(connection)
 
     source_roadmap_ids = {step.get("id") for step in source.get("roadmap", [])}
     edited_roadmap_ids = [step.id for step in payload.roadmap]
@@ -342,7 +356,7 @@ def projects_edit_planning_result(
             detail="Roadmap dependencies must reference an earlier step.",
         )
     if any(
-        node_id not in source_ids
+        node_id not in node_ids
         for step in payload.roadmap
         for node_id in (step.componentNodeIds or [])
     ):
@@ -356,6 +370,7 @@ def projects_edit_planning_result(
         project=project,
         result_id=result_id,
         nodes=[node.model_dump(exclude_none=True) for node in payload.nodes],
+        edges=edges,
         roadmap=[step.model_dump(exclude_none=True) for step in payload.roadmap],
         expected_latest_result_id=payload.expectedLatestResultId,
     )

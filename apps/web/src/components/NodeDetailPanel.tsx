@@ -9,9 +9,11 @@ interface NodeDetailPanelProps {
   editStatus: "idle" | "dirty" | "saving" | "error";
   node: ComponentNode | null;
   onClose: () => void;
+  onDelete?: () => void;
+  canDelete?: boolean;
   onChange: (
     changes: Partial<
-      Pick<ComponentNode, "label" | "description" | "category" | "priority">
+      Pick<ComponentNode, "label" | "description" | "category" | "priority" | "type">
     >,
   ) => void;
   onSave: () => Promise<void>;
@@ -27,6 +29,8 @@ export function NodeDetailPanel({
   editStatus,
   node,
   onClose,
+  onDelete,
+  canDelete = false,
   onChange,
   onSave,
 }: NodeDetailPanelProps) {
@@ -68,10 +72,13 @@ export function NodeDetailPanel({
             onChange={(event) => onChange({ description: event.target.value })}
           />
         </label>
-        <div className="detail-list__item">
-          <p className="detail-list__label">유형</p>
-          <p className="detail-list__value">{nodeTypeLabels[node.type]}</p>
-        </div>
+        <label className="form-field">
+          <span className="form-field__label">유형</span>
+          <select aria-label="Node 유형" disabled={editStatus === "saving"} value={node.type}
+            onChange={(event) => onChange({ type: event.target.value as ComponentNode["type"] })}>
+            {Object.entries(nodeTypeLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+          </select>
+        </label>
         <label className="form-field">
           <span className="form-field__label">분류</span>
           <input
@@ -126,6 +133,11 @@ export function NodeDetailPanel({
       >
         {editStatus === "saving" ? "저장 중" : "편집본 새 버전 저장"}
       </button>
+      {onDelete ? (
+        <button className="button graph-delete" type="button" disabled={!canDelete || editStatus === "saving"}
+          onClick={onDelete}>노드 삭제</button>
+      ) : null}
+      {onDelete && !canDelete ? <p className="graph-edit-panel__hint">마지막 노드는 유지해야 합니다.</p> : null}
     </aside>
   );
 }

@@ -187,11 +187,12 @@ export function saveGraphEdit(
   nodes: ComponentNode[],
   roadmap: RoadmapStep[],
   expectedLatestResultId: string,
+  edges?: PlanningResult["edges"],
 ): Promise<PlanningResult> {
   return requestJson<PlanningResult>(
     `/projects/${encodeURIComponent(projectId)}/planning-results/${encodeURIComponent(resultId)}/edit`,
     {
-      body: JSON.stringify({ nodes, roadmap, expectedLatestResultId }),
+      body: JSON.stringify({ nodes, edges, roadmap, expectedLatestResultId }),
       headers: { "Content-Type": "application/json" },
       method: "POST",
     },

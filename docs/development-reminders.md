@@ -73,14 +73,17 @@
 
 ### 계획 결과 편집
 
-- Graph node와 dependency edge 수동 편집
-- drag 위치와 layout 저장
-- Roadmap 단계 inline 편집과 순서 변경
-- 편집본과 AI 생성 원본의 버전 이력 및 복원
+2026-10-19까지 Graph 노드·연결 추가/삭제, drag 위치 저장, Roadmap 편집과
+순서 변경, 버전 비교·복원·저장 충돌 처리를 완료했다. 완료 내역은 `dev_plan.md`와
+`docs/reports/graph-structure-editing-implementation-report.md`에서 관리한다.
+
 - 이미지, PDF, Markdown 내보내기
 - 고급 편집이 필요할 때 tldraw SDK 도입 검토
 
 ### 사용자와 협업
+
+2026-10-19 결정: 개인 전용 사용이므로 인증·소유권·공유·협업은 보류한다.
+여러 사용자 지원이 필요해질 때 재검토한다.
 
 - 사용자 인증
 - project ownership과 권한 분리
@@ -96,6 +99,8 @@
 - 출처 표시와 오래된 지식 갱신 전략
 
 ### 배포와 운영
+
+2026-10-19 결정: 배포 준비는 다음 필수 작업에서 제외하고 필요해질 때 재검토한다.
 
 - 배포 환경 구성과 release 절차
 - API·AI workflow observability

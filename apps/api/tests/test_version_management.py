@@ -82,3 +82,67 @@ def test_each_version_records_only_its_own_operation(version_project):
     history = client.get(prefix).json()
     assert history[0]["restoredFromResultId"] is None
     assert history[1]["editedFromResultId"] is None
+
+
+def test_graph_structure_changes_round_trip_without_overwriting_history(version_project):
+    client, prefix, original, original_id = version_project
+    draft = deepcopy(original)
+    added = {**draft["nodes"][0], "id": "node-added", "label": "User node"}
+    draft["nodes"].append(added)
+    draft["edges"].append({
+        "id": "edge-added", "source": draft["nodes"][0]["id"],
+        "target": added["id"], "label": "", "dependencyType": "requires",
+    })
+    draft["roadmap"][0]["componentNodeIds"].append(added["id"])
+    response = client.post(f"{prefix}/{original_id}/edit", json={
+        "nodes": draft["nodes"], "edges": draft["edges"], "roadmap": draft["roadmap"],
+        "expectedLatestResultId": original_id,
+    })
+    assert response.status_code == 200
+    added_id = response.json()["metadata"]["resultId"]
+    latest = client.get(f"{prefix}/latest").json()
+    assert latest["nodes"] == draft["nodes"]
+    assert latest["edges"] == draft["edges"]
+    assert latest["roadmap"] == draft["roadmap"]
+    removed_id = original["nodes"][0]["id"]
+    draft["nodes"] = [node for node in draft["nodes"] if node["id"] != removed_id]
+    draft["edges"] = [edge for edge in draft["edges"] if removed_id not in (edge["source"], edge["target"])]
+    for step in draft["roadmap"]:
+        step["componentNodeIds"] = [node_id for node_id in step.get("componentNodeIds", []) if node_id != removed_id]
+    response = client.post(f"{prefix}/{added_id}/edit", json={
+        "nodes": draft["nodes"], "edges": draft["edges"], "roadmap": draft["roadmap"],
+        "expectedLatestResultId": added_id,
+    })
+    assert response.status_code == 200
+    assert client.get(f"{prefix}/latest").json()["edges"] == draft["edges"]
+    assert client.get(f"{prefix}/{original_id}").json() == original
+    assert len(client.get(prefix).json()) == 3
+
+
+@pytest.mark.parametrize("invalid", ["no-nodes", "node-ids", "edge-ids", "missing-endpoint", "self-edge", "duplicate-edge", "parallel-edge", "missing-roadmap-node", "nonfinite-position"])
+def test_invalid_graph_changes_do_not_create_versions(version_project, invalid):
+    client, prefix, original, original_id = version_project
+    payload = {key: deepcopy(original[key]) for key in ("nodes", "edges", "roadmap")}
+    if invalid == "no-nodes":
+        payload["nodes"] = []
+    elif invalid == "node-ids":
+        payload["nodes"].append(deepcopy(payload["nodes"][0]))
+    elif invalid == "edge-ids":
+        payload["edges"].append(deepcopy(payload["edges"][0]))
+    elif invalid == "missing-endpoint":
+        payload["edges"][0]["target"] = "missing-node"
+    elif invalid == "self-edge":
+        payload["edges"][0]["target"] = payload["edges"][0]["source"]
+    elif invalid == "duplicate-edge":
+        payload["edges"].append({**payload["edges"][0], "id": "different-id"})
+    elif invalid == "parallel-edge":
+        edge = payload["edges"][0]
+        payload["edges"].append({**edge, "id": "different-type", "dependencyType": "related" if edge["dependencyType"] != "related" else "feeds"})
+    elif invalid == "missing-roadmap-node":
+        payload["roadmap"][0]["componentNodeIds"] = ["missing-node"]
+    else:
+        payload["nodes"][0]["position"]["x"] = "Infinity"
+    response = client.post(f"{prefix}/{original_id}/edit", json=payload)
+    assert response.status_code == 422
+    assert len(client.get(prefix).json()) == 1
+    assert client.get(f"{prefix}/latest").json() == original

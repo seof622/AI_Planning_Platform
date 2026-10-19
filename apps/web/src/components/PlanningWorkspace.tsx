@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import type { DependencyType } from "@ai-planning-platform/shared";
 import { getSelectedNode, usePlanningStore } from "../store/planningStore";
 import { NodeDetailPanel } from "./NodeDetailPanel";
 import { PlanningCanvas } from "./PlanningCanvas";
@@ -8,6 +9,7 @@ import { PlanningHistoryPanel } from "./PlanningHistoryPanel";
 import { ProjectPanel } from "./ProjectPanel";
 import { RequirementPanel } from "./RequirementPanel";
 import { RoadmapPanel } from "./RoadmapPanel";
+import { GraphEditPanel } from "./GraphEditPanel";
 
 const statusLabels = {
   empty: "비어 있음",
@@ -18,7 +20,13 @@ const statusLabels = {
 };
 
 export function PlanningWorkspace() {
+  const [connectionType, setConnectionType] = useState<DependencyType>("requires");
   const {
+    addNode,
+    removeNode,
+    addEdge,
+    removeEdge,
+    updateEdge,
     createAndSelectProject,
     errorMessage,
     generateResult,
@@ -133,6 +141,12 @@ export function PlanningWorkspace() {
             conflictLatestResultId={conflictLatestResultId}
             onResolveConflict={resolveVersionConflict}
           />
+          {planningResult && status === "ready" ? (
+            <GraphEditPanel edgeCount={planningResult.edges.length} connectionType={connectionType}
+              onConnectionTypeChange={setConnectionType} disabled={isBusy}
+              canSave={versionConflict === null && (graphEditStatus === "dirty" || graphEditStatus === "error")}
+              errorMessage={graphEditErrorMessage} onAddNode={addNode} onSave={saveGraphEdits} />
+          ) : null}
           <RequirementPanel
             generatedModel={planningResult?.metadata.model}
             hasSelectedProject={selectedProjectId !== null}
@@ -155,6 +169,10 @@ export function PlanningWorkspace() {
         </div>
         <div className={`workspace__canvas-area${selectedNode ? " workspace__canvas-area--node-selected" : ""}`}>
           <PlanningCanvas
+            disabled={isBusy}
+            onConnect={(source, target) => addEdge(source, target, connectionType)}
+            onUpdateEdge={updateEdge}
+            onRemoveEdge={removeEdge}
             onMoveNode={updateNodePosition}
             onSelectNode={selectNode}
             result={planningResult}
@@ -178,6 +196,12 @@ export function PlanningWorkspace() {
             editStatus={graphEditStatus}
             node={selectedNode}
             onClose={() => selectNode(null)}
+            canDelete={(planningResult?.nodes.length ?? 0) > 1}
+            onDelete={() => {
+              if (selectedNode && window.confirm(`“${selectedNode.label}” 노드를 삭제할까요? 연결과 로드맵의 해당 노드 참조도 함께 제거됩니다. 저장 전 변경이며 과거 버전은 유지됩니다.`)) {
+                removeNode(selectedNode.id);
+              }
+            }}
             onChange={(changes) => {
               if (selectedNode) {
                 updateNode(selectedNode.id, changes);

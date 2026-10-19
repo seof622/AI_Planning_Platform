@@ -36,6 +36,7 @@ def normalize_planning_result(
     _require_unique(step_ids, "roadmap step")
 
     node_id_set = set(node_ids)
+    connections: set[tuple[str, str]] = set()
     for edge in generated.edges:
         if edge.source not in node_id_set or edge.target not in node_id_set:
             raise PlanningValidationError(
@@ -45,6 +46,11 @@ def normalize_planning_result(
             raise PlanningValidationError(
                 f"Edge {edge.id} must not reference itself."
             )
+
+        connection = (edge.source, edge.target)
+        if connection in connections:
+            raise PlanningValidationError("Duplicate connections are not allowed.")
+        connections.add(connection)
 
     step_id_set = set(step_ids)
     orders = [step.order for step in roadmap]

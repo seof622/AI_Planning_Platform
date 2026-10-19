@@ -68,6 +68,8 @@ class ProjectPlanningBrief(BaseModel):
 
 
 class CanvasPosition(BaseModel):
+    model_config = ConfigDict(allow_inf_nan=False)
+
     x: float
     y: float
 
@@ -98,8 +100,20 @@ class RoadmapStepEdit(BaseModel):
     componentNodeIds: list[str] | None = None
 
 
+class DependencyEdgeEdit(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: str = Field(min_length=1, max_length=100)
+    source: str = Field(min_length=1, max_length=100)
+    target: str = Field(min_length=1, max_length=100)
+    label: str = Field(max_length=200)
+    dependencyType: Literal["requires", "feeds", "blocks", "related"]
+    metadata: dict[str, Any] | None = None
+
+
 class PlanningResultEditRequest(BaseModel):
     nodes: list[ComponentNodeEdit] = Field(min_length=1)
+    edges: list[DependencyEdgeEdit] | None = None
     roadmap: list[RoadmapStepEdit]
     expectedLatestResultId: str | None = Field(default=None, min_length=1, max_length=100)
 

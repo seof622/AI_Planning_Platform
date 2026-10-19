@@ -221,6 +221,10 @@ export function validatePlanningResult(
       );
     }
 
+    if (!hasText(node.category)) {
+      addIssue(issues, `${path}.category`, "Node category must not be empty.");
+    }
+
     if (!priorities.has(node.priority)) {
       addIssue(
         issues,
@@ -242,8 +246,14 @@ export function validatePlanningResult(
     addIssue(issues, "edges", `Duplicate edge id: ${id}.`);
   }
 
+  const connections = new Set<string>();
   result.edges.forEach((edge, index) => {
     const path = `edges.${index}`;
+    const connection = JSON.stringify([edge.source, edge.target]);
+    if (connections.has(connection)) {
+      addIssue(issues, path, "Duplicate connections are not allowed.");
+    }
+    connections.add(connection);
 
     if (!hasText(edge.id)) {
       addIssue(issues, `${path}.id`, "Edge id must not be empty.");

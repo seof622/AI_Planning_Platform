@@ -106,3 +106,15 @@ def test_workflow_rejects_unknown_edge_node() -> None:
 
     with pytest.raises(PlanningValidationError, match="unknown node"):
         workflow.generate({"requirement": "잘못된 그래프"})
+
+
+def test_workflow_rejects_parallel_edges_with_different_types() -> None:
+    invalid_result = {
+        **VALID_RESULT,
+        "edges": [*VALID_RESULT["edges"], {
+            **VALID_RESULT["edges"][0], "id": "parallel-edge", "dependencyType": "related",
+        }],
+    }
+    workflow = PlanningWorkflow(provider=FakeProvider(invalid_result))
+    with pytest.raises(PlanningValidationError, match="Duplicate connections"):
+        workflow.generate({"requirement": "중복 연결 방지"})
