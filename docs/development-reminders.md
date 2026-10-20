@@ -78,7 +78,10 @@
 완료 내역은 `dev_plan.md`, `docs/reports/graph-structure-editing-implementation-report.md`와
 `docs/reports/roadmap-structure-editing-implementation-report.md`에서 관리한다.
 
-- 이미지, PDF, Markdown 내보내기
+2026-10-20 Markdown 내보내기를 완료했다. 선택한 결과와 미저장 Graph·Roadmap
+편집을 파일로 내려받으며 상세 범위는 `docs/reports/markdown-export-implementation-report.md`에 기록한다.
+
+- 그래프 이미지, PDF 내보내기
 - 고급 편집이 필요할 때 tldraw SDK 도입 검토
 
 ### 사용자와 협업

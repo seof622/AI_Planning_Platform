@@ -175,6 +175,11 @@ summary { cursor: pointer; }
 .graph-edit-panel .button:not(.button--primary) { min-height: 32px; padding: 4px 10px; font-size: 12px; }
 .graph-edit-panel__hint { margin: 0; font-size: 12px; line-height: 1.65; color: var(--text-muted); }
 .graph-delete { color: var(--danger); }
+.export-panel { display: grid; gap: 10px; padding: 20px; border-bottom: 1px solid var(--border); }
+.export-panel h2 { margin: 0; font-size: 13px; font-weight: 600; }
+.export-panel p { margin: 0; color: var(--text-muted); font-size: 12px; line-height: 1.65; }
+.export-panel .button { width: 100%; min-height: 34px; font-size: 12px; }
+.export-panel .export-panel__error { color: var(--danger); }
 .panel { display: flex; flex-direction: column; min-height: 0; }
 .panel__title { margin: 0 0 16px; font-size: 14px; font-weight: 600; }
 .panel__description { margin: 0 0 16px; font-size: 13px; color: var(--text-muted); }

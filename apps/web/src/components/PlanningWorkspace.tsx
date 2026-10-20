@@ -10,6 +10,8 @@ import { ProjectPanel } from "./ProjectPanel";
 import { RequirementPanel } from "./RequirementPanel";
 import { RoadmapPanel } from "./RoadmapPanel";
 import { GraphEditPanel } from "./GraphEditPanel";
+import { PlanningExportPanel } from "./PlanningExportPanel";
+import { versionLabel } from "../lib/planningVersions";
 
 const statusLabels = {
   empty: "비어 있음",
@@ -162,6 +164,13 @@ export function PlanningWorkspace() {
               canSave={versionConflict === null && (graphEditStatus === "dirty" || graphEditStatus === "error")}
               errorMessage={graphEditErrorMessage} onAddNode={addNode} onSave={saveGraphEdits} />
           ) : null}
+          <PlanningExportPanel
+            result={planningResult}
+            projectTitle={projects.find((project) => project.id === selectedProjectId)?.title}
+            version={selectedPlanningResultId ? versionLabel(planningHistory, selectedPlanningResultId) : undefined}
+            hasUnsavedEdits={hasUnsavedEdits}
+            disabled={isBusy || status !== "ready"}
+          />
           <RequirementPanel
             generatedModel={planningResult?.metadata.model}
             hasSelectedProject={selectedProjectId !== null}
