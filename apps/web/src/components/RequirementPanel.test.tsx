@@ -16,6 +16,38 @@ const baseProps = {
 
 describe("RequirementPanel", () => {
   afterEach(cleanup);
+  it("keeps the submitted input read-only while generation is running", () => {
+    render(<RequirementPanel {...baseProps} isLoading loadingLabel="생성 중" />);
+    expect(screen.getByRole("button", { name: "생성 중" })).toBeDisabled();
+    expect(screen.getByLabelText("계획 요구사항")).toBeDisabled();
+    expect(screen.getByLabelText("상황 또는 대상 1")).toBeDisabled();
+    expect(screen.getByLabelText("해야 할 일 1")).toBeDisabled();
+    expect(screen.getByLabelText("AI 모델")).toBeDisabled();
+  });
+
+  it("offers a model catalog retry without reloading the page", async () => {
+    const retry = vi.fn();
+    render(<RequirementPanel {...baseProps} models={[]} modelStatus="error" modelErrorMessage="모델 조회 실패" onRetryModels={retry} />);
+    await userEvent.click(screen.getByRole("button", { name: "모델 다시 불러오기" }));
+    expect(retry).toHaveBeenCalledOnce();
+    expect(screen.getByRole("button", { name: "계획 생성" })).toBeDisabled();
+  });
+  it("keeps the submitted input read-only while generation is running", () => {
+    render(<RequirementPanel {...baseProps} isLoading loadingLabel="생성 중" />);
+    expect(screen.getByRole("button", { name: "생성 중" })).toBeDisabled();
+    expect(screen.getByLabelText("계획 요구사항")).toBeDisabled();
+    expect(screen.getByLabelText("상황 또는 대상 1")).toBeDisabled();
+    expect(screen.getByLabelText("해야 할 일 1")).toBeDisabled();
+    expect(screen.getByLabelText("AI 모델")).toBeDisabled();
+  });
+
+  it("offers a model catalog retry without reloading the page", async () => {
+    const retry = vi.fn();
+    render(<RequirementPanel {...baseProps} models={[]} modelStatus="error" modelErrorMessage="모델 조회 실패" onRetryModels={retry} />);
+    await userEvent.click(screen.getByRole("button", { name: "모델 다시 불러오기" }));
+    expect(retry).toHaveBeenCalledOnce();
+    expect(screen.getByRole("button", { name: "계획 생성" })).toBeDisabled();
+  });
   it("explains the next missing input until generation is available", () => {
     const { rerender } = render(<RequirementPanel {...baseProps} />);
     const button = screen.getByRole("button", { name: "계획 생성" });

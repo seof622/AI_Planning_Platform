@@ -97,6 +97,16 @@ function jsonResponse(body: unknown, status = 200): Response {
   });
 }
 
+function setLoadedResult() {
+  usePlanningStore.setState({
+    planningResult, planningHistory, selectedProjectId: project.id,
+    selectedPlanningResultId: planningHistory[0]!.id, expectedLatestResultId: planningHistory[0]!.id,
+    projects: [project], projectStatus: "ready", status: "ready", selectedModel: lunaModel.id,
+    resultPlanningBrief: persistedBrief, requirementText: persistedBrief.requirement,
+    planningBrief: { ...persistedBrief.brief, actionItems: [{ necessity: "required", text: "Implement tests" }] },
+  });
+}
+
 describe("planningStore", () => {
   beforeEach(() => {
     usePlanningStore.setState(usePlanningStore.getInitialState(), true);
@@ -358,6 +368,121 @@ describe("planningStore", () => {
     expect(usePlanningStore.getState().selectedPlanningResultId).toBe(
       "planning-result-edited",
     );
+  });
+
+  it("retains edits, selection and the version token during generation failure and retries explicitly", async () => {
+    setLoadedResult();
+    usePlanningStore.getState().selectNode("node-test");
+    usePlanningStore.getState().updateNode("node-test", { label: "Unsaved node" });
+    const before = usePlanningStore.getState();
+    let complete!: (response: Response) => void;
+    vi.mocked(fetch).mockImplementationOnce(() => new Promise((resolve) => { complete = resolve; }));
+    const generating = usePlanningStore.getState().generateResult();
+    expect(usePlanningStore.getState().pendingOperation?.kind).toBe("generate");
+    expect(usePlanningStore.getState().planningResult).toBe(before.planningResult);
+    expect(usePlanningStore.getState().status).toBe("loading");
+    await usePlanningStore.getState().generateResult();
+    expect(fetch).toHaveBeenCalledTimes(1);
+    complete(jsonResponse({ detail: "AI service unavailable" }, 503));
+    await generating;
+    expect(usePlanningStore.getState()).toMatchObject({
+      planningResult: before.planningResult, selectedNodeId: "node-test", graphEditStatus: "dirty",
+      selectedPlanningResultId: before.selectedPlanningResultId, expectedLatestResultId: before.expectedLatestResultId,
+      requirementText: before.requirementText, planningBrief: before.planningBrief, status: "ready",
+      pendingOperation: null, failedOperation: { kind: "generate", projectId: project.id },
+    });
+    expect(usePlanningStore.getState().planningResult).toBe(before.planningResult);
+    const generated = { ...planningResult, metadata: { ...planningResult.metadata, resultId: "generated-retry" } };
+    vi.mocked(fetch).mockResolvedValueOnce(jsonResponse(generated))
+      .mockResolvedValueOnce(jsonResponse([{ ...planningHistory[0]!, id: "generated-retry" }, ...planningHistory]));
+    await usePlanningStore.getState().retryFailedOperation();
+    expect(usePlanningStore.getState()).toMatchObject({
+      planningResult: generated, selectedPlanningResultId: "generated-retry", expectedLatestResultId: "generated-retry",
+      failedOperation: null, errorMessage: null, graphEditStatus: "idle", status: "ready",
+    });
+    expect(hasUnappliedInput(usePlanningStore.getState())).toBe(false);
+  });
+
+  it("preserves the input after an initial generation failure without inventing a result", async () => {
+    setLoadedResult();
+    usePlanningStore.setState({ planningResult: null, selectedPlanningResultId: null });
+    vi.mocked(fetch).mockRejectedValueOnce(new Error("offline"));
+    await usePlanningStore.getState().generateResult();
+    expect(usePlanningStore.getState()).toMatchObject({ planningResult: null, requirementText: persistedBrief.requirement,
+      status: "error", pendingOperation: null, failedOperation: { kind: "generate" } });
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps a successful generation and its token when only history loading fails", async () => {
+    setLoadedResult();
+    const generated = { ...planningResult, metadata: { ...planningResult.metadata, resultId: "generated-with-history-error" } };
+    vi.mocked(fetch).mockResolvedValueOnce(jsonResponse(generated))
+      .mockResolvedValueOnce(jsonResponse({ detail: "History unavailable" }, 503));
+    await usePlanningStore.getState().generateResult();
+    expect(usePlanningStore.getState()).toMatchObject({ planningResult: generated, planningHistory,
+      selectedPlanningResultId: "generated-with-history-error", expectedLatestResultId: "generated-with-history-error",
+      status: "ready", failedOperation: null, historyStatus: "error", historyErrorMessage: "History unavailable" });
+    vi.mocked(fetch).mockResolvedValueOnce(jsonResponse([{ ...planningHistory[0]!, id: "generated-with-history-error" }]));
+    await usePlanningStore.getState().loadPlanningHistory(project.id);
+    expect(usePlanningStore.getState().historyStatus).toBe("ready");
+    expect(vi.mocked(fetch).mock.calls.filter(([, init]) => init?.method === "POST")).toHaveLength(1);
+  });
+
+  it("retries the failed project instead of showing a previous project's graph", async () => {
+    setLoadedResult();
+    vi.mocked(fetch).mockResolvedValueOnce(jsonResponse({ detail: "Project unavailable" }, 503))
+      .mockResolvedValueOnce(jsonResponse(persistedBrief)).mockResolvedValueOnce(jsonResponse(planningHistory));
+    await usePlanningStore.getState().selectProject("target-project");
+    expect(usePlanningStore.getState()).toMatchObject({ selectedProjectId: "target-project", planningResult: null,
+      status: "error", failedOperation: { kind: "project", projectId: "target-project" } });
+    vi.mocked(fetch).mockResolvedValueOnce(jsonResponse(planningResult)).mockResolvedValueOnce(jsonResponse(persistedBrief))
+      .mockResolvedValueOnce(jsonResponse(planningHistory)).mockResolvedValueOnce(jsonResponse(persistedBrief));
+    await usePlanningStore.getState().retryFailedOperation();
+    expect(usePlanningStore.getState()).toMatchObject({ status: "ready", pendingOperation: null, failedOperation: null });
+    expect(vi.mocked(fetch).mock.calls[3]![0]).toBe("http://localhost:8000/projects/target-project/planning-results/latest");
+  });
+
+  it("preserves the displayed version and edits when another version fails to load", async () => {
+    setLoadedResult();
+    usePlanningStore.getState().updateNode("node-test", { label: "Keep this edit" });
+    const before = usePlanningStore.getState();
+    vi.mocked(fetch).mockResolvedValueOnce(jsonResponse({ detail: "Version unavailable" }, 503))
+      .mockResolvedValueOnce(jsonResponse(persistedBrief));
+    await usePlanningStore.getState().selectPlanningResult("older-version");
+    expect(usePlanningStore.getState()).toMatchObject({ planningResult: before.planningResult,
+      selectedPlanningResultId: before.selectedPlanningResultId, graphEditStatus: "dirty", status: "ready",
+      failedOperation: { kind: "version", projectId: project.id, resultId: "older-version" } });
+    vi.mocked(fetch).mockResolvedValueOnce(jsonResponse({ ...planningResult, summary: "Historical version" }))
+      .mockResolvedValueOnce(jsonResponse(persistedBrief));
+    await usePlanningStore.getState().retryFailedOperation();
+    expect(usePlanningStore.getState()).toMatchObject({ selectedPlanningResultId: "older-version",
+      planningResult: { summary: "Historical version" }, failedOperation: null, graphEditStatus: "idle" });
+  });
+
+  it("ignores a late failure from an older project request", async () => {
+    let complete!: (response: Response) => void;
+    vi.mocked(fetch).mockImplementationOnce(() => new Promise((resolve) => { complete = resolve; }))
+      .mockResolvedValueOnce(jsonResponse(persistedBrief)).mockResolvedValueOnce(jsonResponse(planningHistory));
+    const oldRequest = usePlanningStore.getState().selectProject("old-project");
+    vi.mocked(fetch).mockResolvedValueOnce(jsonResponse(planningResult)).mockResolvedValueOnce(jsonResponse(persistedBrief))
+      .mockResolvedValueOnce(jsonResponse(planningHistory)).mockResolvedValueOnce(jsonResponse(persistedBrief));
+    await usePlanningStore.getState().selectProject("new-project");
+    complete(jsonResponse({ detail: "Late error" }, 503));
+    await oldRequest;
+    expect(usePlanningStore.getState()).toMatchObject({ selectedProjectId: "new-project", planningResult,
+      status: "ready", failedOperation: null, errorMessage: null });
+  });
+
+  it("ignores generation completion after reset", async () => {
+    setLoadedResult();
+    let complete!: (response: Response) => void;
+    vi.mocked(fetch).mockImplementationOnce(() => new Promise((resolve) => { complete = resolve; }));
+    const generating = usePlanningStore.getState().generateResult();
+    usePlanningStore.getState().resetToEmpty();
+    complete(jsonResponse(planningResult));
+    await generating;
+    expect(usePlanningStore.getState()).toMatchObject({ planningResult: null, status: "empty", pendingOperation: null, failedOperation: null });
+    expect(fetch).toHaveBeenCalledTimes(1);
   });
 
   it("adds unique nodes and deletes their connections and roadmap references without mutating the source", () => {
@@ -730,7 +855,7 @@ describe("planningStore", () => {
   });
 
   it("keeps the saved snapshot as its concurrency token even if another save precedes the history refresh", async () => {
-    usePlanningStore.setState({ planningResult: { ...planningResult, metadata: { ...planningResult.metadata, resultId: "my-saved-version" } } });
+    usePlanningStore.setState({ selectedProjectId: project.id, planningResult: { ...planningResult, metadata: { ...planningResult.metadata, resultId: "my-saved-version" } } });
     vi.mocked(fetch).mockResolvedValueOnce(jsonResponse([{ ...planningHistory[0]!, id: "other-saved-version" }, { ...planningHistory[0]!, id: "my-saved-version" }]));
     await usePlanningStore.getState().loadPlanningHistory(project.id);
     expect(usePlanningStore.getState().selectedPlanningResultId).toBe("my-saved-version");

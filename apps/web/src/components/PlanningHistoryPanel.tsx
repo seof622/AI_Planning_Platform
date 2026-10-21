@@ -11,6 +11,7 @@ interface PlanningHistoryPanelProps {
   history: PlanningResultHistoryItem[];
   isLoading: boolean;
   onRestore: () => Promise<void>;
+  onRetry?: () => Promise<void>;
   onSelect: (resultId: string) => Promise<void>;
   selectedResultId: string | null;
   projectId: string | null;
@@ -34,6 +35,7 @@ export function PlanningHistoryPanel({
   isLoading,
   onSelect,
   onRestore,
+  onRetry,
   selectedResultId,
   projectId, result, hasUnsavedEdits, versionConflict, conflictLatestResultId, onResolveConflict,
 }: PlanningHistoryPanelProps) {
@@ -44,13 +46,14 @@ export function PlanningHistoryPanel({
       <div className="history-panel__header">
         <h2>버전</h2>
       </div>
-      {history.length > 0 ? (
+      {history.length > 0 || selectedResultId ? (
         <select
           aria-label="계획 버전"
           disabled={isLoading}
           value={selectedResultId ?? ""}
           onChange={(event) => void onSelect(event.target.value)}
         >
+          {selectedResultId && !selected ? <option value={selectedResultId}>현재 결과 · 이력 확인 필요</option> : null}
           {history.map((item, index) => (
             <option key={item.id} value={item.id}>
               {versionLabel(history, item.id)} · {index === 0 ? "최신" : versionOrigin(item)}
@@ -88,7 +91,7 @@ export function PlanningHistoryPanel({
           }}>최신 버전 불러오기</button>
         </div>
       ) : null}
-      {selectedResultId && selectedResultId !== history[0]?.id ? (
+      {selected && selectedResultId && selectedResultId !== history[0]?.id ? (
         <button
           className="history-panel__restore"
           disabled={
@@ -120,6 +123,9 @@ export function PlanningHistoryPanel({
           {errorMessage}
         </p>
       ) : null}
+      {errorMessage && onRetry ? <button className="button" type="button" disabled={isLoading} onClick={() => void onRetry()}>
+        <WorkspaceIcon name="refresh" />이력 다시 불러오기
+      </button> : null}
     </section>
   );
 }

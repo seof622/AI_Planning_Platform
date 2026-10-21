@@ -13,6 +13,9 @@ import { GraphEditPanel } from "./GraphEditPanel";
 import { PlanningExportPanel } from "./PlanningExportPanel";
 import { versionLabel } from "../lib/planningVersions";
 import { WorkspaceIcon } from "./WorkspaceIcon";
+import { PlanningOperationFeedback } from "./PlanningOperationFeedback";
+import { operationLabels } from "../lib/planningOperations";
+import { getGenerationBlocker } from "../lib/planningInput";
 
 const statusLabels = {
   empty: "비어 있음",
@@ -25,6 +28,10 @@ const statusLabels = {
 export function PlanningWorkspace() {
   const [connectionType, setConnectionType] = useState<DependencyType>("requires");
   const {
+    pendingOperation,
+    failedOperation,
+    retryFailedOperation,
+    dismissOperationError,
     briefSaveStatus,
     briefSaveErrorMessage,
     addNode,
@@ -45,6 +52,7 @@ export function PlanningWorkspace() {
     isViewingHistoricalResult,
     loadModels,
     loadProjects,
+    loadPlanningHistory,
     modelErrorMessage,
     models,
     modelStatus,
@@ -83,6 +91,19 @@ export function PlanningWorkspace() {
   const selectedNode = getSelectedNode(planningResult, selectedNodeId);
   const hasUnsavedEdits = graphEditStatus !== "idle";
   const isBusy = status === "loading" || graphEditStatus === "saving";
+  const resultStatus = planningResult && (pendingOperation || failedOperation) ? (planningResult.nodes.length ? "ready" : "empty") : status;
+  const loadingLabel = pendingOperation?.kind === "generate" ? "생성 중"
+    : pendingOperation?.kind === "restore" ? "복원 중"
+    : graphEditStatus === "saving" ? "저장 중" : "불러오는 중";
+  const retryBlocker = failedOperation?.kind === "generate" ? getGenerationBlocker({
+    hasSelectedProject: selectedProjectId !== null, modelStatus, models, selectedModel, requirementText, planningBrief,
+  }) : null;
+  const feedback = pendingOperation || failedOperation ? <PlanningOperationFeedback
+    pending={pendingOperation} failed={failedOperation} errorMessage={errorMessage} hasResult={planningResult !== null}
+    retryDisabled={isBusy || retryBlocker !== null} retryDisabledReason={retryBlocker}
+    onRetry={async () => { if (confirmDiscardEdits()) await retryFailedOperation(); }}
+    onDismiss={dismissOperationError}
+  /> : undefined;
   const inputNeedsGeneration = hasUnappliedInput({
     planningResult, resultPlanningBrief, requirementText, planningBrief, selectedModel,
   });
@@ -91,6 +112,17 @@ export function PlanningWorkspace() {
     : hasUnsavedEdits ? "결과 편집 미저장" : "결과 편집 저장됨";
   function confirmDiscardEdits(): boolean {
     return !hasUnsavedEdits || window.confirm("미저장 편집이 있습니다. 변경 내용을 버리고 이동할까요?");
+  }
+  function focusPlanningInput() {
+    if (selectedProjectId) {
+      document.getElementById("planning-requirement")?.focus();
+    } else {
+      const newProject = document.querySelector<HTMLDetailsElement>(".project-panel__new");
+      if (newProject) {
+        newProject.open = true;
+        newProject.querySelector<HTMLInputElement>("input")?.focus();
+      }
+    }
   }
 
   useEffect(() => {
@@ -141,7 +173,7 @@ export function PlanningWorkspace() {
           <div><h1>플랜노트</h1></div>
         </div>
         <ProjectPanel
-          errorMessage={projectErrorMessage}
+          errorMessage={failedOperation?.kind === "projects" || failedOperation?.kind === "project" ? null : projectErrorMessage}
           isLoading={projectStatus === "loading" || isBusy}
           onCreate={async (title) => { if (confirmDiscardEdits()) await createAndSelectProject(title); }}
           onSelect={async (id) => { if (confirmDiscardEdits()) await selectProject(id); }}
@@ -153,12 +185,13 @@ export function PlanningWorkspace() {
             <WorkspaceIcon name={graphEditStatus === "saving" ? "refresh" : graphEditStatus === "error" ? "alert" : hasUnsavedEdits ? "circle" : "check"} />
             <span aria-hidden="true">{graphEditStatus === "saving" ? "저장 중" : graphEditStatus === "error" ? "저장 실패" : hasUnsavedEdits ? "미저장" : "저장됨"}</span>
           </span> : null}
-          {status !== "ready" ? <span className={`workspace__status workspace__status--${status}`}><span aria-hidden="true" />{statusLabels[status]}</span> : null}
+          {status !== "ready" ? <span className={`workspace__status workspace__status--${status}`}><span aria-hidden="true" />{pendingOperation ? loadingLabel : statusLabels[status]}</span> : null}
         </div>
       </header>
       <div className="workspace__toolbar" aria-label="계획 작업 도구">
           <PlanningHistoryPanel
             errorMessage={historyErrorMessage}
+            onRetry={selectedProjectId && historyStatus === "error" ? () => loadPlanningHistory(selectedProjectId) : undefined}
             history={planningHistory}
             isLoading={historyStatus === "loading" || isBusy}
             onRestore={restoreSelectedPlanningResult}
@@ -191,6 +224,8 @@ export function PlanningWorkspace() {
             generatedModel={planningResult?.metadata.model}
             hasSelectedProject={selectedProjectId !== null}
             isLoading={isBusy}
+            loadingLabel={loadingLabel}
+            onRetryModels={loadModels}
             modelErrorMessage={modelErrorMessage}
             models={models}
             modelStatus={modelStatus}
@@ -209,7 +244,11 @@ export function PlanningWorkspace() {
         </div>
         <div className={`workspace__canvas-area${selectedNode ? " workspace__canvas-area--node-selected" : ""}`}>
           <PlanningCanvas
-            toolbar={planningResult && status === "ready" ? (
+            feedback={feedback}
+            errorMessage={errorMessage}
+            onStart={focusPlanningInput}
+            hasSelectedProject={selectedProjectId !== null}
+            toolbar={planningResult && resultStatus === "ready" ? (
               <GraphEditPanel edgeCount={planningResult.edges.length} connectionType={connectionType}
                 onConnectionTypeChange={setConnectionType} disabled={isBusy}
                 canSave={versionConflict === null && (graphEditStatus === "dirty" || graphEditStatus === "error")}
@@ -223,9 +262,11 @@ export function PlanningWorkspace() {
             onSelectNode={selectNode}
             result={planningResult}
             selectedNodeId={selectedNodeId}
-            status={status}
+            status={resultStatus}
           />
           <RoadmapPanel
+            disabled={isBusy}
+            loadingLabel={pendingOperation ? operationLabels[pendingOperation.kind] : undefined}
             nodes={planningResult?.nodes ?? []}
             onAdd={addRoadmapStep}
             onDelete={(stepId) => {
@@ -245,9 +286,10 @@ export function PlanningWorkspace() {
             onMove={moveRoadmapStep}
             onSave={saveGraphEdits}
             roadmap={planningResult?.roadmap ?? []}
-            status={status}
+            status={resultStatus}
           />
           <NodeDetailPanel
+            disabled={isBusy}
             saveBlocked={versionConflict !== null}
             editErrorMessage={graphEditErrorMessage}
             editStatus={graphEditStatus}

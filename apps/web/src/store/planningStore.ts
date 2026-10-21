@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { sortRoadmapByDependencies } from "../lib/roadmapEditing";
+import type { PlanningOperation, PlanningOperationTarget } from "../lib/planningOperations";
 import type {
   ActionItemNecessity,
   AIModelOption,
@@ -114,6 +115,10 @@ function toDraft(
 }
 
 interface PlanningState {
+  pendingOperation: PlanningOperation | null;
+  failedOperation: PlanningOperation | null;
+  retryFailedOperation: () => Promise<void>;
+  dismissOperationError: () => void;
   briefSaveStatus: BriefSaveStatus;
   briefSaveErrorMessage: string | null;
   briefRevision: number;
@@ -188,7 +193,35 @@ interface PlanningState {
 export const usePlanningStore = create<PlanningState>((set, get) => {
   // Keep writes ordered when the user types while a previous save is in flight.
   let briefSaveQueue = Promise.resolve();
+  function beginOperation(target: PlanningOperationTarget): PlanningOperation {
+    const operation = { ...target, startedAt: Date.now() };
+    set({ pendingOperation: operation, failedOperation: null, errorMessage: null });
+    return operation;
+  }
   return ({
+  pendingOperation: null,
+  failedOperation: null,
+  async retryFailedOperation() {
+    const target = get().failedOperation;
+    if (!target || get().pendingOperation || get().graphEditStatus === "saving") return;
+    switch (target.kind) {
+      case "projects": await get().loadProjects(); break;
+      case "project": await get().selectProject(target.projectId); break;
+      case "version":
+        if (get().selectedProjectId === target.projectId) await get().selectPlanningResult(target.resultId);
+        break;
+      case "generate":
+        if (get().selectedProjectId === target.projectId) await get().generateResult();
+        break;
+      case "restore": break;
+    }
+  },
+  dismissOperationError() {
+    const kind = get().failedOperation?.kind;
+    set({ failedOperation: null, errorMessage: null,
+      ...(kind === "project" || kind === "projects" ? { projectErrorMessage: null } : {}),
+    });
+  },
   briefSaveStatus: "idle",
   briefSaveErrorMessage: null,
   briefRevision: 0,
@@ -248,7 +281,9 @@ export const usePlanningStore = create<PlanningState>((set, get) => {
     }
   },
   async generateResult() {
-    const selectedProjectId = get().selectedProjectId;
+    const state = get();
+    if (state.pendingOperation || state.graphEditStatus === "saving") return;
+    const selectedProjectId = state.selectedProjectId;
     if (!selectedProjectId) {
       set({
         errorMessage: "계획을 저장할 프로젝트를 먼저 선택해 주세요.",
@@ -257,13 +292,8 @@ export const usePlanningStore = create<PlanningState>((set, get) => {
       return;
     }
 
-    set({
-      errorMessage: null,
-      isViewingHistoricalResult: false,
-      status: "loading",
-      versionConflict: null,
-      conflictLatestResultId: null,
-    });
+    const operation = beginOperation({ kind: "generate", projectId: selectedProjectId });
+    set({ status: "loading" });
 
     try {
       const currentRequirement = get().requirementText.trim();
@@ -292,9 +322,17 @@ export const usePlanningStore = create<PlanningState>((set, get) => {
         };
       }
       const result = await generatePlanningResult(selectedProjectId, request);
+      if (get().pendingOperation !== operation) return;
 
       set({
         planningResult: result,
+        pendingOperation: null,
+        failedOperation: null,
+        versionConflict: null,
+        conflictLatestResultId: null,
+        isViewingHistoricalResult: false,
+        selectedPlanningResultId: result.metadata.resultId ?? null,
+        expectedLatestResultId: result.metadata.resultId ?? null,
         resultPlanningBrief: {
           requirement: request.requirement,
           brief: request.brief!,
@@ -313,14 +351,15 @@ export const usePlanningStore = create<PlanningState>((set, get) => {
       });
       await get().loadPlanningHistory(selectedProjectId);
     } catch (error) {
+      if (get().pendingOperation !== operation) return;
       const message =
         error instanceof Error ? error.message : "계획 결과를 불러올 수 없습니다.";
 
       set({
         errorMessage: message,
-        planningResult: null,
-        selectedNodeId: null,
-        status: "error",
+        pendingOperation: null,
+        failedOperation: operation,
+        status: state.planningResult ? (state.planningResult.nodes.length ? "ready" : "empty") : "error",
       });
     }
   },
@@ -328,15 +367,18 @@ export const usePlanningStore = create<PlanningState>((set, get) => {
     if (get().projectStatus === "loading") {
       return;
     }
-    set({ projectErrorMessage: null, projectStatus: "loading" });
+    const operation = beginOperation({ kind: "projects" });
+    set({ projectErrorMessage: null, projectStatus: "loading", status: "loading" });
     try {
       const projects = await listProjects();
+      if (get().pendingOperation !== operation) return;
       set({ projects, projectStatus: "ready" });
       const firstProject = projects[0];
       if (firstProject) {
         await get().selectProject(firstProject.id);
       } else {
         set({
+          pendingOperation: null,
           planningResult: null,
           requirementText: "",
           selectedProjectId: null,
@@ -344,12 +386,17 @@ export const usePlanningStore = create<PlanningState>((set, get) => {
         });
       }
     } catch (error) {
+      if (get().pendingOperation !== operation) return;
       set({
         projectErrorMessage:
           error instanceof Error
             ? error.message
             : "프로젝트 목록을 불러오지 못했습니다.",
         projectStatus: "error",
+        pendingOperation: null,
+        failedOperation: operation,
+        errorMessage: error instanceof Error ? error.message : "프로젝트 목록을 불러오지 못했습니다.",
+        status: get().planningResult ? "ready" : "error",
       });
     }
   },
@@ -378,9 +425,11 @@ export const usePlanningStore = create<PlanningState>((set, get) => {
     }
   },
   async loadPlanningHistory(projectId) {
+    const resultAtRequest = get().selectedPlanningResultId;
     set({ historyErrorMessage: null, historyStatus: "loading" });
     try {
       const history = await listPlanningResults(projectId);
+      if (get().selectedProjectId !== projectId || get().selectedPlanningResultId !== resultAtRequest) return;
       const actualResultId = get().planningResult?.metadata.resultId ?? history[0]?.id ?? null;
       set({
         historyStatus: "ready",
@@ -390,19 +439,20 @@ export const usePlanningStore = create<PlanningState>((set, get) => {
         isViewingHistoricalResult: actualResultId !== history[0]?.id,
       });
     } catch (error) {
+      if (get().selectedProjectId !== projectId || get().selectedPlanningResultId !== resultAtRequest) return;
       set({
         historyErrorMessage:
           error instanceof Error
             ? error.message
             : "계획 생성 이력을 불러오지 못했습니다.",
         historyStatus: "error",
-        planningHistory: [],
-        selectedPlanningResultId: null,
       });
     }
   },
   resetToEmpty() {
     set({
+      pendingOperation: null,
+      failedOperation: null,
       briefSaveStatus: "dirty",
       briefSaveErrorMessage: null,
       briefRevision: get().briefRevision + 1,
@@ -425,9 +475,10 @@ export const usePlanningStore = create<PlanningState>((set, get) => {
   },
   async restoreSelectedPlanningResult() {
     const state = get();
-    if (!state.selectedProjectId || !state.selectedPlanningResultId) {
+    if (!state.selectedProjectId || !state.selectedPlanningResultId || state.pendingOperation || state.graphEditStatus === "saving") {
       return;
     }
+    const operation = beginOperation({ kind: "restore", projectId: state.selectedProjectId, resultId: state.selectedPlanningResultId });
     set({
       errorMessage: null,
       historyErrorMessage: null,
@@ -441,7 +492,9 @@ export const usePlanningStore = create<PlanningState>((set, get) => {
         (state.versionConflict === "restore" ? state.conflictLatestResultId : null)
           ?? state.expectedLatestResultId ?? state.planningHistory[0]?.id ?? state.selectedPlanningResultId,
       );
+      if (get().pendingOperation !== operation) return;
       set({
+        pendingOperation: null,
         versionConflict: null,
         conflictLatestResultId: null,
         isViewingHistoricalResult: false,
@@ -466,7 +519,9 @@ export const usePlanningStore = create<PlanningState>((set, get) => {
       });
       await get().loadPlanningHistory(state.selectedProjectId);
     } catch (error) {
+      if (get().pendingOperation !== operation) return;
       set({
+        pendingOperation: null,
         historyErrorMessage:
           error instanceof Error
             ? error.message
@@ -516,6 +571,7 @@ export const usePlanningStore = create<PlanningState>((set, get) => {
   async saveGraphEdits() {
     const state = get();
     if (
+      state.pendingOperation ||
       !state.selectedProjectId ||
       !state.selectedPlanningResultId ||
       !state.planningResult ||
@@ -565,6 +621,7 @@ export const usePlanningStore = create<PlanningState>((set, get) => {
     if (!projectId) {
       return;
     }
+    const operation = beginOperation({ kind: "project", projectId });
     set({
       briefSaveStatus: "idle",
       briefSaveErrorMessage: null,
@@ -604,6 +661,7 @@ export const usePlanningStore = create<PlanningState>((set, get) => {
       const resultBrief = resultId
         ? await getPlanningResultBrief(projectId, resultId).catch(() => null)
         : null;
+      if (get().pendingOperation !== operation) return;
       const resultModel = result?.metadata.model;
       const persistedModel = persistedBrief?.selectedModel;
       const restorableModel =
@@ -614,6 +672,7 @@ export const usePlanningStore = create<PlanningState>((set, get) => {
             : get().selectedModel;
       set({
         planningBrief: toDraft(persistedBrief),
+        pendingOperation: null,
         planningHistory: history,
         planningResult: result,
         resultPlanningBrief: resultBrief,
@@ -628,13 +687,18 @@ export const usePlanningStore = create<PlanningState>((set, get) => {
         status: result && result.nodes.length > 0 ? "ready" : "empty",
       });
     } catch (error) {
+      if (get().pendingOperation !== operation) return;
       set({
         projectErrorMessage:
           error instanceof Error
             ? error.message
             : "프로젝트를 불러오지 못했습니다.",
+        pendingOperation: null,
+        failedOperation: operation,
+        errorMessage: error instanceof Error ? error.message : "프로젝트를 불러오지 못했습니다.",
+        historyStatus: "idle",
         projectStatus: "error",
-        status: "empty",
+        status: "error",
       });
     }
   },
@@ -643,17 +707,20 @@ export const usePlanningStore = create<PlanningState>((set, get) => {
     if (!projectId || !resultId) {
       return;
     }
-    set({ errorMessage: null, selectedNodeId: null, status: "loading",
-      briefSaveStatus: "idle", briefSaveErrorMessage: null, briefRevision: get().briefRevision + 1 });
+    const state = get();
+    const operation = beginOperation({ kind: "version", projectId, resultId });
+    set({ status: "loading", briefRevision: get().briefRevision + 1 });
     try {
       const [result, historicalBrief] = await Promise.all([
         getPlanningResult(projectId, resultId),
         getPlanningResultBrief(projectId, resultId),
       ]);
+      if (get().pendingOperation !== operation) return;
       const isHistorical = resultId !== get().planningHistory[0]?.id;
       const historicalModel =
         historicalBrief?.selectedModel ?? result.metadata.model;
       set({
+        pendingOperation: null,
         versionConflict: null,
         conflictLatestResultId: null,
         isViewingHistoricalResult: isHistorical,
@@ -673,16 +740,21 @@ export const usePlanningStore = create<PlanningState>((set, get) => {
             ? historicalModel
             : get().selectedModel,
         selectedPlanningResultId: resultId,
+        selectedNodeId: null,
         expectedLatestResultId: get().planningHistory[0]?.id ?? resultId,
         status: result.nodes.length > 0 ? "ready" : "empty",
       });
     } catch (error) {
+      if (get().pendingOperation !== operation) return;
       set({
         errorMessage:
           error instanceof Error
             ? error.message
             : "선택한 계획 결과를 불러오지 못했습니다.",
-        status: "error",
+        pendingOperation: null,
+        failedOperation: operation,
+        status: state.planningResult ? (state.planningResult.nodes.length ? "ready" : "empty") : "error",
+        briefSaveStatus: state.briefSaveStatus === "saving" ? "dirty" : state.briefSaveStatus,
       });
     }
   },
@@ -899,6 +971,8 @@ export const usePlanningStore = create<PlanningState>((set, get) => {
   },
   setErrorState(message) {
     set({
+      pendingOperation: null,
+      failedOperation: null,
       errorMessage: message,
       planningResult: null,
       selectedNodeId: null,

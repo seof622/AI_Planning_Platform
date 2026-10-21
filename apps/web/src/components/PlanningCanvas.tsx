@@ -21,6 +21,10 @@ import type { PlanningStatus } from "../store/planningStore";
 
 interface PlanningCanvasProps {
   toolbar?: ReactNode;
+  feedback?: ReactNode;
+  errorMessage?: string | null;
+  onStart?: () => void;
+  hasSelectedProject?: boolean;
   disabled?: boolean;
   onConnect: (source: string, target: string) => void;
   onUpdateEdge: (edgeId: string, changes: Partial<Pick<DependencyEdge, "source" | "target" | "dependencyType">>) => void;
@@ -46,6 +50,10 @@ type NodeStyleWithAccent = Node["style"] & {
 
 export function PlanningCanvas({
   toolbar,
+  feedback,
+  errorMessage,
+  onStart,
+  hasSelectedProject,
   disabled = false,
   onConnect,
   onUpdateEdge,
@@ -75,6 +83,8 @@ export function PlanningCanvas({
       frame = requestAnimationFrame(() => { void flow.fitView({ padding: 0.14 }); });
     });
     observer.observe(shellRef.current);
+    const viewport = shellRef.current.querySelector(".react-flow");
+    if (viewport) observer.observe(viewport);
     return () => { observer.disconnect(); cancelAnimationFrame(frame); };
   }, [flow]);
 
@@ -116,7 +126,7 @@ export function PlanningCanvas({
   if (status !== "ready" || !result) {
     return (
       <section className="canvas-shell" ref={shellRef}>
-        <StatusView status={status} />
+        {feedback ?? <StatusView status={status} errorMessage={errorMessage} onStart={onStart} hasSelectedProject={hasSelectedProject} />}
       </section>
     );
   }
@@ -132,6 +142,7 @@ export function PlanningCanvas({
         </div>
       </div>
       {toolbar}
+      {feedback}
       <ReactFlow
         onInit={setFlow}
         nodesDraggable={!disabled}

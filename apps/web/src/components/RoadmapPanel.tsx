@@ -8,6 +8,8 @@ import { WorkspaceIcon } from "./WorkspaceIcon";
 import { ResultSaveButton } from "./ResultSaveButton";
 
 interface RoadmapPanelProps {
+  disabled?: boolean;
+  loadingLabel?: string;
   saveBlocked?: boolean;
   editErrorMessage: string | null;
   editStatus: "idle" | "dirty" | "saving" | "error";
@@ -28,6 +30,8 @@ interface RoadmapPanelProps {
 }
 
 export function RoadmapPanel({
+  disabled = false,
+  loadingLabel = "불러오는 중",
   saveBlocked = false,
   editErrorMessage,
   editStatus,
@@ -44,7 +48,7 @@ export function RoadmapPanel({
   const stepsRef = useRef<HTMLOListElement>(null);
   const sortedRoadmap = [...roadmap].sort((left, right) => left.order - right.order);
   const canSave =
-    status === "ready" && !saveBlocked && (editStatus === "dirty" || editStatus === "error") &&
+    status === "ready" && !disabled && !saveBlocked && (editStatus === "dirty" || editStatus === "error") &&
     sortedRoadmap.every(
       (step) => step.title.trim() && step.description.trim(),
     );
@@ -55,7 +59,7 @@ export function RoadmapPanel({
         <h2 className="roadmap__title">로드맵</h2>
         <div className="roadmap__actions">
           <span className="pill">{sortedRoadmap.length}단계</span>
-          <button className="button roadmap__save" type="button" aria-label="단계 추가" title="단계 추가" disabled={status !== "ready" || editStatus === "saving"}
+          <button className="button roadmap__save" type="button" aria-label="단계 추가" title="단계 추가" disabled={disabled || status !== "ready" || editStatus === "saving"}
             onClick={() => {
               onAdd();
               requestAnimationFrame(() => stepsRef.current?.lastElementChild?.scrollIntoView?.({ block: "nearest", inline: "end" }));
@@ -83,11 +87,11 @@ export function RoadmapPanel({
       ) : null}
 
       {status === "loading" ? (
-        <StatusViewCopy title="생성 중" copy="로드맵을 준비하고 있습니다." />
+        <StatusViewCopy title={loadingLabel} copy="" />
       ) : null}
 
       {status === "ready" ? (
-        <fieldset className="roadmap__fields" disabled={editStatus === "saving"}>
+        <fieldset className="roadmap__fields" disabled={disabled || editStatus === "saving"}>
         {sortedRoadmap.length === 0 ? <p className="roadmap__empty">단계가 없습니다. 단계 추가로 로드맵을 만들어 보세요.</p> : null}
         <ol className="roadmap__steps" ref={stepsRef}>
           {sortedRoadmap.map((step, index) => (

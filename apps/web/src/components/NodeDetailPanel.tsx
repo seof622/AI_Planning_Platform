@@ -6,6 +6,7 @@ import { WorkspaceIcon } from "./WorkspaceIcon";
 import { ResultSaveButton } from "./ResultSaveButton";
 
 interface NodeDetailPanelProps {
+  disabled?: boolean;
   saveBlocked?: boolean;
   editErrorMessage: string | null;
   editStatus: "idle" | "dirty" | "saving" | "error";
@@ -26,6 +27,7 @@ const metadataLabels: Record<string, string> = {
 };
 
 export function NodeDetailPanel({
+  disabled = false,
   saveBlocked = false,
   editErrorMessage,
   editStatus,
@@ -42,7 +44,7 @@ export function NodeDetailPanel({
 
   const metadataEntries = Object.entries(node.metadata ?? {});
   const canSave =
-    !saveBlocked && (editStatus === "dirty" || editStatus === "error") &&
+    !disabled && !saveBlocked && (editStatus === "dirty" || editStatus === "error") &&
     node.label.trim().length > 0 &&
     node.description.trim().length > 0 &&
     node.category.trim().length > 0;
@@ -60,7 +62,7 @@ export function NodeDetailPanel({
           <span className="form-field__label">이름</span>
           <input
             aria-label="Node 이름"
-            disabled={editStatus === "saving"}
+            disabled={disabled || editStatus === "saving"}
             value={node.label}
             onChange={(event) => onChange({ label: event.target.value })}
           />
@@ -69,14 +71,14 @@ export function NodeDetailPanel({
           <span className="form-field__label">설명</span>
           <textarea
             aria-label="Node 설명"
-            disabled={editStatus === "saving"}
+            disabled={disabled || editStatus === "saving"}
             value={node.description}
             onChange={(event) => onChange({ description: event.target.value })}
           />
         </label>
         <label className="form-field">
           <span className="form-field__label">유형</span>
-          <select aria-label="Node 유형" disabled={editStatus === "saving"} value={node.type}
+          <select aria-label="Node 유형" disabled={disabled || editStatus === "saving"} value={node.type}
             onChange={(event) => onChange({ type: event.target.value as ComponentNode["type"] })}>
             {Object.entries(nodeTypeLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
           </select>
@@ -85,7 +87,7 @@ export function NodeDetailPanel({
           <span className="form-field__label">분류</span>
           <input
             aria-label="Node 분류"
-            disabled={editStatus === "saving"}
+            disabled={disabled || editStatus === "saving"}
             value={node.category}
             onChange={(event) => onChange({ category: event.target.value })}
           />
@@ -94,7 +96,7 @@ export function NodeDetailPanel({
           <span className="form-field__label">우선순위</span>
           <select
             aria-label="Node 우선순위"
-            disabled={editStatus === "saving"}
+            disabled={disabled || editStatus === "saving"}
             value={node.priority}
             onChange={(event) =>
               onChange({ priority: event.target.value as ComponentNode["priority"] })
@@ -129,7 +131,7 @@ export function NodeDetailPanel({
       ) : null}
       <ResultSaveButton className="detail-drawer__save" disabled={!canSave} saving={editStatus === "saving"} onSave={onSave} />
       {onDelete ? (
-        <button className="button graph-delete" type="button" disabled={!canDelete || editStatus === "saving"}
+        <button className="button graph-delete" type="button" disabled={disabled || !canDelete || editStatus === "saving"}
           onClick={onDelete}><WorkspaceIcon name="trash" />노드 삭제</button>
       ) : null}
       {onDelete && !canDelete ? <p className="graph-edit-panel__hint">마지막 노드는 유지해야 합니다.</p> : null}

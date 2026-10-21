@@ -8,6 +8,7 @@ import type {
 import type { BriefSaveStatus, PlanningBriefDraft } from "../store/planningStore";
 import { recommendModel } from "../lib/modelRecommendation";
 import { WorkspaceIcon } from "./WorkspaceIcon";
+import { getGenerationBlocker } from "../lib/planningInput";
 
 const planTypeLabels: Record<PlanType, string> = {
   creative: "창작 / 아이디어",
@@ -48,6 +49,8 @@ interface RequirementPanelProps {
   generatedModel?: string;
   hasSelectedProject: boolean;
   isLoading: boolean;
+  loadingLabel?: string;
+  onRetryModels?: () => Promise<void>;
   modelErrorMessage: string | null;
   models: AIModelOption[];
   modelStatus: "idle" | "loading" | "ready" | "error";
@@ -75,6 +78,8 @@ export function RequirementPanel({
   generatedModel,
   hasSelectedProject,
   isLoading,
+  loadingLabel = "작업 중",
+  onRetryModels,
   modelErrorMessage,
   models,
   modelStatus,
@@ -100,14 +105,7 @@ export function RequirementPanel({
   const selectedModelOption = models.find(
     (model) => model.id === selectedModel,
   );
-  const missingInput = !hasSelectedProject ? "프로젝트를 먼저 선택하거나 만들어 주세요."
-    : modelStatus === "loading" || modelStatus === "idle" ? "AI 모델 목록을 불러오고 있습니다."
-    : modelStatus === "error" ? "AI 모델 목록을 불러오지 못했습니다. 모델 목록을 다시 불러오려면 새로고침해 주세요."
-    : models.length === 0 ? "사용 가능한 AI 모델이 없습니다."
-    : !selectedModelOption ? "AI 모델을 선택해 주세요."
-    : !requirementText.trim() ? "계획 주제를 입력해 주세요."
-    : contextCount === 0 ? "상황 또는 대상을 1개 이상 입력해 주세요."
-    : actionCount === 0 ? "해야 할 일을 1개 이상 입력해 주세요." : null;
+  const missingInput = getGenerationBlocker({ hasSelectedProject, modelStatus, models, selectedModel, requirementText, planningBrief });
   const canSubmit = !isLoading && missingInput === null;
   const draftStatusText = !hasSelectedProject ? "프로젝트를 선택하면 입력 초안을 자동 저장합니다."
     : isViewingHistoricalResult ? "과거 버전 입력을 보는 중 · 자동 저장 일시 중지"
@@ -187,11 +185,12 @@ export function RequirementPanel({
           if (canSubmit) void onGenerate();
         }}
       >
-        <div className="requirement-form__body">
+        <fieldset className="requirement-form__body" disabled={isLoading}>
           <label className="form-field">
             <span className="form-field__label">계획 주제 <span className="form-field__required" title="필수 입력"><span aria-hidden="true">*</span><span className="sr-only">필수</span></span></span>
             <textarea
               aria-label="계획 요구사항"
+              id="planning-requirement"
               required
               value={requirementText}
               onChange={(event) => setRequirementText(event.target.value)}
@@ -396,7 +395,7 @@ export function RequirementPanel({
             </div>
           </details>
 
-        </div>
+        </fieldset>
         <div className="requirement-form__footer">
             {briefSaveStatus === "error" && !isViewingHistoricalResult ? <div className="brief-save-error">
               <p className="form-field__error" role="alert">{briefSaveErrorMessage}</p>
@@ -407,7 +406,7 @@ export function RequirementPanel({
             <select
               id="planning-model"
               aria-label="AI 모델"
-              disabled={modelStatus !== "ready" || models.length === 0}
+              disabled={isLoading || modelStatus !== "ready" || models.length === 0}
               value={selectedModel}
               onChange={(event) => setSelectedModel(event.target.value)}
             >
@@ -430,6 +429,8 @@ export function RequirementPanel({
                 {modelErrorMessage}
               </span>
             ) : null}
+            {modelStatus === "error" && onRetryModels ? <button className="button" type="button" disabled={isLoading}
+              onClick={() => void onRetryModels()}><WorkspaceIcon name="refresh" />모델 다시 불러오기</button> : null}
             <details className="model-details">
               <summary>모델 안내</summary>
               {modelRecommendation ? (
@@ -477,13 +478,13 @@ export function RequirementPanel({
           <button
             className="button button--primary"
             aria-describedby="generation-guidance"
-            aria-label={isLoading ? "작업 중" : hasResult ? "새 버전으로 다시 생성" : "계획 생성"}
+            aria-label={isLoading ? loadingLabel : hasResult ? "새 버전으로 다시 생성" : "계획 생성"}
             title={hasResult ? "현재 입력으로 새 결과 버전을 생성합니다." : "계획 생성"}
             type="submit"
             disabled={!canSubmit}
           >
             <WorkspaceIcon name={isLoading ? "refresh" : hasResult ? "refresh" : "sparkle"} className={isLoading ? "workspace-icon--spin" : ""} />
-            {isLoading ? "작업 중" : hasResult ? "다시 생성" : "계획 생성"}
+            {isLoading ? loadingLabel : hasResult ? "다시 생성" : "계획 생성"}
           </button>
         </div>
       </form>

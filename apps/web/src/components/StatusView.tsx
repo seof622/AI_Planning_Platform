@@ -4,12 +4,15 @@ import type { PlanningStatus } from "../store/planningStore";
 
 interface StatusViewProps {
   status: PlanningStatus;
+  errorMessage?: string | null;
+  onStart?: () => void;
+  hasSelectedProject?: boolean;
 }
 
 const statusCopy: Record<PlanningStatus, { title: string; copy: string }> = {
   empty: {
-    title: "그래프 없음",
-    copy: "계획을 생성하세요.",
+    title: "첫 계획을 만들어 보세요",
+    copy: "주제와 해야 할 일을 입력하면 계획을 정리해 드려요.",
   },
   error: {
     title: "오류",
@@ -20,7 +23,7 @@ const statusCopy: Record<PlanningStatus, { title: string; copy: string }> = {
     copy: "",
   },
   loading: {
-    title: "생성 중",
+    title: "불러오는 중",
     copy: "",
   },
   ready: {
@@ -29,14 +32,16 @@ const statusCopy: Record<PlanningStatus, { title: string; copy: string }> = {
   },
 };
 
-export function StatusView({ status }: StatusViewProps) {
+export function StatusView({ status, errorMessage, onStart, hasSelectedProject = false }: StatusViewProps) {
   const content = statusCopy[status];
 
   return (
     <div className="status-view">
       <div className="status-view__box">
         <h2 className="status-view__title">{content.title}</h2>
-        {content.copy ? <p className="status-view__copy">{content.copy}</p> : null}
+        {status === "error" && errorMessage ? <p className="status-view__copy">{errorMessage}</p>
+          : content.copy ? <p className="status-view__copy">{content.copy}</p> : null}
+        {status === "empty" && onStart ? <button className="button" type="button" onClick={onStart}>{hasSelectedProject ? "계획 입력" : "프로젝트 만들기"}</button> : null}
       </div>
     </div>
   );

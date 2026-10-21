@@ -39,4 +39,5 @@ Docker Desktop과 기존 API·PostgreSQL 컨테이너를 시작하고 전체 실
 
 ## 다음 개선
 
-UI/UX 검토의 로딩·실패 복구 항목과 로드맵 읽기 보기·선택 기반 상세 편집은 후속 작업으로 남는다.
+로딩·실패 복구는 `loading-recovery-implementation-report.md`의 범위로 구현했다.
+로드맵 읽기 보기·선택 기반 상세 편집은 후속 작업으로 남는다.
