@@ -128,22 +128,20 @@ export function PlanningWorkspace() {
           </span>
           <div><h1>플랜노트</h1><span>생각에서 실행까지</span></div>
         </div>
-        <div className="workspace__breadcrumb"><span>내 작업 공간</span><span aria-hidden="true">/</span><strong>{projects.find((project) => project.id === selectedProjectId)?.title ?? "새로운 계획"}</strong></div>
+        <ProjectPanel
+          errorMessage={projectErrorMessage}
+          isLoading={projectStatus === "loading" || isBusy}
+          onCreate={async (title) => { if (confirmDiscardEdits()) await createAndSelectProject(title); }}
+          onSelect={async (id) => { if (confirmDiscardEdits()) await selectProject(id); }}
+          projects={projects}
+          selectedProjectId={selectedProjectId}
+        />
         <div className="workspace__header-status">
           {planningResult ? <span className={`workspace__save-state${hasUnsavedEdits ? " workspace__save-state--dirty" : ""}`}>{graphEditStatus === "saving" ? "저장 중…" : hasUnsavedEdits ? "저장하지 않은 변경" : "저장된 상태"}</span> : null}
           <span className={`workspace__status workspace__status--${status}`}><span aria-hidden="true" />{statusLabels[status]}</span>
         </div>
       </header>
-      <div className="workspace__body">
-        <div className="workspace__sidebar">
-          <ProjectPanel
-            errorMessage={projectErrorMessage}
-            isLoading={projectStatus === "loading" || isBusy}
-            onCreate={async (title) => { if (confirmDiscardEdits()) await createAndSelectProject(title); }}
-            onSelect={async (id) => { if (confirmDiscardEdits()) await selectProject(id); }}
-            projects={projects}
-            selectedProjectId={selectedProjectId}
-          />
+      <div className="workspace__toolbar" aria-label="계획 작업 도구">
           <PlanningHistoryPanel
             errorMessage={historyErrorMessage}
             history={planningHistory}
@@ -158,12 +156,6 @@ export function PlanningWorkspace() {
             conflictLatestResultId={conflictLatestResultId}
             onResolveConflict={resolveVersionConflict}
           />
-          {planningResult && status === "ready" ? (
-            <GraphEditPanel edgeCount={planningResult.edges.length} connectionType={connectionType}
-              onConnectionTypeChange={setConnectionType} disabled={isBusy}
-              canSave={versionConflict === null && (graphEditStatus === "dirty" || graphEditStatus === "error")}
-              errorMessage={graphEditErrorMessage} onAddNode={addNode} onSave={saveGraphEdits} />
-          ) : null}
           <PlanningExportPanel
             result={planningResult}
             projectTitle={projects.find((project) => project.id === selectedProjectId)?.title}
@@ -171,6 +163,9 @@ export function PlanningWorkspace() {
             hasUnsavedEdits={hasUnsavedEdits}
             disabled={isBusy || status !== "ready"}
           />
+      </div>
+      <div className="workspace__body">
+        <div className="workspace__sidebar">
           <RequirementPanel
             generatedModel={planningResult?.metadata.model}
             hasSelectedProject={selectedProjectId !== null}
@@ -193,6 +188,12 @@ export function PlanningWorkspace() {
         </div>
         <div className={`workspace__canvas-area${selectedNode ? " workspace__canvas-area--node-selected" : ""}`}>
           <PlanningCanvas
+            toolbar={planningResult && status === "ready" ? (
+              <GraphEditPanel edgeCount={planningResult.edges.length} connectionType={connectionType}
+                onConnectionTypeChange={setConnectionType} disabled={isBusy}
+                canSave={versionConflict === null && (graphEditStatus === "dirty" || graphEditStatus === "error")}
+                errorMessage={graphEditErrorMessage} onAddNode={addNode} onSave={saveGraphEdits} />
+            ) : null}
             disabled={isBusy}
             onConnect={(source, target) => addEdge(source, target, connectionType)}
             onUpdateEdge={updateEdge}

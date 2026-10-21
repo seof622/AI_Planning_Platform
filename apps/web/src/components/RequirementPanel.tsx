@@ -150,7 +150,11 @@ export function RequirementPanel({
 
   return (
     <aside className="panel panel--requirements">
-      <h2 className="panel__title">계획 입력</h2>
+      <div className="requirement-panel__heading">
+        <span>PLAN BRIEF</span>
+        <h2 className="panel__title">계획 입력</h2>
+        <p>주제와 해야 할 일을 정리해 보세요.</p>
+      </div>
       <form
         className="requirement-form"
         onSubmit={(event) => {
@@ -158,278 +162,291 @@ export function RequirementPanel({
           void onGenerate();
         }}
       >
-        <label className="form-field">
-          <span className="form-field__label">AI 모델</span>
-          <select
-            aria-label="AI 모델"
-            disabled={modelStatus !== "ready" || models.length === 0}
-            value={selectedModel}
-            onChange={(event) => setSelectedModel(event.target.value)}
-          >
-            {models.length === 0 ? (
-              <option value="">
-                {modelStatus === "loading"
-                  ? "모델 목록을 불러오는 중"
-                  : "사용 가능한 모델 없음"}
-              </option>
-            ) : null}
-            {models.map((model) => (
-              <option key={model.id} value={model.id}>
-                {model.label}
-                {model.id === modelRecommendation?.model.id ? " · 추천" : ""}
-              </option>
-            ))}
-          </select>
-          {modelErrorMessage ? (
-            <span className="form-field__error" role="alert">
-              {modelErrorMessage}
-            </span>
-          ) : null}
-          <details className="model-details">
-          <summary>모델 선택 안내</summary>
-          {modelRecommendation ? (
-            <div className="model-recommendation" aria-label="추천 모델">
-              <span className="model-recommendation__badge">추천</span>
-              <p>
-                <strong>{modelRecommendation.model.label}</strong>
-                <span>
-                  계획 복잡도: {complexityLabels[modelRecommendation.complexity]}
-                  {" · "}{modelRecommendation.score}점
-                </span>
-                <span>{modelRecommendation.reason}</span>
-              </p>
+        <div className="requirement-form__body">
+          <label className="form-field">
+            <span className="form-field__label">계획 주제</span>
+            <textarea
+              aria-label="계획 요구사항"
+              required
+              value={requirementText}
+              onChange={(event) => setRequirementText(event.target.value)}
+              placeholder="무엇을 계획하고 싶나요?"
+            />
+          </label>
+
+          <section className="form-field">
+            <div className="form-field__header">
+              <span className="form-field__label">상황 / 대상</span>
             </div>
-          ) : null}
-          {selectedModelOption ? (
-            <section className="model-guidance" aria-label="선택 모델 안내">
-              <p className="model-guidance__description">
-                {selectedModelOption.description}
-              </p>
-              <dl className="model-guidance__levels">
-                <div><dt>품질</dt><dd>{modelLevelLabels.quality[selectedModelOption.quality]}</dd></div>
-                <div><dt>속도</dt><dd>{modelLevelLabels.speed[selectedModelOption.speed]}</dd></div>
-                <div><dt>비용</dt><dd>{modelLevelLabels.cost[selectedModelOption.cost]}</dd></div>
-              </dl>
-              <p className="model-guidance__recommendation">
-                <strong>추천:</strong> {selectedModelOption.recommendedFor}
-              </p>
-            </section>
-          ) : null}
-          {generatedModel ? (
-            <span className="form-field__hint">
-              최근 결과 모델: {generatedModel}
-            </span>
-          ) : null}
-          </details>
-        </label>
-
-        <label className="form-field">
-          <span className="form-field__label">계획 주제</span>
-          <textarea
-            aria-label="계획 요구사항"
-            required
-            value={requirementText}
-            onChange={(event) => setRequirementText(event.target.value)}
-            placeholder="무엇을 계획하고 싶나요?"
-          />
-        </label>
-
-        <section className="form-field">
-          <div className="form-field__header">
-            <span className="form-field__label">상황 / 대상</span>
-          </div>
-          <div className="repeatable-list">
-            {planningBrief.context.map((item, index) => (
-              <div className="repeatable-row" key={index}>
-                <div className="repeatable-input-shell">
-                  <input
-                    value={item}
-                    onChange={(event) =>
-                      updateContextItem(index, event.target.value)
-                    }
-                    placeholder={
-                      index === 0
-                        ? "예: 나 혼자, 가족 여행, 시험 준비"
-                        : "추가 상황 또는 대상"
-                    }
-                  />
-                  {index === planningBrief.context.length - 1 ? (
-                    <div className="repeatable-inline-actions">
-                      <button
-                        aria-label="상황 또는 대상 추가"
-                        className="icon-button"
-                        type="button"
-                        onClick={addContextItem}
-                      >
-                        +
-                      </button>
-                      <button
-                        aria-label="상황 또는 대상 삭제"
-                        className="icon-button icon-button--ghost"
-                        disabled={planningBrief.context.length === 1}
-                        type="button"
-                        onClick={() => removeContextItem(index)}
-                      >
-                        -
-                      </button>
-                    </div>
-                  ) : null}
+            <div className="repeatable-list">
+              {planningBrief.context.map((item, index) => (
+                <div className="repeatable-row" key={index}>
+                  <div className="repeatable-input-shell">
+                    <input
+                      aria-label={`상황 또는 대상 ${index + 1}`}
+                      value={item}
+                      onChange={(event) =>
+                        updateContextItem(index, event.target.value)
+                      }
+                      placeholder={
+                        index === 0
+                          ? "예: 나 혼자, 가족 여행, 시험 준비"
+                          : "추가 상황 또는 대상"
+                      }
+                    />
+                    {index === planningBrief.context.length - 1 ? (
+                      <div className="repeatable-inline-actions">
+                        <button
+                          aria-label="상황 또는 대상 추가"
+                          className="icon-button"
+                          type="button"
+                          onClick={addContextItem}
+                        >
+                          +
+                        </button>
+                        <button
+                          aria-label="상황 또는 대상 삭제"
+                          className="icon-button icon-button--ghost"
+                          disabled={planningBrief.context.length === 1}
+                          type="button"
+                          onClick={() => removeContextItem(index)}
+                        >
+                          -
+                        </button>
+                      </div>
+                    ) : null}
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
-        </section>
+              ))}
+            </div>
+          </section>
 
-        <section className="form-field">
-          <div className="form-field__header">
-            <span className="form-field__label">해야 할 일</span>
-          </div>
-          <div className="repeatable-list">
-            {planningBrief.actionItems.map((item, index) => (
-              <div className="repeatable-row repeatable-row--action" key={index}>
-                <div className="repeatable-input-shell">
-                  <button
-                    aria-label="해야 할 일 필수 여부"
-                    aria-pressed={item.necessity === "required"}
-                    className={`necessity-toggle necessity-toggle--${item.necessity}`}
-                    type="button"
-                    onClick={() =>
-                      updateActionItem(index, {
-                        necessity:
-                          item.necessity === "required"
-                            ? "optional"
-                            : "required",
-                      })
+          <section className="form-field">
+            <div className="form-field__header">
+              <span className="form-field__label">해야 할 일</span>
+            </div>
+            <div className="repeatable-list">
+              {planningBrief.actionItems.map((item, index) => (
+                <div className="repeatable-row repeatable-row--action" key={index}>
+                  <div className="repeatable-input-shell">
+                    <button
+                      aria-label="해야 할 일 필수 여부"
+                      aria-pressed={item.necessity === "required"}
+                      className={`necessity-toggle necessity-toggle--${item.necessity}`}
+                      type="button"
+                      onClick={() =>
+                        updateActionItem(index, {
+                          necessity:
+                            item.necessity === "required"
+                              ? "optional"
+                              : "required",
+                        })
+                      }
+                    >
+                      {item.necessity === "required" ? "필수" : "선택"}
+                    </button>
+                    <input
+                      aria-label={`해야 할 일 ${index + 1}`}
+                      value={item.text}
+                      onChange={(event) =>
+                        updateActionItem(index, { text: event.target.value })
+                      }
+                      placeholder={index === 0 ? "예: 숙소 후보 정리" : "추가할 일"}
+                    />
+                    {index === planningBrief.actionItems.length - 1 ? (
+                      <div className="repeatable-inline-actions">
+                        <button
+                          aria-label="해야 할 일 추가"
+                          className="icon-button"
+                          type="button"
+                          onClick={addActionItem}
+                        >
+                          +
+                        </button>
+                        <button
+                          aria-label="해야 할 일 삭제"
+                          className="icon-button icon-button--ghost"
+                          disabled={planningBrief.actionItems.length === 1}
+                          type="button"
+                          onClick={() => removeActionItem(index)}
+                        >
+                          -
+                        </button>
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          <details className="brief-options">
+            <summary>세부 조건 <span>{planTypeLabels[planningBrief.planType]} · {criterionLabels[planningBrief.successCriterion]}{planningBrief.constraints.trim() ? " · 제약 있음" : ""}</span></summary>
+            <div className="brief-options__fields">
+              <div className="form-field-grid">
+                <label className="form-field">
+                  <span className="form-field__label">계획 유형</span>
+                  <select
+                    value={planningBrief.planType}
+                    onChange={(event) =>
+                      setPlanningBriefField(
+                        "planType",
+                        event.target.value as PlanningBriefDraft["planType"],
+                      )
                     }
                   >
-                    {item.necessity === "required" ? "필수" : "선택"}
-                  </button>
-                  <input
-                    value={item.text}
+                    {Object.entries(planTypeLabels).map(([value, label]) => (
+                      <option key={value} value={value}>
+                        {label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="form-field">
+                  <span className="form-field__label">중요 기준</span>
+                  <select
+                    value={planningBrief.successCriterion}
                     onChange={(event) =>
-                      updateActionItem(index, { text: event.target.value })
+                      setPlanningBriefField(
+                        "successCriterion",
+                        event.target.value as PlanningBriefDraft["successCriterion"],
+                      )
                     }
-                    placeholder={index === 0 ? "예: 숙소 후보 정리" : "추가할 일"}
-                  />
-                  {index === planningBrief.actionItems.length - 1 ? (
-                    <div className="repeatable-inline-actions">
-                      <button
-                        aria-label="해야 할 일 추가"
-                        className="icon-button"
-                        type="button"
-                        onClick={addActionItem}
-                      >
-                        +
-                      </button>
-                      <button
-                        aria-label="해야 할 일 삭제"
-                        className="icon-button icon-button--ghost"
-                        disabled={planningBrief.actionItems.length === 1}
-                        type="button"
-                        onClick={() => removeActionItem(index)}
-                      >
-                        -
-                      </button>
-                    </div>
-                  ) : null}
-                </div>
+                  >
+                    {Object.entries(criterionLabels).map(([value, label]) => (
+                      <option key={value} value={value}>
+                        {label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
               </div>
-            ))}
-          </div>
-        </section>
 
-        <div className="form-field-grid">
-          <label className="form-field">
-            <span className="form-field__label">계획 유형</span>
-            <select
-              value={planningBrief.planType}
-              onChange={(event) =>
-                setPlanningBriefField(
-                  "planType",
-                  event.target.value as PlanningBriefDraft["planType"],
-                )
-              }
-            >
-              {Object.entries(planTypeLabels).map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
-            </select>
-          </label>
+              <label className="form-field">
+                <span className="form-field__label">제약 조건</span>
+                <textarea
+                  aria-label="제약 조건"
+                  className="form-field__compact-textarea"
+                  value={planningBrief.constraints}
+                  onChange={(event) =>
+                    setPlanningBriefField("constraints", event.target.value)
+                  }
+                  placeholder="시간, 예산, 장소, 체력, 함께하는 사람"
+                />
+              </label>
+            </div>
+          </details>
 
-          <label className="form-field">
-            <span className="form-field__label">중요 기준</span>
-            <select
-              value={planningBrief.successCriterion}
-              onChange={(event) =>
-                setPlanningBriefField(
-                  "successCriterion",
-                  event.target.value as PlanningBriefDraft["successCriterion"],
-                )
-              }
-            >
-              {Object.entries(criterionLabels).map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
-            </select>
-          </label>
+          <details className="requirement-summary" aria-label="입력 요약">
+            <summary>입력 요약 <span>상황 {contextCount} · 할 일 {actionCount}</span></summary>
+            <dl>
+              <div>
+                <dt>상황</dt>
+                <dd>{contextCount}개</dd>
+              </div>
+              <div>
+                <dt>유형</dt>
+                <dd>{planTypeLabels[planningBrief.planType]}</dd>
+              </div>
+              <div>
+                <dt>할 일</dt>
+                <dd>
+                  {actionCount}개 / 필수 {requiredActionCount}개
+                </dd>
+              </div>
+              <div>
+                <dt>기준</dt>
+                <dd>{criterionLabels[planningBrief.successCriterion]}</dd>
+              </div>
+            </dl>
+          </details>
+
+          <details className="requirement-tools">
+            <summary>기타 도구</summary>
+            <div className="button-row" aria-label="MVP 상태 제어">
+              <button className="button" type="button" onClick={onReset}>초기화</button>
+              <button className="button" type="button" onClick={onShowError}>오류</button>
+            </div>
+          </details>
+
         </div>
+        <div className="requirement-form__footer">
+          <div className="form-field">
+            <label className="form-field__label" htmlFor="planning-model">AI 모델</label>
+            <select
+              id="planning-model"
+              aria-label="AI 모델"
+              disabled={modelStatus !== "ready" || models.length === 0}
+              value={selectedModel}
+              onChange={(event) => setSelectedModel(event.target.value)}
+            >
+              {models.length === 0 ? (
+                <option value="">
+                  {modelStatus === "loading"
+                    ? "모델 목록을 불러오는 중"
+                    : "사용 가능한 모델 없음"}
+                </option>
+              ) : null}
+              {models.map((model) => (
+                <option key={model.id} value={model.id}>
+                  {model.label}
+                  {model.id === modelRecommendation?.model.id ? " · 추천" : ""}
+                </option>
+              ))}
+            </select>
+            {modelErrorMessage ? (
+              <span className="form-field__error" role="alert">
+                {modelErrorMessage}
+              </span>
+            ) : null}
+            <details className="model-details">
+              <summary>모델 선택 안내</summary>
+              {modelRecommendation ? (
+                <div className="model-recommendation" aria-label="추천 모델">
+                  <span className="model-recommendation__badge">추천</span>
+                  <p>
+                    <strong>{modelRecommendation.model.label}</strong>
+                    <span>
+                      계획 복잡도: {complexityLabels[modelRecommendation.complexity]}
+                      {" · "}{modelRecommendation.score}점
+                    </span>
+                    <span>{modelRecommendation.reason}</span>
+                  </p>
+                </div>
+              ) : null}
+              {selectedModelOption ? (
+                <section className="model-guidance" aria-label="선택 모델 안내">
+                  <p className="model-guidance__description">
+                    {selectedModelOption.description}
+                  </p>
+                  <dl className="model-guidance__levels">
+                    <div><dt>품질</dt><dd>{modelLevelLabels.quality[selectedModelOption.quality]}</dd></div>
+                    <div><dt>속도</dt><dd>{modelLevelLabels.speed[selectedModelOption.speed]}</dd></div>
+                    <div><dt>비용</dt><dd>{modelLevelLabels.cost[selectedModelOption.cost]}</dd></div>
+                  </dl>
+                  <p className="model-guidance__recommendation">
+                    <strong>추천:</strong> {selectedModelOption.recommendedFor}
+                  </p>
+                </section>
+              ) : null}
+              {generatedModel ? (
+                <span className="form-field__hint">
+                  최근 결과 모델: {generatedModel}
+                </span>
+              ) : null}
+            </details>
+          </div>
 
-        <label className="form-field">
-          <span className="form-field__label">제약 조건</span>
-          <textarea
-            className="form-field__compact-textarea"
-            value={planningBrief.constraints}
-            onChange={(event) =>
-              setPlanningBriefField("constraints", event.target.value)
-            }
-            placeholder="시간, 예산, 장소, 체력, 함께하는 사람"
-          />
-        </label>
-
-        <section className="requirement-summary" aria-label="입력 요약">
-          <h3>입력 요약</h3>
-          <dl>
-            <div>
-              <dt>상황</dt>
-              <dd>{contextCount}개</dd>
-            </div>
-            <div>
-              <dt>유형</dt>
-              <dd>{planTypeLabels[planningBrief.planType]}</dd>
-            </div>
-            <div>
-              <dt>할 일</dt>
-              <dd>
-                {actionCount}개 / 필수 {requiredActionCount}개
-              </dd>
-            </div>
-            <div>
-              <dt>기준</dt>
-              <dd>{criterionLabels[planningBrief.successCriterion]}</dd>
-            </div>
-          </dl>
-        </section>
-
-        <button
-          className="button button--primary"
-          type="submit"
-          disabled={isLoading || !canSubmit}
-        >
-          {isLoading ? "생성 중" : "계획 생성"}
-        </button>
+          <button
+            className="button button--primary"
+            type="submit"
+            disabled={isLoading || !canSubmit}
+          >
+            {isLoading ? "생성 중" : "계획 생성"}
+          </button>
+        </div>
       </form>
-      <div className="button-row" aria-label="MVP 상태 제어">
-        <button className="button" type="button" onClick={onReset}>
-          초기화
-        </button>
-        <button className="button" type="button" onClick={onShowError}>
-          오류
-        </button>
-      </div>
     </aside>
   );
 }

@@ -37,6 +37,7 @@ test("version provenance, comparison, unsaved navigation and two-tab conflict re
   await second.getByLabel("Node 이름", { exact: true }).fill("탭 B 미저장 편집");
   await clickSave(page, 200);
   await expect(page.locator(".history-panel__origin")).toContainText("v2 · 사용자 편집본 · v1에서 편집");
+  await page.locator(".history-panel__details > summary").click();
   await page.locator(".version-comparison summary").click();
   await expect(page.locator(".version-change-list")).toContainText("탭 A 편집");
   await expect(page.locator(".version-change-list")).toContainText(original.nodes[0]!.label);
@@ -86,6 +87,7 @@ test("version provenance, comparison, unsaved navigation and two-tab conflict re
   await expect(second.locator(".history-panel__origin")).toContainText("v5 · 복원본 · v1에서 복원");
   expect((await json<PlanningResult>(request, `${prefix}/latest`)).nodes).toEqual(original.nodes);
   expect(await json<PlanningResult>(request, `${prefix}/${seed.resultId}`)).toEqual(original);
+  await second.locator(".history-panel__details > summary").click();
   await second.locator(".version-comparison summary").click();
   await second.getByLabel("비교 기준 버전", { exact: true }).selectOption(history[0]!.id);
   await expect(second.locator(".version-change-list")).toContainText("탭 B 미저장 편집");

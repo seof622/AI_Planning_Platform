@@ -2,6 +2,7 @@
 
 import { FormEvent, useState } from "react";
 import type { Project } from "@ai-planning-platform/shared";
+import { WorkspacePopover } from "./WorkspacePopover";
 
 interface ProjectPanelProps {
   errorMessage: string | null;
@@ -34,14 +35,6 @@ export function ProjectPanel({
 
   return (
     <section className="project-panel" aria-label="프로젝트 관리">
-      <div className="project-panel__header">
-        <div>
-          <p className="project-panel__eyebrow">MY PROJECTS</p>
-          <h2 className="project-panel__title">프로젝트</h2>
-        </div>
-        <span className="project-panel__count">{projects.length}</span>
-      </div>
-
       <label className="project-panel__select-label" htmlFor="project-select">
         프로젝트
       </label>
@@ -62,18 +55,21 @@ export function ProjectPanel({
         ))}
       </select>
 
-      <form className="project-panel__create" onSubmit={handleSubmit}>
-        <input
-          aria-label="새 프로젝트 이름"
-          disabled={isLoading}
-          placeholder="새 프로젝트 이름"
-          value={title}
-          onChange={(event) => setTitle(event.target.value)}
-        />
-        <button disabled={isLoading || title.trim().length === 0} type="submit">
-          추가
-        </button>
-      </form>
+      <WorkspacePopover label="새 프로젝트" className="project-panel__new" closeOn={selectedProjectId}>
+        <form className="project-panel__create" onSubmit={handleSubmit}>
+          <input
+            aria-label="새 프로젝트 이름"
+            disabled={isLoading}
+            placeholder="새 프로젝트 이름"
+            value={title}
+            onChange={(event) => setTitle(event.target.value)}
+          />
+          <button disabled={isLoading || title.trim().length === 0} type="submit">
+            추가
+          </button>
+        </form>
+        {errorMessage ? <p className="form-field__error" role="alert">{errorMessage}</p> : null}
+      </WorkspacePopover>
 
       {errorMessage ? (
         <p className="project-panel__error" role="alert">

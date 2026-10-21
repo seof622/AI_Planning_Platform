@@ -3,6 +3,7 @@
 import type { PlanningResult, PlanningResultHistoryItem } from "@ai-planning-platform/shared";
 import { versionLabel, versionOrigin } from "../lib/planningVersions";
 import { VersionComparisonPanel } from "./VersionComparisonPanel";
+import { WorkspacePopover } from "./WorkspacePopover";
 
 interface PlanningHistoryPanelProps {
   errorMessage: string | null;
@@ -40,8 +41,7 @@ export function PlanningHistoryPanel({
   return (
     <section className="history-panel" aria-label="계획 생성 이력">
       <div className="history-panel__header">
-        <h2>생성 이력</h2>
-        <span>{history.length}</span>
+        <h2>버전</h2>
       </div>
       {history.length > 0 ? (
         <select
@@ -61,7 +61,7 @@ export function PlanningHistoryPanel({
         <p>{isLoading ? "이력을 불러오는 중" : "아직 생성된 계획이 없습니다."}</p>
       )}
       {selectedResultId ? (
-        <>
+        <WorkspacePopover label="버전 정보·비교" className="history-panel__details" openOn={conflictLatestResultId}>
           {selected ? <p className="history-panel__origin">{versionLabel(history, selected.id)} · {versionOrigin(selected)}{sourceId ? ` · ${versionLabel(history, sourceId)}에서 ${selected.restoredFromResultId ? "복원" : "편집"}` : ""}</p> : null}
           <p className="history-panel__summary">
             {history.find((item) => item.id === selectedResultId)?.summary}
@@ -72,7 +72,10 @@ export function PlanningHistoryPanel({
             {history.find((item) => item.id === selectedResultId)
               ?.promptVersion ?? "기록 없음"}
           </p></details>
-        </>
+          {projectId && result && history.length > 1 ? (
+            <VersionComparisonPanel key={`${projectId}/${selectedResultId}`} projectId={projectId} selectedResultId={selectedResultId} result={result} history={history} hasUnsavedEdits={hasUnsavedEdits} conflictLatestResultId={conflictLatestResultId} />
+          ) : null}
+        </WorkspacePopover>
       ) : null}
       {versionConflict ? (
         <div className="version-conflict" role="alert">
@@ -84,9 +87,6 @@ export function PlanningHistoryPanel({
             if (!hasUnsavedEdits || window.confirm("미저장 편집을 버리고 최신 버전을 불러올까요?")) void onResolveConflict(false);
           }}>최신 버전 불러오기</button>
         </div>
-      ) : null}
-      {projectId && selectedResultId && result && history.length > 1 ? (
-        <VersionComparisonPanel key={`${projectId}/${selectedResultId}`} projectId={projectId} selectedResultId={selectedResultId} result={result} history={history} hasUnsavedEdits={hasUnsavedEdits} conflictLatestResultId={conflictLatestResultId} />
       ) : null}
       {selectedResultId && selectedResultId !== history[0]?.id ? (
         <button

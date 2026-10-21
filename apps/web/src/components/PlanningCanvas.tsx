@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   Background,
   Controls,
@@ -19,6 +19,7 @@ import { toReactFlowEdges, toReactFlowNodes } from "../lib/reactFlowMapping";
 import type { PlanningStatus } from "../store/planningStore";
 
 interface PlanningCanvasProps {
+  toolbar?: ReactNode;
   disabled?: boolean;
   onConnect: (source: string, target: string) => void;
   onUpdateEdge: (edgeId: string, changes: Partial<Pick<DependencyEdge, "source" | "target" | "dependencyType">>) => void;
@@ -43,6 +44,7 @@ type NodeStyleWithAccent = Node["style"] & {
 };
 
 export function PlanningCanvas({
+  toolbar,
   disabled = false,
   onConnect,
   onUpdateEdge,
@@ -128,6 +130,7 @@ export function PlanningCanvas({
             onClick={() => setShowMiniMap((value) => !value)}>미니맵</button>
         </div>
       </div>
+      {toolbar}
       <ReactFlow
         onInit={setFlow}
         nodesDraggable={!disabled}
