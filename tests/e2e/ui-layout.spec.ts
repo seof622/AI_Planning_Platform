@@ -3,6 +3,12 @@ import { mockPlanningResult } from "@ai-planning-platform/shared";
 import type { ProjectPlanningBrief } from "@ai-planning-platform/shared";
 import { openRoadmapStep } from "./roadmapHelpers";
 
+async function expectNoOverflow(page: import("@playwright/test").Page, width: number, height?: number) {
+  const size = await page.evaluate(() => ({ width: document.documentElement.scrollWidth, height: document.documentElement.scrollHeight }));
+  expect(size.width).toBeLessThanOrEqual(width);
+  if (height) expect(size.height).toBeLessThanOrEqual(height);
+}
+
 // Layout checks use a fixture so they do not create or modify personal projects.
 test.beforeEach(async ({ page }) => {
   const project = { ...mockPlanningResult.project!, title: "나만의 계획 서비스" };
@@ -234,6 +240,129 @@ test("ten roadmap steps are readable and share a single selected-item editor wit
   expect(bounds.pageHeight).toBeLessThanOrEqual(960);
   expect(bounds.listScrollWidth).toBeLessThanOrEqual(bounds.listWidth);
   await testInfo.attach("roadmap-reading-desktop", { body: await page.screenshot({ fullPage: true }), contentType: "image/png" });
+});
+
+test("focus views and collapsed inputs preserve edits, selection and canvas controls", async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 1440, height: 960 });
+  await page.goto("/");
+  await expect(page.locator(".react-flow__node").first()).toBeVisible();
+  await page.getByLabel("계획 요구사항", { exact: true }).fill("접어도 유지할 입력");
+  await page.locator(".brief-options > summary").click();
+  await page.getByLabel("제약 조건", { exact: true }).fill("유지할 세부 조건");
+  await page.getByRole("button", { name: "미니맵 표시", exact: true }).click();
+  await page.locator(".react-flow__node").first().click();
+  await page.getByLabel("Node 이름", { exact: true }).fill("보기 전환 후에도 유지할 노드");
+  await page.getByRole("button", { name: "그래프 집중 보기", exact: true }).click();
+  await expect(page.locator(".roadmap")).toBeHidden();
+  await expect(page.getByLabel("Node 이름", { exact: true })).toHaveValue("보기 전환 후에도 유지할 노드");
+  await page.getByRole("button", { name: "로드맵 집중 보기", exact: true }).click();
+  await expect(page.locator(".canvas-shell")).toBeHidden();
+  await expect(page.locator(".roadmap")).toBeVisible();
+  await openRoadmapStep(page, 1);
+  await page.getByLabel("1단계 제목", { exact: true }).fill("집중 보기에서 수정한 단계");
+  await page.getByRole("button", { name: "계획 입력 접기", exact: true }).click();
+  await expect(page.locator(".workspace__sidebar")).toBeHidden();
+  await expect(page.getByLabel("1단계 제목", { exact: true })).toHaveValue("집중 보기에서 수정한 단계");
+  await expectNoOverflow(page, 1440, 960);
+  await testInfo.attach("roadmap-focus-collapsed", { body: await page.screenshot(), contentType: "image/png" });
+  await page.getByRole("button", { name: "함께 보기", exact: true }).click();
+  await expect(page.locator(".react-flow__minimap")).toBeVisible();
+  await expect(page.locator(".react-flow__node").first()).toContainText("보기 전환 후에도 유지할 노드");
+  await page.getByRole("button", { name: "계획 입력 펼치기", exact: true }).click();
+  await expect(page.getByLabel("계획 요구사항", { exact: true })).toHaveValue("접어도 유지할 입력");
+  await expect(page.getByLabel("제약 조건", { exact: true })).toHaveValue("유지할 세부 조건");
+  await expect(page.locator(".workspace__save-state")).toHaveAttribute("aria-label", "결과 편집 미저장");
+  await page.getByRole("button", { name: "화면 배치 초기화", exact: true }).click();
+  await expect(page.getByLabel("1단계 제목", { exact: true })).toHaveValue("집중 보기에서 수정한 단계");
+});
+
+test("panel resizing is bounded, keyboard accessible, persistent and resettable", async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 1440, height: 960 });
+  await page.goto("/");
+  await expect(page.locator(".react-flow__node").first()).toBeVisible();
+  async function drag(label: string, dx: number, dy: number) {
+    const handle = page.getByRole("separator", { name: label, exact: true });
+    const box = (await handle.boundingBox())!;
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(box.x + box.width / 2 + dx, box.y + box.height / 2 + dy, { steps: 6 });
+    await page.mouse.up();
+  }
+  const input = page.getByRole("separator", { name: "입력 패널 너비 조절", exact: true });
+  await drag("입력 패널 너비 조절", 60, 0);
+  await expect(input).toHaveAttribute("aria-valuenow", "364");
+  expect((await page.locator(".workspace__sidebar").boundingBox())!.width).toBeCloseTo(364, 0);
+  const split = page.getByRole("separator", { name: "그래프와 로드맵 높이 조절", exact: true });
+  const initialGraph = (await page.locator(".canvas-shell").boundingBox())!.height;
+  await drag("그래프와 로드맵 높이 조절", 0, 60);
+  expect((await page.locator(".canvas-shell").boundingBox())!.height).toBeGreaterThan(initialGraph + 40);
+  await split.focus();
+  await page.keyboard.press("End");
+  await expect(split).toHaveAttribute("aria-valuenow", "75");
+  await page.keyboard.press("Home");
+  await expect(split).toHaveAttribute("aria-valuenow", "25");
+  await page.keyboard.press("ArrowDown");
+  await expect(split).toHaveAttribute("aria-valuenow", "27");
+  await openRoadmapStep(page, 1);
+  const detail = page.getByRole("separator", { name: "상세 편집 너비 조절", exact: true });
+  await drag("상세 편집 너비 조절", -50, 0);
+  await expect(detail).toHaveAttribute("aria-valuenow", "350");
+  expect((await page.locator(".detail-drawer--open").boundingBox())!.width).toBeCloseTo(350, 0);
+  await input.focus();
+  await page.keyboard.press("End");
+  await page.keyboard.press("ArrowRight");
+  await expect(input).toHaveAttribute("aria-valuenow", "420");
+  await detail.focus();
+  await page.keyboard.press("End");
+  await expectNoOverflow(page, 1440, 960);
+  await testInfo.attach("workspace-resized", { body: await page.screenshot(), contentType: "image/png" });
+  await detail.dblclick();
+  await expect(detail).toHaveAttribute("aria-valuenow", "300");
+  await expect(page.locator(".workspace__save-state")).toHaveAttribute("aria-label", "결과 편집 저장됨");
+  await page.getByRole("button", { name: "로드맵 집중 보기", exact: true }).click();
+  await page.getByRole("button", { name: "계획 입력 접기", exact: true }).click();
+  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem("plannote.workspace-layout.v1") ?? "{}").inputCollapsed)).toBe(true);
+  await page.reload();
+  await expect(page.getByRole("button", { name: "로드맵 집중 보기", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator(".workspace__sidebar")).toBeHidden();
+  await expect(page.locator(".canvas-shell")).toBeHidden();
+  await page.getByRole("button", { name: "함께 보기", exact: true }).click();
+  await page.getByRole("button", { name: "계획 입력 펼치기", exact: true }).click();
+  await expect(input).toHaveAttribute("aria-valuenow", "420");
+  await expect(split).toHaveAttribute("aria-valuenow", "27");
+  await page.getByRole("button", { name: "화면 배치 초기화", exact: true }).click();
+  await expect(input).toHaveAttribute("aria-valuenow", "304");
+  await expect(split).toHaveAttribute("aria-valuenow", "56");
+  await page.setViewportSize({ width: 1024, height: 768 });
+  await input.focus();
+  await page.keyboard.press("End");
+  await expectNoOverflow(page, 1024, 768);
+});
+
+test("mobile focus views keep controls and editor in bounds without desktop resize handles", async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/");
+  await expect(page.locator(".react-flow__node").first()).toBeVisible();
+  await page.getByRole("button", { name: "계획 입력 접기", exact: true }).click();
+  await page.getByRole("button", { name: "로드맵 집중 보기", exact: true }).click();
+  await expect(page.locator(".canvas-shell")).toBeHidden();
+  await expect(page.getByRole("separator")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "단계 추가", exact: true })).toBeInViewport();
+  await openRoadmapStep(page, 1);
+  await page.getByLabel("1단계 제목", { exact: true }).click();
+  await expect(page.getByLabel("1단계 제목", { exact: true })).toBeFocused();
+  await page.getByLabel("1단계 제목", { exact: true }).fill("모바일 집중 보기 수정");
+  await expectNoOverflow(page, 390);
+  await testInfo.attach("workspace-mobile-focus", { body: await page.screenshot(), contentType: "image/png" });
+  await page.getByRole("button", { name: "단계 편집 닫기", exact: true }).click();
+  await page.getByRole("button", { name: "그래프 집중 보기", exact: true }).click();
+  await expect(page.locator(".roadmap")).toBeHidden();
+  await expect(page.locator(".react-flow__node").first()).toBeVisible();
+  await page.getByRole("button", { name: "함께 보기", exact: true }).click();
+  await expect(page.getByRole("button", { name: "1단계 모바일 집중 보기 수정 편집", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "계획 입력 펼치기", exact: true }).click();
+  await expect(page.getByLabel("계획 요구사항", { exact: true })).toBeVisible();
+  await expectNoOverflow(page, 390);
 });
 
 test("mobile roadmap selection opens one bounded editor and closing keeps the edit", async ({ page }, testInfo) => {

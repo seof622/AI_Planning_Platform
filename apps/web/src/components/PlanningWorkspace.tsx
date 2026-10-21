@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import type { DependencyType } from "@ai-planning-platform/shared";
 import { getSelectedNode, hasUnappliedInput, usePlanningStore } from "../store/planningStore";
 import { NodeDetailPanel } from "./NodeDetailPanel";
@@ -17,6 +17,8 @@ import { WorkspaceIcon } from "./WorkspaceIcon";
 import { PlanningOperationFeedback } from "./PlanningOperationFeedback";
 import { operationLabels } from "../lib/planningOperations";
 import { getGenerationBlocker } from "../lib/planningInput";
+import { defaultWorkspaceLayout, layoutLimits, useWorkspaceLayout } from "../lib/useWorkspaceLayout";
+import { WorkspaceResizeHandle } from "./WorkspaceResizeHandle";
 
 const statusLabels = {
   empty: "비어 있음",
@@ -28,6 +30,10 @@ const statusLabels = {
 
 export function PlanningWorkspace() {
   const [connectionType, setConnectionType] = useState<DependencyType>("requires");
+  const { layout, setLayout, resetLayout } = useWorkspaceLayout();
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const canvasAreaRef = useRef<HTMLDivElement>(null);
+  const resultsRef = useRef<HTMLDivElement>(null);
   const {
     pendingOperation,
     failedOperation,
@@ -92,6 +98,10 @@ export function PlanningWorkspace() {
   } = usePlanningStore();
 
   const selectedNode = getSelectedNode(planningResult, selectedNodeId);
+  const view = planningResult ? layout.view : "both";
+  function resize(key: "inputWidth" | "detailWidth" | "graphShare", value: number) {
+    setLayout((previous) => ({ ...previous, [key]: value }));
+  }
   const selectedStep = planningResult?.roadmap.find((step) => step.id === selectedRoadmapStepId) ?? null;
   const hasUnsavedEdits = graphEditStatus !== "idle";
   const isBusy = status === "loading" || graphEditStatus === "saving";
@@ -119,7 +129,8 @@ export function PlanningWorkspace() {
   }
   function focusPlanningInput() {
     if (selectedProjectId) {
-      document.getElementById("planning-requirement")?.focus();
+      setLayout((previous) => ({ ...previous, inputCollapsed: false }));
+      requestAnimationFrame(() => document.getElementById("planning-requirement")?.focus());
     } else {
       const newProject = document.querySelector<HTMLDetailsElement>(".project-panel__new");
       if (newProject) {
@@ -132,7 +143,8 @@ export function PlanningWorkspace() {
     const id = selectedRoadmapStepId;
     selectRoadmapStep(null);
     requestAnimationFrame(() => {
-      if (id) document.querySelector<HTMLButtonElement>(`.roadmap-step[data-step-id="${CSS.escape(id)}"] > button`)?.focus({ preventScroll: true });
+      if (view === "graph") document.querySelector<HTMLButtonElement>('[aria-label="로드맵 집중 보기"]')?.focus({ preventScroll: true });
+      else if (id) document.querySelector<HTMLButtonElement>(`.roadmap-step[data-step-id="${CSS.escape(id)}"] > button`)?.focus({ preventScroll: true });
     });
   }
   function confirmRemoveStep(stepId: string) {
@@ -183,7 +195,10 @@ export function PlanningWorkspace() {
   ]);
 
   return (
-    <main className="workspace">
+    <main className="workspace" style={{
+      "--input-width": `${layout.inputWidth}px`, "--detail-width": `${layout.detailWidth}px`,
+      "--graph-size": `${layout.graphShare}fr`, "--roadmap-size": `${100 - layout.graphShare}fr`,
+    } as CSSProperties}>
       <header className="workspace__header">
         <div className="workspace__brand">
           <span className="workspace__brand-mark" aria-hidden="true">
@@ -223,6 +238,26 @@ export function PlanningWorkspace() {
             conflictLatestResultId={conflictLatestResultId}
             onResolveConflict={resolveVersionConflict}
           />
+          <div className="workspace__view-tools">
+            <button className="button button--icon" type="button" aria-controls="workspace-input"
+              aria-expanded={!layout.inputCollapsed} aria-label={layout.inputCollapsed ? "계획 입력 펼치기" : "계획 입력 접기"}
+              title={layout.inputCollapsed ? "계획 입력 펼치기" : "계획 입력 접기"}
+              onClick={() => setLayout((previous) => ({ ...previous, inputCollapsed: !previous.inputCollapsed }))}>
+              <WorkspaceIcon name="sidebar" />
+            </button>
+            <div className="workspace__view-switch" role="group" aria-label="결과 보기">
+              {([
+                ["both", "함께 보기", "panels"], ["graph", "그래프 집중 보기", "graph"], ["roadmap", "로드맵 집중 보기", "list"],
+              ] as const).map(([mode, label, icon]) => <button className="button button--icon" type="button" key={mode}
+                aria-label={label} title={label} aria-pressed={view === mode} disabled={!planningResult}
+                onClick={() => setLayout((previous) => ({ ...previous, view: mode }))}>
+                <WorkspaceIcon name={icon} />
+              </button>)}
+            </div>
+            <button className="button button--icon" type="button" aria-label="화면 배치 초기화" title="화면 배치 초기화" onClick={resetLayout}>
+              <WorkspaceIcon name="refresh" />
+            </button>
+          </div>
           <PlanningExportPanel
             result={planningResult}
             projectTitle={projects.find((project) => project.id === selectedProjectId)?.title}
@@ -231,8 +266,8 @@ export function PlanningWorkspace() {
             disabled={isBusy || status !== "ready"}
           />
       </div>
-      <div className="workspace__body">
-        <div className="workspace__sidebar">
+      <div ref={bodyRef} className={`workspace__body${layout.inputCollapsed ? " workspace__body--input-collapsed" : ""}`}>
+        <div className="workspace__sidebar" id="workspace-input" hidden={layout.inputCollapsed}>
           <RequirementPanel
             briefSaveStatus={briefSaveStatus}
             briefSaveErrorMessage={briefSaveErrorMessage}
@@ -261,9 +296,15 @@ export function PlanningWorkspace() {
             setSelectedModel={setSelectedModel}
           />
         </div>
-        <div className={`workspace__canvas-area${selectedNode || selectedStep ? " workspace__canvas-area--detail-open" : ""}`}>
+        {!layout.inputCollapsed ? <WorkspaceResizeHandle label="입력 패널 너비 조절" orientation="vertical" controls="workspace-input"
+          className="workspace__input-resize" value={layout.inputWidth} min={layoutLimits.inputWidth[0]} max={layoutLimits.inputWidth[1]}
+          onChange={(value) => resize("inputWidth", value)} onReset={() => resize("inputWidth", defaultWorkspaceLayout.inputWidth)}
+          fromPointer={(event) => event.clientX - (bodyRef.current?.getBoundingClientRect().left ?? 0) - 8} /> : null}
+        <div ref={canvasAreaRef} className={`workspace__canvas-area${selectedNode || selectedStep ? " workspace__canvas-area--detail-open" : ""}`}>
+          <div ref={resultsRef} className={`workspace__results workspace__results--${view}`}>
           <PlanningCanvas
-            feedback={feedback}
+            hidden={view === "roadmap"}
+            feedback={view !== "roadmap" ? feedback : undefined}
             errorMessage={errorMessage}
             onStart={focusPlanningInput}
             hasSelectedProject={selectedProjectId !== null}
@@ -283,7 +324,16 @@ export function PlanningWorkspace() {
             selectedNodeId={selectedNodeId}
             status={resultStatus}
           />
+          {view === "both" ? <WorkspaceResizeHandle label="그래프와 로드맵 높이 조절" orientation="horizontal" controls="planning-canvas planning-roadmap"
+            value={layout.graphShare} min={layoutLimits.graphShare[0]} max={layoutLimits.graphShare[1]} step={2}
+            onChange={(value) => resize("graphShare", value)} onReset={() => resize("graphShare", defaultWorkspaceLayout.graphShare)}
+            fromPointer={(event) => {
+              const box = resultsRef.current!.getBoundingClientRect();
+              return (event.clientY - box.top - 8) / (box.height - 16) * 100;
+            }} /> : null}
           <RoadmapPanel
+            hidden={view === "graph"}
+            feedback={view === "roadmap" ? feedback : undefined}
             disabled={isBusy}
             loadingLabel={pendingOperation ? operationLabels[pendingOperation.kind] : undefined}
             selectedStepId={selectedRoadmapStepId}
@@ -297,6 +347,11 @@ export function PlanningWorkspace() {
             roadmap={planningResult?.roadmap ?? []}
             status={resultStatus}
           />
+          </div>
+          {selectedNode || selectedStep ? <WorkspaceResizeHandle label="상세 편집 너비 조절" orientation="vertical" controls="workspace-detail"
+            className="workspace__detail-resize" value={layout.detailWidth} min={layoutLimits.detailWidth[0]} max={layoutLimits.detailWidth[1]}
+            onChange={(value) => resize("detailWidth", value)} onReset={() => resize("detailWidth", defaultWorkspaceLayout.detailWidth)}
+            fromPointer={(event) => (canvasAreaRef.current?.getBoundingClientRect().right ?? 0) - event.clientX - 8} /> : null}
           <RoadmapStepDetailPanel
             key={selectedStep?.id}
             step={selectedStep} roadmap={planningResult?.roadmap ?? []} nodes={planningResult?.nodes ?? []}

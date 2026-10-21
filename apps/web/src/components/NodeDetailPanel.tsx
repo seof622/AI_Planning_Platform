@@ -50,7 +50,7 @@ export function NodeDetailPanel({
     node.category.trim().length > 0;
 
   return (
-    <aside className="detail-drawer detail-drawer--open">
+    <aside className="detail-drawer detail-drawer--open" id="workspace-detail">
       <div className="detail-drawer__header">
         <h2 className="panel__title">노드 편집</h2>
         <button type="button" aria-label="Node 편집 닫기" onClick={onClose}>

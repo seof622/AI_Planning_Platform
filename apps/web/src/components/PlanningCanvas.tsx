@@ -20,6 +20,7 @@ import { toReactFlowEdges, toReactFlowNodes } from "../lib/reactFlowMapping";
 import type { PlanningStatus } from "../store/planningStore";
 
 interface PlanningCanvasProps {
+  hidden?: boolean;
   toolbar?: ReactNode;
   feedback?: ReactNode;
   errorMessage?: string | null;
@@ -49,6 +50,7 @@ type NodeStyleWithAccent = Node["style"] & {
 };
 
 export function PlanningCanvas({
+  hidden = false,
   toolbar,
   feedback,
   errorMessage,
@@ -125,14 +127,14 @@ export function PlanningCanvas({
 
   if (status !== "ready" || !result) {
     return (
-      <section className="canvas-shell" ref={shellRef}>
+      <section className="canvas-shell" id="planning-canvas" hidden={hidden} ref={shellRef}>
         {feedback ?? <StatusView status={status} errorMessage={errorMessage} onStart={onStart} hasSelectedProject={hasSelectedProject} />}
       </section>
     );
   }
 
   return (
-    <section className="canvas-shell" ref={shellRef} aria-label="계획 의존성 그래프">
+    <section className="canvas-shell" id="planning-canvas" hidden={hidden} ref={shellRef} aria-label="계획 의존성 그래프">
       <div className="canvas-heading">
         <div><h2>구조 캔버스</h2></div>
         <div className="canvas-heading__tools">

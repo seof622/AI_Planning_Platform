@@ -143,6 +143,7 @@ test("failed regeneration keeps the graph, roadmap, selection and edits until ex
 test("initial failure retains the input and the empty view leads to the first input", async ({ page }) => {
   const { control, original } = await setupRecoveryFixture(page, { empty: true, generationFailures: 1 });
   await page.goto("/");
+  await page.getByRole("button", { name: "계획 입력 접기", exact: true }).click();
   await page.getByRole("button", { name: "계획 입력", exact: true }).click();
   await expect(page.getByLabel("계획 요구사항", { exact: true })).toBeFocused();
   await page.getByRole("button", { name: "계획 생성", exact: true }).click();
@@ -189,6 +190,30 @@ test("version lookup failures preserve the displayed result and retry the chosen
   await failure.getByRole("button", { name: "다시 시도", exact: true }).click();
   await expect(version).toHaveValue("older");
   await expect(page.locator(".react-flow__node").first()).toContainText("과거 버전 노드");
+  expect(control.generationCalls).toBe(0);
+});
+
+test("roadmap focus keeps version progress, failure and retry visible with the input collapsed", async ({ page }, testInfo) => {
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => { release = resolve; });
+  const { control } = await setupRecoveryFixture(page, { versionFailures: 1, versionGate: gate });
+  await page.goto("/");
+  await expect(page.locator(".react-flow__node").first()).toBeVisible();
+  await page.getByRole("button", { name: "로드맵 집중 보기", exact: true }).click();
+  await page.getByRole("button", { name: "계획 입력 접기", exact: true }).click();
+  await page.getByLabel("계획 버전", { exact: true }).selectOption("older");
+  const roadmap = page.getByRole("region", { name: "계획 로드맵", exact: true });
+  await expect(roadmap.getByRole("status", { name: "버전 불러오는 중", exact: true })).toBeVisible();
+  await expect(page.locator(".canvas-shell")).toBeHidden();
+  release();
+  const failure = roadmap.getByRole("alert", { name: "버전 조회 실패", exact: true });
+  await expect(failure).toBeFocused();
+  await expect(failure.getByRole("button", { name: "다시 시도", exact: true })).toBeInViewport();
+  await testInfo.attach("roadmap-focus-recovery", { body: await page.screenshot(), contentType: "image/png" });
+  control.versionFailures = 0;
+  await failure.getByRole("button", { name: "다시 시도", exact: true }).click();
+  await expect(page.getByLabel("계획 버전", { exact: true })).toHaveValue("older");
+  await expect(failure).toHaveCount(0);
   expect(control.generationCalls).toBe(0);
 });
 

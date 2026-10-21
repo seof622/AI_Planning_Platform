@@ -42,4 +42,4 @@
 ## 다음 작업
 
 [로드맵 읽기와 선택 기반 상세 편집](roadmap-reading-implementation-report.md)을 구현했다.
-다음 우선순위는 그래프·로드맵 집중 보기, 입력 패널 접기와 크기 조절이다.
+이어서 [그래프·로드맵 집중 보기, 입력 패널 접기와 크기 조절](workspace-focus-resize-implementation-report.md)을 구현했다.

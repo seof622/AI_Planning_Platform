@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import type { RoadmapStep } from "@ai-planning-platform/shared";
 import { priorityLabels } from "../lib/planningLabels";
 import type { PlanningStatus } from "../store/planningStore";
@@ -8,6 +8,8 @@ import { WorkspaceIcon } from "./WorkspaceIcon";
 import { ResultSaveButton } from "./ResultSaveButton";
 
 interface RoadmapPanelProps {
+  hidden?: boolean;
+  feedback?: ReactNode;
   disabled?: boolean;
   loadingLabel?: string;
   saveBlocked?: boolean;
@@ -22,7 +24,7 @@ interface RoadmapPanelProps {
   status: PlanningStatus;
 }
 
-export function RoadmapPanel({ disabled = false, loadingLabel = "불러오는 중", saveBlocked = false,
+export function RoadmapPanel({ hidden = false, feedback, disabled = false, loadingLabel = "불러오는 중", saveBlocked = false,
   editErrorMessage, editStatus, errorMessage, selectedStepId, onSelect, onAdd, onSave, roadmap, status,
 }: RoadmapPanelProps) {
   const stepsRef = useRef<HTMLOListElement>(null);
@@ -42,9 +44,9 @@ export function RoadmapPanel({ disabled = false, loadingLabel = "불러오는 �
     else if (row.offsetTop + row.offsetHeight > list.scrollTop + list.clientHeight) {
       list.scrollTop = row.offsetTop + row.offsetHeight - list.clientHeight;
     }
-  }, [selectedStepId, selectedOrder]);
+  }, [selectedStepId, selectedOrder, hidden]);
 
-  return <section className="roadmap" aria-label="계획 로드맵">
+  return <section className="roadmap" id="planning-roadmap" hidden={hidden} aria-label="계획 로드맵">
     <div className="roadmap__header">
       <h2 className="roadmap__title">로드맵</h2>
       <div className="roadmap__actions">
@@ -56,6 +58,7 @@ export function RoadmapPanel({ disabled = false, loadingLabel = "불러오는 �
         <ResultSaveButton className="roadmap__save" disabled={!canSave} saving={editStatus === "saving"} onSave={onSave} />
       </div>
     </div>
+    {feedback}
     {editErrorMessage ? <p className="form-field__error" role="alert">{editErrorMessage}</p> : null}
     {status !== "ready" ? <div className="status-view"><div className="status-view__box">
       <h3 className="status-view__title">{status === "loading" ? loadingLabel : "로드맵 없음"}</h3>
@@ -67,7 +70,7 @@ export function RoadmapPanel({ disabled = false, loadingLabel = "불러오는 �
         {sortedRoadmap.map((step) => <li className="roadmap-step" key={step.id} data-step-id={step.id}>
           <button className="roadmap-step__select" type="button"
             aria-label={`${step.order}단계 ${step.title.trim() || "제목 없음"} 편집`}
-            aria-pressed={step.id === selectedStepId} aria-controls={step.id === selectedStepId ? "roadmap-step-editor" : undefined}
+            aria-pressed={step.id === selectedStepId} aria-controls={step.id === selectedStepId ? "workspace-detail" : undefined}
             disabled={disabled || editStatus === "saving"}
             onClick={() => onSelect(step.id === selectedStepId ? null : step.id)}>
             <span className="roadmap-step__order" aria-hidden="true">{step.order}</span>

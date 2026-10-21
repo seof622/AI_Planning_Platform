@@ -32,7 +32,7 @@ export function RoadmapStepDetailPanel({ step, roadmap, nodes, disabled, saveBlo
   const canSave = !locked && !saveBlocked && (editStatus === "dirty" || editStatus === "error")
     && roadmap.every((item) => item.title.trim() && item.description.trim());
 
-  return <aside className="detail-drawer detail-drawer--open roadmap-step-editor" id="roadmap-step-editor" aria-label="로드맵 단계 편집">
+  return <aside className="detail-drawer detail-drawer--open roadmap-step-editor" id="workspace-detail" aria-label="로드맵 단계 편집">
     <div className="detail-drawer__header">
       <h2 className="panel__title">단계 편집 <span className="pill">{step.order}</span></h2>
       <button type="button" aria-label="단계 편집 닫기" title="단계 편집 닫기" onClick={onClose}><WorkspaceIcon name="close" /></button>

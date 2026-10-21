@@ -1,6 +1,10 @@
 import type { ReactNode } from "react";
 
 const shapes = {
+  panels: <><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M3 12h18" /></>,
+  graph: <><rect x="3" y="8" width="5" height="8" rx="1" /><rect x="16" y="3" width="5" height="6" rx="1" /><rect x="16" y="15" width="5" height="6" rx="1" /><path d="M8 12h4V6h4m-4 6v6h4" /></>,
+  list: <><path d="M9 6h12M9 12h12M9 18h12M3 6h1M3 12h1M3 18h1" /></>,
+  sidebar: <><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M9 3v18" /></>,
   plus: <path d="M12 5v14M5 12h14" />,
   close: <path d="m6 6 12 12M6 18 18 6" />,
   save: <><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h12l4 4v12a2 2 0 0 1-2 2Z" /><path d="M7 3v6h10V3M7 21v-8h10v8" /></>,
