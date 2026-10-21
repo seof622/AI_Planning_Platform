@@ -485,6 +485,41 @@ describe("planningStore", () => {
     expect(fetch).toHaveBeenCalledTimes(1);
   });
 
+  it("shares selection between nodes and roadmap steps without discarding edits", () => {
+    usePlanningStore.setState({ planningResult: structuredClone(mockPlanningResult), status: "ready" });
+    const nodeId = mockPlanningResult.nodes[0]!.id;
+    const stepId = mockPlanningResult.roadmap[0]!.id;
+    usePlanningStore.getState().selectNode(nodeId);
+    usePlanningStore.getState().updateNode(nodeId, { label: "Keep node edit" });
+    usePlanningStore.getState().selectRoadmapStep(stepId);
+    expect(usePlanningStore.getState()).toMatchObject({ selectedNodeId: null, selectedRoadmapStepId: stepId, graphEditStatus: "dirty" });
+    usePlanningStore.getState().updateRoadmapStep(stepId, { title: "Keep step edit" });
+    usePlanningStore.getState().selectNode(nodeId);
+    expect(usePlanningStore.getState()).toMatchObject({ selectedNodeId: nodeId, selectedRoadmapStepId: null, graphEditStatus: "dirty" });
+    expect(usePlanningStore.getState().planningResult?.nodes[0]?.label).toBe("Keep node edit");
+    expect(usePlanningStore.getState().planningResult?.roadmap[0]?.title).toBe("Keep step edit");
+  });
+
+  it("selects newly added steps, tracks selection by ID through sorting and clears deleted selection", () => {
+    usePlanningStore.setState({ planningResult: structuredClone(mockPlanningResult), status: "ready" });
+    usePlanningStore.getState().addRoadmapStep();
+    const stepId = usePlanningStore.getState().selectedRoadmapStepId!;
+    expect(stepId).toBeTruthy();
+    const originalFirstId = mockPlanningResult.roadmap[0]!.id;
+    usePlanningStore.getState().updateRoadmapStep(originalFirstId, { dependsOn: [stepId] });
+    expect(usePlanningStore.getState().selectedRoadmapStepId).toBe(stepId);
+    expect(usePlanningStore.getState().planningResult?.roadmap[0]?.id).toBe(stepId);
+    usePlanningStore.getState().removeRoadmapStep(stepId);
+    expect(usePlanningStore.getState().selectedRoadmapStepId).toBeNull();
+    usePlanningStore.getState().selectRoadmapStep(originalFirstId);
+    usePlanningStore.getState().addNode();
+    expect(usePlanningStore.getState().selectedRoadmapStepId).toBeNull();
+    expect(usePlanningStore.getState().selectedNodeId).toBeTruthy();
+    usePlanningStore.getState().selectRoadmapStep(originalFirstId);
+    usePlanningStore.getState().resetToEmpty();
+    expect(usePlanningStore.getState().selectedRoadmapStepId).toBeNull();
+  });
+
   it("adds unique nodes and deletes their connections and roadmap references without mutating the source", () => {
     const source = structuredClone(mockPlanningResult);
     const snapshot = structuredClone(source);

@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { mockPlanningResult, type PlanningResult, type ProjectPlanningBrief } from "@ai-planning-platform/shared";
+import { openRoadmapStep } from "./roadmapHelpers";
 
 // Recovery failures are simulated locally: no AI calls or personal project writes.
 async function setupRecoveryFixture(page: Page, options: {
@@ -99,13 +100,14 @@ test("failed regeneration keeps the graph, roadmap, selection and edits until ex
   await page.goto("/");
   await page.locator(".react-flow__node").first().click();
   await page.getByLabel("Node 이름", { exact: true }).fill("유지할 노드 편집");
+  await openRoadmapStep(page, 1);
   await page.getByLabel("1단계 제목", { exact: true }).fill("유지할 단계 편집");
   page.once("dialog", (dialog) => dialog.accept());
   await page.getByRole("button", { name: "새 버전으로 다시 생성", exact: true }).click();
   await expect(page.getByRole("status", { name: "AI 생성 중", exact: true })).toBeVisible();
   await expect(page.locator(".react-flow__node").first()).toContainText("유지할 노드 편집");
-  await expect(page.getByLabel("Node 이름", { exact: true })).toHaveValue("유지할 노드 편집");
-  await expect(page.getByLabel("Node 이름", { exact: true })).toBeDisabled();
+  await expect(page.getByLabel("Node 이름", { exact: true })).toHaveCount(0);
+  await expect(page.getByLabel("1단계 제목", { exact: true })).toBeDisabled();
   await expect(page.getByLabel("1단계 제목", { exact: true })).toHaveValue("유지할 단계 편집");
   await expect(page.getByLabel("계획 요구사항", { exact: true })).toBeDisabled();
   await expect(page.getByRole("button", { name: "생성 중", exact: true })).toBeDisabled();
@@ -115,7 +117,7 @@ test("failed regeneration keeps the graph, roadmap, selection and edits until ex
   const failure = page.getByRole("alert", { name: "AI 생성 실패", exact: true });
   await expect(failure).toContainText("기존 결과 유지");
   await expect(failure).toContainText("AI 서비스에 연결하지 못했습니다.");
-  await expect(page.getByLabel("Node 이름", { exact: true })).toBeEnabled();
+  await expect(page.getByLabel("1단계 제목", { exact: true })).toBeEnabled();
   await expect(page.getByLabel("계획 버전", { exact: true })).toHaveValue("original");
   await expect(page.getByLabel("계획 요구사항", { exact: true })).toHaveValue(original.requirement!.content);
   await expect(page.locator(".workspace__save-state")).toHaveAttribute("aria-label", "결과 편집 미저장");

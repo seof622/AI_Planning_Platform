@@ -1,95 +1,47 @@
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import { mockPlanningResult } from "@ai-planning-platform/shared";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { RoadmapPanel } from "./RoadmapPanel";
 
-const roadmap = [
-  {
-    componentNodeIds: ["node-api"],
-    dependsOn: [],
-    description: "요구사항을 정리합니다.",
-    estimatedEffort: "small" as const,
-    id: "step-one",
-    order: 1,
-    priority: "high" as const,
-    title: "요구사항 정리",
-  },
-  {
-    componentNodeIds: ["node-api"],
-    dependsOn: ["step-one"],
-    description: "API를 구현합니다.",
-    estimatedEffort: "large" as const,
-    id: "step-two",
-    order: 2,
-    priority: "medium" as const,
-    title: "API 구현",
-  },
-];
+const baseProps = { editErrorMessage: null, editStatus: "idle", errorMessage: null,
+  selectedStepId: null, onSelect: vi.fn(), onAdd: vi.fn(), onSave: vi.fn(), roadmap: mockPlanningResult.roadmap,
+  status: "ready" } satisfies React.ComponentProps<typeof RoadmapPanel>;
 
 describe("RoadmapPanel", () => {
   afterEach(cleanup);
-  it("edits, reorders, and saves roadmap steps", async () => {
-    const user = userEvent.setup();
-    const onChange = vi.fn();
-    const onMove = vi.fn();
-    const onSave = vi.fn().mockResolvedValue(undefined);
-
-    render(
-      <RoadmapPanel
-        editErrorMessage={null}
-        editStatus="dirty"
-        errorMessage={null}
-        nodes={mockPlanningResult.nodes}
-        onAdd={vi.fn()}
-        onDelete={vi.fn()}
-        onChange={onChange}
-        onMove={onMove}
-        onSave={onSave}
-        roadmap={roadmap}
-        status="ready"
-      />,
-    );
-
-    await user.clear(screen.getByLabelText("1단계 제목"));
-    await user.type(screen.getByLabelText("1단계 제목"), "범위 정의");
-    await user.selectOptions(screen.getByLabelText("1단계 우선순위"), "low");
-    await user.selectOptions(screen.getByLabelText("1단계 예상 작업량"), "medium");
-    await user.click(screen.getByRole("button", { name: "요구사항 정리 뒤로 이동" }));
-    await user.click(screen.getByRole("button", { name: "변경 내용을 새 버전으로 저장" }));
-
-    expect(onChange).toHaveBeenCalledWith("step-one", { title: "" });
-    expect(onChange).toHaveBeenCalledWith("step-one", { priority: "low" });
-    expect(onChange).toHaveBeenCalledWith("step-one", { estimatedEffort: "medium" });
-    expect(onMove).toHaveBeenCalledWith("step-one", 1);
-    expect(onSave).toHaveBeenCalledOnce();
+  it("lets ten steps be read and selected without edit forms", async () => {
+    const select = vi.fn();
+    const steps = Array.from({ length: 10 }, (_, index) => ({ ...mockPlanningResult.roadmap[0]!,
+      id: `step-${index}`, order: index + 1, title: `실행 ${index + 1}`, description: `작업 설명 ${index + 1}`,
+      dependsOn: index ? [`step-${index - 1}`] : [] }));
+    render(<RoadmapPanel {...baseProps} roadmap={steps} onSelect={select} />);
+    expect(screen.getAllByRole("listitem")).toHaveLength(10);
+    expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+    expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
+    expect(screen.getByText("작업 설명 10")).toBeInTheDocument();
+    expect(screen.getByText("선행 9")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "10단계 실행 10 편집" }));
+    expect(select).toHaveBeenCalledWith("step-9");
   });
-
-  it("adds and deletes steps and edits node and dependency references", async () => {
-    const user = userEvent.setup();
-    const onChange = vi.fn();
-    const onAdd = vi.fn();
-    const onDelete = vi.fn();
-    render(<RoadmapPanel nodes={mockPlanningResult.nodes} roadmap={roadmap} status="ready" editStatus="idle"
-      editErrorMessage={null} errorMessage={null} onChange={onChange} onMove={vi.fn()} onSave={vi.fn()} onAdd={onAdd} onDelete={onDelete} />);
-    await user.click(screen.getByRole("button", { name: "단계 추가" }));
-    expect(onAdd).toHaveBeenCalledOnce();
-    const card = within(screen.getAllByRole("listitem")[0]!);
-    await user.click(card.getByText(/관련 노드 ·/));
-    await user.click(card.getByLabelText(`1단계 관련 노드: ${mockPlanningResult.nodes[0]!.label}`));
-    expect(onChange).toHaveBeenCalledWith("step-one", { componentNodeIds: ["node-api", mockPlanningResult.nodes[0]!.id] });
-    await user.click(card.getByText(/선행 단계 ·/));
-    await user.click(card.getByLabelText("1단계 선행 단계: API 구현"));
-    expect(onChange).toHaveBeenCalledWith("step-one", { dependsOn: ["step-two"] });
-    await user.click(card.getByRole("button", { name: "요구사항 정리 단계 삭제" }));
-    expect(onDelete).toHaveBeenCalledWith("step-one");
+  it("reflects selection, can close it and preserves the common save action", async () => {
+    const select = vi.fn();
+    const save = vi.fn();
+    const step = mockPlanningResult.roadmap[0]!;
+    render(<RoadmapPanel {...baseProps} selectedStepId={step.id} editStatus="dirty" onSelect={select} onSave={save} />);
+    const button = screen.getByRole("button", { name: `${step.order}단계 ${step.title} 편집` });
+    expect(button).toHaveAttribute("aria-pressed", "true");
+    await userEvent.click(button);
+    expect(select).toHaveBeenCalledWith(null);
+    await userEvent.click(screen.getByRole("button", { name: "변경 내용을 새 버전으로 저장" }));
+    expect(save).toHaveBeenCalledOnce();
   });
-
-  it("can save an empty roadmap and add its first step", () => {
-    render(<RoadmapPanel nodes={[]} roadmap={[]} status="ready" editStatus="dirty" editErrorMessage={null}
-      errorMessage={null} onChange={vi.fn()} onMove={vi.fn()} onSave={vi.fn()} onAdd={vi.fn()} onDelete={vi.fn()} />);
-    expect(screen.getByText(/단계가 없습니다/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "단계 추가" })).toBeEnabled();
+  it("can save an empty roadmap and add the first step", async () => {
+    const add = vi.fn();
+    render(<RoadmapPanel {...baseProps} roadmap={[]} editStatus="dirty" onAdd={add} />);
+    expect(screen.getByText(/단계가 없습니다/)).toBeVisible();
+    await userEvent.click(screen.getByRole("button", { name: "단계 추가" }));
+    expect(add).toHaveBeenCalledOnce();
     expect(screen.getByRole("button", { name: "변경 내용을 새 버전으로 저장" })).toBeEnabled();
   });
 });

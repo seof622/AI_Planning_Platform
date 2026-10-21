@@ -147,6 +147,7 @@ interface PlanningState {
   selectedPlanningResultId: string | null;
   selectedProjectId: string | null;
   selectedNodeId: string | null;
+  selectedRoadmapStepId: string | null;
   status: PlanningStatus;
   createAndSelectProject: (title: string) => Promise<void>;
   generateResult: () => Promise<void>;
@@ -160,6 +161,7 @@ interface PlanningState {
   selectProject: (projectId: string) => Promise<void>;
   selectPlanningResult: (resultId: string) => Promise<void>;
   selectNode: (nodeId: string | null) => void;
+  selectRoadmapStep: (stepId: string | null) => void;
   addNode: () => void;
   removeNode: (nodeId: string) => void;
   addEdge: (source: string, target: string, dependencyType: DependencyEdge["dependencyType"]) => void;
@@ -260,6 +262,7 @@ export const usePlanningStore = create<PlanningState>((set, get) => {
   selectedPlanningResultId: null,
   selectedProjectId: null,
   selectedNodeId: null,
+  selectedRoadmapStepId: null,
   status: "idle",
   async createAndSelectProject(title) {
     set({ projectErrorMessage: null, projectStatus: "loading" });
@@ -347,6 +350,7 @@ export const usePlanningStore = create<PlanningState>((set, get) => {
         ),
         requirementText: currentRequirement || result.requirement?.content || "",
         selectedNodeId: null,
+        selectedRoadmapStepId: null,
         status: result.nodes.length > 0 ? "ready" : "empty",
       });
       await get().loadPlanningHistory(selectedProjectId);
@@ -469,6 +473,7 @@ export const usePlanningStore = create<PlanningState>((set, get) => {
       planningResult: null,
       requirementText: "",
       selectedNodeId: null,
+      selectedRoadmapStepId: null,
       selectedPlanningResultId: null,
       status: "empty",
     });
@@ -515,6 +520,7 @@ export const usePlanningStore = create<PlanningState>((set, get) => {
             ? restored.planningBrief.selectedModel
             : get().selectedModel,
         selectedNodeId: null,
+        selectedRoadmapStepId: null,
         status: restored.result.nodes.length > 0 ? "ready" : "empty",
       });
       await get().loadPlanningHistory(state.selectedProjectId);
@@ -642,6 +648,7 @@ export const usePlanningStore = create<PlanningState>((set, get) => {
       projectStatus: "loading",
       requirementText: "",
       selectedNodeId: null,
+      selectedRoadmapStepId: null,
       selectedPlanningResultId: null,
       selectedProjectId: projectId,
       status: "loading",
@@ -741,6 +748,7 @@ export const usePlanningStore = create<PlanningState>((set, get) => {
             : get().selectedModel,
         selectedPlanningResultId: resultId,
         selectedNodeId: null,
+        selectedRoadmapStepId: null,
         expectedLatestResultId: get().planningHistory[0]?.id ?? resultId,
         status: result.nodes.length > 0 ? "ready" : "empty",
       });
@@ -759,7 +767,10 @@ export const usePlanningStore = create<PlanningState>((set, get) => {
     }
   },
   selectNode(nodeId) {
-    set({ selectedNodeId: nodeId });
+    set({ selectedNodeId: nodeId, selectedRoadmapStepId: null });
+  },
+  selectRoadmapStep(stepId) {
+    set({ selectedRoadmapStepId: stepId, selectedNodeId: null });
   },
   addNode() {
     set((state) => {
@@ -774,7 +785,7 @@ export const usePlanningStore = create<PlanningState>((set, get) => {
         position: { x: (anchor?.position.x ?? 0) + 320, y: (anchor?.position.y ?? 0) + 100 },
       };
       return {
-        graphEditErrorMessage: null, graphEditStatus: "dirty", selectedNodeId: node.id,
+        graphEditErrorMessage: null, graphEditStatus: "dirty", selectedNodeId: node.id, selectedRoadmapStepId: null,
         planningResult: { ...result, nodes: [...result.nodes, node] },
       };
     });
@@ -896,7 +907,7 @@ export const usePlanningStore = create<PlanningState>((set, get) => {
         priority: "medium", estimatedEffort: "medium", order: result.roadmap.length + 1,
         dependsOn: [], componentNodeIds: [],
       };
-      return { graphEditErrorMessage: null, graphEditStatus: "dirty",
+      return { graphEditErrorMessage: null, graphEditStatus: "dirty", selectedNodeId: null, selectedRoadmapStepId: step.id,
         planningResult: { ...result, roadmap: [...result.roadmap, step] } };
     });
   },
@@ -908,7 +919,9 @@ export const usePlanningStore = create<PlanningState>((set, get) => {
       const roadmap = [...result.roadmap].sort((left, right) => left.order - right.order)
         .filter((step) => step.id !== stepId)
         .map((step, index) => ({ ...step, order: index + 1, dependsOn: step.dependsOn.filter((id) => id !== stepId) }));
-      return { graphEditErrorMessage: null, graphEditStatus: "dirty", planningResult: { ...result, roadmap } };
+      return { graphEditErrorMessage: null, graphEditStatus: "dirty",
+        selectedRoadmapStepId: state.selectedRoadmapStepId === stepId ? null : state.selectedRoadmapStepId,
+        planningResult: { ...result, roadmap } };
     });
   },
   updateRoadmapStep(stepId, changes) {
@@ -976,6 +989,7 @@ export const usePlanningStore = create<PlanningState>((set, get) => {
       errorMessage: message,
       planningResult: null,
       selectedNodeId: null,
+      selectedRoadmapStepId: null,
       status: "error",
     });
   },

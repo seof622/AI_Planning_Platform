@@ -182,7 +182,8 @@
 - 저장 범위·초안 저장 상태·생성 조건 안내(항목 1·2)를 구현했다.
 - 구현과 검증 범위는 [저장·생성 안내 보고서](save-generation-guidance-implementation-report.md)에 기록한다.
 - 로딩·실패 복구(항목 3)는 [로딩·복구 보고서](loading-recovery-implementation-report.md)의 범위로 구현했다.
-- 다음 우선순위는 로드맵 읽기 보기와 선택 기반 상세 편집(항목 4)이다.
+- 로드맵 읽기 보기와 선택 기반 상세 편집(항목 4)은 [로드맵 읽기 보고서](roadmap-reading-implementation-report.md)의 범위로 구현했다.
+- 다음 우선순위는 그래프·로드맵 집중 보기, 입력 패널 접기와 크기 조절(항목 5)이다.
 
 ## 권장 진행 순서
 

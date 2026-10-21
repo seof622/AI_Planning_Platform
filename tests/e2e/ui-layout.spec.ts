@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { mockPlanningResult } from "@ai-planning-platform/shared";
 import type { ProjectPlanningBrief } from "@ai-planning-platform/shared";
+import { openRoadmapStep } from "./roadmapHelpers";
 
 // Layout checks use a fixture so they do not create or modify personal projects.
 test.beforeEach(async ({ page }) => {
@@ -179,6 +180,7 @@ test("draft retry, unapplied inputs and the full result save scope remain distin
   await expect(generate).toBeEnabled();
   await page.locator(".react-flow__node").first().click();
   await page.getByLabel("Node 이름", { exact: true }).fill("결과 노드 수정");
+  await openRoadmapStep(page, 1);
   await page.getByLabel("1단계 제목", { exact: true }).fill("결과 단계 수정");
   const saves = page.getByRole("button", { name: "변경 내용을 새 버전으로 저장", exact: true });
   await expect(saves).toHaveCount(3);
@@ -190,4 +192,62 @@ test("draft retry, unapplied inputs and the full result save scope remain distin
   await expect(page.locator(".workspace__save-state")).toHaveAttribute("aria-label", "결과 편집 미저장");
   await expect(page.getByLabel("입력 초안 저장 상태")).toContainText("입력 초안 자동 저장됨");
   await testInfo.attach("save-generation-guidance", { body: await page.screenshot({ fullPage: true }), contentType: "image/png" });
+});
+
+test("ten roadmap steps are readable and share a single selected-item editor with graph nodes", async ({ page }, testInfo) => {
+  const steps = Array.from({ length: 10 }, (_, index) => ({ ...mockPlanningResult.roadmap[0]!,
+    id: `reading-${index + 1}`, order: index + 1, title: `${index + 1}번째 실행`, description: `실행 설명 ${index + 1}`,
+    dependsOn: index ? [`reading-${index}`] : [] }));
+  await page.route("http://localhost:8000/projects/*/planning-results/latest", (route) => route.fulfill({ json: {
+    ...mockPlanningResult, roadmap: steps, metadata: { ...mockPlanningResult.metadata, resultId: "layout-result" },
+  } }));
+  await page.setViewportSize({ width: 1440, height: 960 });
+  await page.goto("/");
+  const roadmap = page.getByRole("region", { name: "계획 로드맵", exact: true });
+  await expect(roadmap.locator(".roadmap-step")).toHaveCount(10);
+  await expect(roadmap.locator("input, textarea, select")).toHaveCount(0);
+  await expect(page.locator(".detail-drawer--open")).toHaveCount(0);
+  const last = roadmap.locator('[data-step-id="reading-10"] > button');
+  await last.focus();
+  await page.keyboard.press("Enter");
+  const editor = page.getByRole("complementary", { name: "로드맵 단계 편집", exact: true });
+  await expect(editor.getByLabel("10단계 제목", { exact: true })).toHaveValue("10번째 실행");
+  await expect(page.getByLabel("1단계 제목", { exact: true })).toHaveCount(0);
+  await editor.getByLabel("10단계 제목", { exact: true }).fill("수정한 열 번째 단계");
+  await editor.getByRole("button", { name: "단계 편집 닫기", exact: true }).click();
+  await expect(last).toBeFocused();
+  await expect(last).toContainText("수정한 열 번째 단계");
+  await page.locator(".react-flow__node").first().click();
+  await page.getByLabel("Node 이름", { exact: true }).fill("전환해도 유지하는 노드");
+  await openRoadmapStep(page, "reading-10");
+  await expect(page.getByLabel("Node 이름", { exact: true })).toHaveCount(0);
+  await expect(editor.getByLabel("10단계 제목", { exact: true })).toHaveValue("수정한 열 번째 단계");
+  await expect(page.locator(".react-flow__node").first()).toContainText("전환해도 유지하는 노드");
+  await expect(page.locator(".detail-drawer--open")).toHaveCount(1);
+  await expect(last).toHaveAttribute("aria-pressed", "true");
+  const bounds = await page.evaluate(() => ({
+    pageWidth: document.documentElement.scrollWidth, pageHeight: document.documentElement.scrollHeight,
+    listWidth: document.querySelector(".roadmap__steps")!.clientWidth,
+    listScrollWidth: document.querySelector(".roadmap__steps")!.scrollWidth,
+  }));
+  expect(bounds.pageWidth).toBeLessThanOrEqual(1440);
+  expect(bounds.pageHeight).toBeLessThanOrEqual(960);
+  expect(bounds.listScrollWidth).toBeLessThanOrEqual(bounds.listWidth);
+  await testInfo.attach("roadmap-reading-desktop", { body: await page.screenshot({ fullPage: true }), contentType: "image/png" });
+});
+
+test("mobile roadmap selection opens one bounded editor and closing keeps the edit", async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/");
+  const editor = await openRoadmapStep(page, 1);
+  await editor.getByLabel("1단계 제목", { exact: true }).fill("모바일에서 수정한 단계");
+  const bounds = await editor.boundingBox();
+  expect(bounds!.x).toBeGreaterThanOrEqual(0);
+  expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(390);
+  await expect(page.locator(".detail-drawer--open")).toHaveCount(1);
+  await testInfo.attach("roadmap-reading-mobile", { body: await page.screenshot({ fullPage: true }), contentType: "image/png" });
+  await editor.getByRole("button", { name: "단계 편집 닫기", exact: true }).click();
+  await expect(page.getByRole("button", { name: "1단계 모바일에서 수정한 단계 편집", exact: true })).toBeFocused();
+  await expect(page.locator(".detail-drawer--open")).toHaveCount(0);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
 });

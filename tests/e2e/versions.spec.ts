@@ -1,6 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { test, expect, type Page, type APIRequestContext } from "@playwright/test";
 import type { PlanningResult, PlanningResultHistoryItem } from "@ai-planning-platform/shared";
+import { openRoadmapStep } from "./roadmapHelpers";
 
 const api = "http://localhost:8000";
 function seedProject(): { projectId: string; resultId: string } {
@@ -79,6 +80,7 @@ test("version provenance, comparison, unsaved navigation and two-tab conflict re
   await second.getByRole("button", { name: "이 버전 복원", exact: true }).click();
   expect((await restoreConflict).status()).toBe(409);
   await expect(second.locator(".version-conflict")).toContainText("복원을 중단");
+  await openRoadmapStep(second, 1);
   await expect(second.getByLabel("1단계 제목", { exact: true })).toHaveValue(original.roadmap[0]!.title);
   second.once("dialog", (dialog) => dialog.accept());
   const restored = second.waitForResponse((response) => response.url().endsWith("/restore"));

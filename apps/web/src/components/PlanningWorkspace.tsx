@@ -9,6 +9,7 @@ import { PlanningHistoryPanel } from "./PlanningHistoryPanel";
 import { ProjectPanel } from "./ProjectPanel";
 import { RequirementPanel } from "./RequirementPanel";
 import { RoadmapPanel } from "./RoadmapPanel";
+import { RoadmapStepDetailPanel } from "./RoadmapStepDetailPanel";
 import { GraphEditPanel } from "./GraphEditPanel";
 import { PlanningExportPanel } from "./PlanningExportPanel";
 import { versionLabel } from "../lib/planningVersions";
@@ -69,10 +70,12 @@ export function PlanningWorkspace() {
     saveGraphEdits,
     saveCurrentPlanningBrief,
     selectedNodeId,
+    selectedRoadmapStepId,
     selectedModel,
     selectedPlanningResultId,
     selectedProjectId,
     selectNode,
+    selectRoadmapStep,
     selectPlanningResult,
     selectProject,
     setErrorState,
@@ -89,6 +92,7 @@ export function PlanningWorkspace() {
   } = usePlanningStore();
 
   const selectedNode = getSelectedNode(planningResult, selectedNodeId);
+  const selectedStep = planningResult?.roadmap.find((step) => step.id === selectedRoadmapStepId) ?? null;
   const hasUnsavedEdits = graphEditStatus !== "idle";
   const isBusy = status === "loading" || graphEditStatus === "saving";
   const resultStatus = planningResult && (pendingOperation || failedOperation) ? (planningResult.nodes.length ? "ready" : "empty") : status;
@@ -123,6 +127,21 @@ export function PlanningWorkspace() {
         newProject.querySelector<HTMLInputElement>("input")?.focus();
       }
     }
+  }
+  function closeStepEditor() {
+    const id = selectedRoadmapStepId;
+    selectRoadmapStep(null);
+    requestAnimationFrame(() => {
+      if (id) document.querySelector<HTMLButtonElement>(`.roadmap-step[data-step-id="${CSS.escape(id)}"] > button`)?.focus({ preventScroll: true });
+    });
+  }
+  function confirmRemoveStep(stepId: string) {
+    const step = planningResult?.roadmap.find((item) => item.id === stepId);
+    if (!step) return;
+    const dependents = planningResult?.roadmap.filter((item) => item.dependsOn.includes(stepId)) ?? [];
+    const impact = dependents.length > 0
+      ? `\n다음 단계의 선행 조건에서 이 단계가 제거됩니다: ${dependents.map((item) => item.title).join(", ")}` : "";
+    if (window.confirm(`“${step.title}” 단계를 삭제할까요?${impact}\n남은 단계 번호를 다시 매깁니다. 과거 버전은 유지됩니다.`)) removeRoadmapStep(stepId);
   }
 
   useEffect(() => {
@@ -242,7 +261,7 @@ export function PlanningWorkspace() {
             setSelectedModel={setSelectedModel}
           />
         </div>
-        <div className={`workspace__canvas-area${selectedNode ? " workspace__canvas-area--node-selected" : ""}`}>
+        <div className={`workspace__canvas-area${selectedNode || selectedStep ? " workspace__canvas-area--detail-open" : ""}`}>
           <PlanningCanvas
             feedback={feedback}
             errorMessage={errorMessage}
@@ -267,26 +286,23 @@ export function PlanningWorkspace() {
           <RoadmapPanel
             disabled={isBusy}
             loadingLabel={pendingOperation ? operationLabels[pendingOperation.kind] : undefined}
-            nodes={planningResult?.nodes ?? []}
+            selectedStepId={selectedRoadmapStepId}
+            onSelect={selectRoadmapStep}
             onAdd={addRoadmapStep}
-            onDelete={(stepId) => {
-              const step = planningResult?.roadmap.find((item) => item.id === stepId);
-              if (!step) return;
-              const dependents = planningResult?.roadmap.filter((item) => item.dependsOn.includes(stepId)) ?? [];
-              const impact = dependents.length > 0
-                ? `\n다음 단계의 선행 조건에서 이 단계가 제거됩니다: ${dependents.map((item) => item.title).join(", ")}`
-                : "";
-              if (window.confirm(`“${step.title}” 단계를 삭제할까요?${impact}\n남은 단계 번호를 다시 매깁니다. 과거 버전은 유지됩니다.`)) removeRoadmapStep(stepId);
-            }}
             saveBlocked={versionConflict !== null}
             editErrorMessage={graphEditErrorMessage}
             editStatus={graphEditStatus}
             errorMessage={errorMessage}
-            onChange={updateRoadmapStep}
-            onMove={moveRoadmapStep}
             onSave={saveGraphEdits}
             roadmap={planningResult?.roadmap ?? []}
             status={resultStatus}
+          />
+          <RoadmapStepDetailPanel
+            key={selectedStep?.id}
+            step={selectedStep} roadmap={planningResult?.roadmap ?? []} nodes={planningResult?.nodes ?? []}
+            disabled={isBusy} saveBlocked={versionConflict !== null} editStatus={graphEditStatus}
+            errorMessage={graphEditErrorMessage} onClose={closeStepEditor}
+            onChange={updateRoadmapStep} onMove={moveRoadmapStep} onDelete={confirmRemoveStep} onSave={saveGraphEdits}
           />
           <NodeDetailPanel
             disabled={isBusy}
