@@ -2,6 +2,8 @@
 
 import type { ComponentNode } from "@ai-planning-platform/shared";
 import { nodeTypeLabels, priorityLabels } from "../lib/planningLabels";
+import { WorkspaceIcon } from "./WorkspaceIcon";
+import { ResultSaveButton } from "./ResultSaveButton";
 
 interface NodeDetailPanelProps {
   saveBlocked?: boolean;
@@ -50,7 +52,7 @@ export function NodeDetailPanel({
       <div className="detail-drawer__header">
         <h2 className="panel__title">노드 편집</h2>
         <button type="button" aria-label="Node 편집 닫기" onClick={onClose}>
-          닫기
+          <WorkspaceIcon name="close" />
         </button>
       </div>
       <div className="detail-list">
@@ -125,17 +127,10 @@ export function NodeDetailPanel({
       {editErrorMessage ? (
         <p className="form-field__error" role="alert">{editErrorMessage}</p>
       ) : null}
-      <button
-        className="button button--primary detail-drawer__save"
-        disabled={!canSave}
-        type="button"
-        onClick={() => void onSave()}
-      >
-        {editStatus === "saving" ? "저장 중" : "편집본 새 버전 저장"}
-      </button>
+      <ResultSaveButton className="detail-drawer__save" disabled={!canSave} saving={editStatus === "saving"} onSave={onSave} />
       {onDelete ? (
         <button className="button graph-delete" type="button" disabled={!canDelete || editStatus === "saving"}
-          onClick={onDelete}>노드 삭제</button>
+          onClick={onDelete}><WorkspaceIcon name="trash" />노드 삭제</button>
       ) : null}
       {onDelete && !canDelete ? <p className="graph-edit-panel__hint">마지막 노드는 유지해야 합니다.</p> : null}
     </aside>

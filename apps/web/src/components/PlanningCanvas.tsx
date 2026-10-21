@@ -15,6 +15,7 @@ import type { DependencyEdge, DependencyType, PlanningResult } from "@ai-plannin
 import { ComponentNodeCard } from "./ComponentNodeCard";
 import { LabeledDependencyEdge } from "./LabeledDependencyEdge";
 import { StatusView } from "./StatusView";
+import { WorkspaceIcon } from "./WorkspaceIcon";
 import { toReactFlowEdges, toReactFlowNodes } from "../lib/reactFlowMapping";
 import type { PlanningStatus } from "../store/planningStore";
 
@@ -123,11 +124,11 @@ export function PlanningCanvas({
   return (
     <section className="canvas-shell" ref={shellRef} aria-label="계획 의존성 그래프">
       <div className="canvas-heading">
-        <div><span className="canvas-heading__eyebrow">PLAN OVERVIEW</span><h2>구조 캔버스</h2></div>
+        <div><h2>구조 캔버스</h2></div>
         <div className="canvas-heading__tools">
           <span className="canvas-heading__count">{result.nodes.length}개 노드<span aria-hidden="true"> · </span>{result.edges.length}개 연결</span>
           <button className="canvas-heading__map-toggle" type="button" aria-label={showMiniMap ? "미니맵 숨기기" : "미니맵 표시"} aria-pressed={showMiniMap}
-            onClick={() => setShowMiniMap((value) => !value)}>미니맵</button>
+            title={showMiniMap ? "미니맵 숨기기" : "미니맵 표시"} onClick={() => setShowMiniMap((value) => !value)}><WorkspaceIcon name="map" /></button>
         </div>
       </div>
       {toolbar}

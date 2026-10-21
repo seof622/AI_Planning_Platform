@@ -3,6 +3,7 @@
 import { FormEvent, useState } from "react";
 import type { Project } from "@ai-planning-platform/shared";
 import { WorkspacePopover } from "./WorkspacePopover";
+import { WorkspaceIcon } from "./WorkspaceIcon";
 
 interface ProjectPanelProps {
   errorMessage: string | null;
@@ -55,7 +56,7 @@ export function ProjectPanel({
         ))}
       </select>
 
-      <WorkspacePopover label="새 프로젝트" className="project-panel__new" closeOn={selectedProjectId}>
+      <WorkspacePopover label="새 프로젝트" trigger={<WorkspaceIcon name="plus" />} className="project-panel__new" closeOn={selectedProjectId}>
         <form className="project-panel__create" onSubmit={handleSubmit}>
           <input
             aria-label="새 프로젝트 이름"

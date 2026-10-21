@@ -16,10 +16,10 @@ test("graph additions and deletions persist, clean references and preserve origi
   }
   async function save() {
     const saved = page.waitForResponse((response) => response.url().endsWith("/edit") && response.request().method() === "POST");
-    await page.getByRole("button", { name: "그래프 새 버전 저장", exact: true }).click();
+    await page.locator(".graph-edit-panel").getByRole("button", { name: "변경 내용을 새 버전으로 저장", exact: true }).click();
     const response = await saved;
     expect(response.status()).toBe(200);
-    await expect(page.getByRole("button", { name: "그래프 새 버전 저장", exact: true })).toBeDisabled();
+    await expect(page.locator(".graph-edit-panel").getByRole("button", { name: "변경 내용을 새 버전으로 저장", exact: true })).toBeDisabled();
     return response.json() as Promise<PlanningResult>;
   }
   await openProject();

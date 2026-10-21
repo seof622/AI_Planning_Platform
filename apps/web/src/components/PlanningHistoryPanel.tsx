@@ -4,6 +4,7 @@ import type { PlanningResult, PlanningResultHistoryItem } from "@ai-planning-pla
 import { versionLabel, versionOrigin } from "../lib/planningVersions";
 import { VersionComparisonPanel } from "./VersionComparisonPanel";
 import { WorkspacePopover } from "./WorkspacePopover";
+import { WorkspaceIcon } from "./WorkspaceIcon";
 
 interface PlanningHistoryPanelProps {
   errorMessage: string | null;
@@ -52,8 +53,7 @@ export function PlanningHistoryPanel({
         >
           {history.map((item, index) => (
             <option key={item.id} value={item.id}>
-              {index === 0 ? "최신 · " : ""}
-              {versionLabel(history, item.id)} · {versionOrigin(item)} · {formatGeneratedAt(item.createdAt)}
+              {versionLabel(history, item.id)} · {index === 0 ? "최신" : versionOrigin(item)}
             </option>
           ))}
         </select>
@@ -61,13 +61,13 @@ export function PlanningHistoryPanel({
         <p>{isLoading ? "이력을 불러오는 중" : "아직 생성된 계획이 없습니다."}</p>
       )}
       {selectedResultId ? (
-        <WorkspacePopover label="버전 정보·비교" className="history-panel__details" openOn={conflictLatestResultId}>
+        <WorkspacePopover label="버전 정보·비교" trigger={<WorkspaceIcon name="history" />} className="history-panel__details" openOn={conflictLatestResultId}>
           {selected ? <p className="history-panel__origin">{versionLabel(history, selected.id)} · {versionOrigin(selected)}{sourceId ? ` · ${versionLabel(history, sourceId)}에서 ${selected.restoredFromResultId ? "복원" : "편집"}` : ""}</p> : null}
           <p className="history-panel__summary">
             {history.find((item) => item.id === selectedResultId)?.summary}
           </p>
           <details className="history-panel__metadata"><summary>생성 정보</summary><p>
-            모델: {selected?.model ?? "기록 없음"} ·{" "}
+            {selected ? formatGeneratedAt(selected.createdAt) : ""} · 모델: {selected?.model ?? "기록 없음"} ·{" "}
             Prompt:{" "}
             {history.find((item) => item.id === selectedResultId)
               ?.promptVersion ?? "기록 없음"}

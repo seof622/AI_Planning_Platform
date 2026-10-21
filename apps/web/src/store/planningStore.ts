@@ -32,6 +32,7 @@ import {
 } from "../lib/planningClient";
 
 export type PlanningStatus = "idle" | "ready" | "loading" | "error" | "empty";
+export type BriefSaveStatus = "idle" | "dirty" | "saving" | "saved" | "error";
 
 export interface PlanningActionItemDraft {
   necessity: ActionItemNecessity;
@@ -113,6 +114,10 @@ function toDraft(
 }
 
 interface PlanningState {
+  briefSaveStatus: BriefSaveStatus;
+  briefSaveErrorMessage: string | null;
+  briefRevision: number;
+  resultPlanningBrief: ProjectPlanningBrief | null;
   expectedLatestResultId: string | null;
   versionConflict: "edit" | "restore" | null;
   conflictLatestResultId: string | null;
@@ -180,7 +185,14 @@ interface PlanningState {
   setSelectedModel: (value: string) => void;
 }
 
-export const usePlanningStore = create<PlanningState>((set, get) => ({
+export const usePlanningStore = create<PlanningState>((set, get) => {
+  // Keep writes ordered when the user types while a previous save is in flight.
+  let briefSaveQueue = Promise.resolve();
+  return ({
+  briefSaveStatus: "idle",
+  briefSaveErrorMessage: null,
+  briefRevision: 0,
+  resultPlanningBrief: null,
   expectedLatestResultId: null,
   versionConflict: null,
   conflictLatestResultId: null,
@@ -283,6 +295,11 @@ export const usePlanningStore = create<PlanningState>((set, get) => ({
 
       set({
         planningResult: result,
+        resultPlanningBrief: {
+          requirement: request.requirement,
+          brief: request.brief!,
+          selectedModel: request.options?.model ?? null,
+        },
         graphEditErrorMessage: null,
         graphEditStatus: "idle",
         projects: get().projects.map((item) =>
@@ -386,6 +403,10 @@ export const usePlanningStore = create<PlanningState>((set, get) => ({
   },
   resetToEmpty() {
     set({
+      briefSaveStatus: "dirty",
+      briefSaveErrorMessage: null,
+      briefRevision: get().briefRevision + 1,
+      resultPlanningBrief: null,
       expectedLatestResultId: null,
       versionConflict: null,
       conflictLatestResultId: null,
@@ -424,6 +445,10 @@ export const usePlanningStore = create<PlanningState>((set, get) => ({
         versionConflict: null,
         conflictLatestResultId: null,
         isViewingHistoricalResult: false,
+        briefSaveStatus: "saved",
+        briefSaveErrorMessage: null,
+        briefRevision: get().briefRevision + 1,
+        resultPlanningBrief: restored.planningBrief,
         planningBrief: toDraft(restored.planningBrief),
         planningResult: restored.result,
         graphEditErrorMessage: null,
@@ -467,23 +492,26 @@ export const usePlanningStore = create<PlanningState>((set, get) => ({
     ) {
       return;
     }
-    try {
-      await saveProjectPlanningBrief(
-        state.selectedProjectId,
-        toPersistedBrief(
-          state.requirementText,
-          state.planningBrief,
-          state.selectedModel,
-        ),
-      );
-    } catch (error) {
-      set({
-        projectErrorMessage:
-          error instanceof Error
-            ? error.message
-            : "계획 입력을 저장하지 못했습니다.",
-      });
-    }
+    const isCurrent = () => get().selectedProjectId === state.selectedProjectId
+      && get().briefRevision === state.briefRevision
+      && !get().isViewingHistoricalResult;
+    briefSaveQueue = briefSaveQueue.then(async () => {
+      if (!isCurrent()) return;
+      set({ briefSaveStatus: "saving", briefSaveErrorMessage: null });
+      try {
+        await saveProjectPlanningBrief(
+          state.selectedProjectId!,
+          toPersistedBrief(state.requirementText, state.planningBrief, state.selectedModel),
+        );
+        if (isCurrent()) set({ briefSaveStatus: "saved" });
+      } catch (error) {
+        if (isCurrent()) set({
+          briefSaveStatus: "error",
+          briefSaveErrorMessage: error instanceof Error ? error.message : "계획 입력을 저장하지 못했습니다.",
+        });
+      }
+    });
+    await briefSaveQueue;
   },
   async saveGraphEdits() {
     const state = get();
@@ -538,6 +566,10 @@ export const usePlanningStore = create<PlanningState>((set, get) => ({
       return;
     }
     set({
+      briefSaveStatus: "idle",
+      briefSaveErrorMessage: null,
+      briefRevision: get().briefRevision + 1,
+      resultPlanningBrief: null,
       expectedLatestResultId: null,
       versionConflict: null,
       conflictLatestResultId: null,
@@ -567,6 +599,11 @@ export const usePlanningStore = create<PlanningState>((set, get) => ({
       const result = history[0] && (!loadedResult || (loadedResult.metadata.resultId && loadedResult.metadata.resultId !== history[0].id))
         ? await getPlanningResult(projectId, history[0].id)
         : loadedResult;
+      const resultId = result?.metadata.resultId ?? history[0]?.id;
+      // A missing legacy snapshot must not prevent viewing an existing result.
+      const resultBrief = resultId
+        ? await getPlanningResultBrief(projectId, resultId).catch(() => null)
+        : null;
       const resultModel = result?.metadata.model;
       const persistedModel = persistedBrief?.selectedModel;
       const restorableModel =
@@ -579,6 +616,8 @@ export const usePlanningStore = create<PlanningState>((set, get) => ({
         planningBrief: toDraft(persistedBrief),
         planningHistory: history,
         planningResult: result,
+        resultPlanningBrief: resultBrief,
+        briefSaveStatus: persistedBrief ? "saved" : "idle",
         historyStatus: "ready",
         projectStatus: "ready",
         requirementText:
@@ -604,7 +643,8 @@ export const usePlanningStore = create<PlanningState>((set, get) => ({
     if (!projectId || !resultId) {
       return;
     }
-    set({ errorMessage: null, selectedNodeId: null, status: "loading" });
+    set({ errorMessage: null, selectedNodeId: null, status: "loading",
+      briefSaveStatus: "idle", briefSaveErrorMessage: null, briefRevision: get().briefRevision + 1 });
     try {
       const [result, historicalBrief] = await Promise.all([
         getPlanningResult(projectId, resultId),
@@ -623,6 +663,8 @@ export const usePlanningStore = create<PlanningState>((set, get) => ({
           ? toDraft(historicalBrief)
           : initialPlanningBrief,
         planningResult: result,
+        resultPlanningBrief: historicalBrief,
+        briefSaveStatus: "idle",
         requirementText:
           historicalBrief?.requirement ?? result.requirement?.content ?? "",
         selectedModel:
@@ -865,17 +907,43 @@ export const usePlanningStore = create<PlanningState>((set, get) => ({
   },
   setPlanningBriefField(field, value) {
     set((state) => ({
+      briefSaveStatus: "dirty",
+      briefSaveErrorMessage: null,
+      briefRevision: state.briefRevision + 1,
       isViewingHistoricalResult: false,
       planningBrief: { ...state.planningBrief, [field]: value },
     }));
   },
   setRequirementText(value) {
-    set({ isViewingHistoricalResult: false, requirementText: value });
+    set({ isViewingHistoricalResult: false, requirementText: value,
+      briefSaveStatus: "dirty", briefSaveErrorMessage: null, briefRevision: get().briefRevision + 1 });
   },
   setSelectedModel(value) {
-    set({ isViewingHistoricalResult: false, selectedModel: value });
+    set({ isViewingHistoricalResult: false, selectedModel: value,
+      briefSaveStatus: "dirty", briefSaveErrorMessage: null, briefRevision: get().briefRevision + 1 });
   },
-}));
+});
+});
+
+export function hasUnappliedInput(state: Pick<PlanningState,
+  "planningResult" | "resultPlanningBrief" | "requirementText" | "planningBrief" | "selectedModel"
+>): boolean {
+  const source = state.resultPlanningBrief;
+  if (!state.planningResult || !source) return false;
+  const normalize = (input: ProjectPlanningBrief) => JSON.stringify({
+    requirement: input.requirement.trim(),
+    context: trimList(input.brief.context),
+    actionItems: input.brief.actionItems.filter((item) => item.title.trim()).map((item) => ({
+      necessity: item.necessity, title: item.title.trim(),
+    })),
+    constraints: input.brief.constraints?.trim() ?? "",
+    planType: input.brief.planType,
+    successCriterion: input.brief.successCriterion,
+    model: input.selectedModel,
+  });
+  return normalize(toPersistedBrief(state.requirementText, state.planningBrief, state.selectedModel))
+    !== normalize({ ...source, selectedModel: source.selectedModel ?? state.planningResult.metadata.model ?? null });
+}
 
 export function getSelectedNode(
   result: PlanningResult | null,

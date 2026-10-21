@@ -4,6 +4,8 @@ import { useRef } from "react";
 import type { ComponentNode, RoadmapStep } from "@ai-planning-platform/shared";
 import { effortLabels, priorityLabels } from "../lib/planningLabels";
 import type { PlanningStatus } from "../store/planningStore";
+import { WorkspaceIcon } from "./WorkspaceIcon";
+import { ResultSaveButton } from "./ResultSaveButton";
 
 interface RoadmapPanelProps {
   saveBlocked?: boolean;
@@ -53,19 +55,12 @@ export function RoadmapPanel({
         <h2 className="roadmap__title">로드맵</h2>
         <div className="roadmap__actions">
           <span className="pill">{sortedRoadmap.length}단계</span>
-          <button className="button roadmap__save" type="button" disabled={status !== "ready" || editStatus === "saving"}
+          <button className="button roadmap__save" type="button" aria-label="단계 추가" title="단계 추가" disabled={status !== "ready" || editStatus === "saving"}
             onClick={() => {
               onAdd();
               requestAnimationFrame(() => stepsRef.current?.lastElementChild?.scrollIntoView?.({ block: "nearest", inline: "end" }));
-            }}>단계 추가</button>
-          <button
-            className="button button--primary roadmap__save"
-            disabled={!canSave}
-            type="button"
-            onClick={() => void onSave()}
-          >
-            {editStatus === "saving" ? "저장 중" : "로드맵 새 버전 저장"}
-          </button>
+            }}><WorkspaceIcon name="plus" />단계</button>
+          <ResultSaveButton className="roadmap__save" disabled={!canSave} saving={editStatus === "saving"} onSave={onSave} />
         </div>
       </div>
 
@@ -102,11 +97,11 @@ export function RoadmapPanel({
                 <div className="roadmap-step__move-actions">
                   <button aria-label={`${step.title} 앞으로 이동`} disabled={index === 0} type="button" onClick={() => onMove(step.id, -1)}>←</button>
                   <button aria-label={`${step.title} 뒤로 이동`} disabled={index === sortedRoadmap.length - 1} type="button" onClick={() => onMove(step.id, 1)}>→</button>
-                  <button className="graph-delete" aria-label={`${step.title} 단계 삭제`} type="button" onClick={() => onDelete(step.id)}>삭제</button>
+                  <button className="graph-delete" aria-label={`${step.title} 단계 삭제`} title="단계 삭제" type="button" onClick={() => onDelete(step.id)}><WorkspaceIcon name="trash" /></button>
                 </div>
               </div>
               <label className="form-field">
-                <span className="form-field__label">단계 제목</span>
+                <span className="sr-only">단계 제목</span>
                 <input aria-label={`${step.order}단계 제목`} value={step.title} onChange={(event) => onChange(step.id, { title: event.target.value })} />
               </label>
               <details className="roadmap-step__references">
@@ -140,7 +135,7 @@ export function RoadmapPanel({
                 </fieldset>
               </details>
               <label className="form-field">
-                <span className="form-field__label">단계 설명</span>
+                <span className="sr-only">단계 설명</span>
                 <textarea aria-label={`${step.order}단계 설명`} value={step.description} onChange={(event) => onChange(step.id, { description: event.target.value })} />
               </label>
               <div className="roadmap-step__attributes">

@@ -9,14 +9,15 @@ async function readJson(request: APIRequestContext, path: string) {
   return response.json();
 }
 
-async function saveEdit(page: Page, buttonName: string) {
+async function saveEdit(page: Page, region: string) {
+  const button = page.locator(region).getByRole("button", { name: "변경 내용을 새 버전으로 저장", exact: true });
   const responsePromise = page.waitForResponse(
     (response) => response.url().endsWith("/edit") && response.request().method() === "POST",
   );
-  await page.getByRole("button", { name: buttonName, exact: true }).click();
+  await button.click();
   const response = await responsePromise;
   expect(response.ok()).toBeTruthy();
-  await expect(page.getByRole("button", { name: buttonName, exact: true })).toBeDisabled();
+  await expect(button).toBeDisabled();
   return response.json();
 }
 
@@ -67,7 +68,7 @@ test("Graph and Roadmap edits persist as new versions through browser reload", a
     await page.mouse.down();
     await page.mouse.move(box!.x + box!.width / 2 + 70, box!.y + 65, { steps: 12 });
     await page.mouse.up();
-    graphResult = await saveEdit(page, "편집본 새 버전 저장");
+    graphResult = await saveEdit(page, ".detail-drawer");
     const editedNode = graphResult.nodes.find((item: any) => item.id === nodeId);
     expect(editedNode).toMatchObject({
       label: "브라우저 E2E 노드", description: "브라우저에서 수정한 설명",
@@ -96,14 +97,14 @@ test("Graph and Roadmap edits persist as new versions through browser reload", a
     await roadmap.getByRole("button", { name: `${original.roadmap[0].title} 뒤로 이동`, exact: true }).click();
     await expect(roadmap.getByRole("alert")).toHaveText("선행 단계보다 앞이나 같은 위치로 이동할 수 없습니다.");
     await expect(page.getByLabel("1단계 제목", { exact: true })).toHaveValue(original.roadmap[0].title);
-    await expect(page.getByRole("button", { name: "로드맵 새 버전 저장", exact: true })).toBeDisabled();
+    await expect(roadmap.getByRole("button", { name: "변경 내용을 새 버전으로 저장", exact: true })).toBeDisabled();
     await roadmap.getByRole("button", { name: `${original.roadmap[1].title} 뒤로 이동`, exact: true }).click();
     await expect(page.getByLabel("2단계 제목", { exact: true })).toHaveValue(original.roadmap[2].title);
     await page.getByLabel("1단계 제목", { exact: true }).fill("브라우저 E2E 단계");
     await page.getByLabel("1단계 설명", { exact: true }).fill("브라우저에서 수정한 단계 설명");
     await page.getByLabel("1단계 우선순위", { exact: true }).selectOption("low");
     await page.getByLabel("1단계 예상 작업량", { exact: true }).selectOption("large");
-    roadmapResult = await saveEdit(page, "로드맵 새 버전 저장");
+    roadmapResult = await saveEdit(page, ".roadmap");
     expect(roadmapResult.metadata.editedFromResultId).toBe(graphVersion);
     expect(roadmapResult.nodes).toEqual(graphResult.nodes);
     expect(roadmapResult.roadmap[0]).toMatchObject({
@@ -127,7 +128,7 @@ test("Graph and Roadmap edits persist as new versions through browser reload", a
     await node.click();
     await page.getByLabel("Node 이름", { exact: true }).fill("동시 편집 노드");
     await page.getByLabel("1단계 제목", { exact: true }).fill("동시 편집 단계");
-    combinedResult = await saveEdit(page, "로드맵 새 버전 저장");
+    combinedResult = await saveEdit(page, ".roadmap");
     await expect(version.locator("option")).toHaveCount(4);
     await reloadProject();
     await node.click();

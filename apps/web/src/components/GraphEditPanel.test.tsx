@@ -12,7 +12,7 @@ describe("GraphEditPanel", () => {
       disabled={false} canSave errorMessage={null} onAddNode={vi.fn()} onSave={onSave} />);
     await user.selectOptions(screen.getByLabelText("새 연결 유형"), "feeds");
     expect(onConnectionTypeChange).toHaveBeenCalledWith("feeds");
-    await user.click(screen.getByRole("button", { name: "그래프 새 버전 저장" }));
+    await user.click(screen.getByRole("button", { name: "변경 내용을 새 버전으로 저장" }));
     expect(onSave).toHaveBeenCalledOnce();
   });
 });

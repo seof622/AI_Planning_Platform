@@ -33,7 +33,7 @@ describe("NodeDetailPanel", () => {
     await user.clear(screen.getByLabelText("Node 이름"));
     await user.type(screen.getByLabelText("Node 이름"), "편집된 API");
     await user.selectOptions(screen.getByLabelText("Node 우선순위"), "medium");
-    await user.click(screen.getByRole("button", { name: "편집본 새 버전 저장" }));
+    await user.click(screen.getByRole("button", { name: "변경 내용을 새 버전으로 저장" }));
 
     expect(onChange).toHaveBeenCalledWith({ label: "" });
     expect(onChange).toHaveBeenCalledWith({ priority: "medium" });

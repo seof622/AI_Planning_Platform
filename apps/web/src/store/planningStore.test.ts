@@ -3,7 +3,7 @@ import type {
   Project,
 } from "@ai-planning-platform/shared";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { usePlanningStore } from "./planningStore";
+import { hasUnappliedInput, usePlanningStore } from "./planningStore";
 import { validatePlanningResult, mockPlanningResult } from "@ai-planning-platform/shared";
 
 const project: Project = {
@@ -136,7 +136,8 @@ describe("planningStore", () => {
       .mockResolvedValueOnce(jsonResponse([project]))
       .mockResolvedValueOnce(jsonResponse(planningResult))
       .mockResolvedValueOnce(jsonResponse(persistedBrief))
-      .mockResolvedValueOnce(jsonResponse(planningHistory));
+      .mockResolvedValueOnce(jsonResponse(planningHistory))
+      .mockResolvedValueOnce(jsonResponse(persistedBrief));
 
     await usePlanningStore.getState().loadProjects();
 
@@ -150,6 +151,8 @@ describe("planningStore", () => {
     expect(state.selectedPlanningResultId).toBe("planning-result-latest");
     expect(state.selectedModel).toBe("gpt-5.6-luna");
     expect(state.status).toBe("ready");
+    expect(state.briefSaveStatus).toBe("saved");
+    expect(hasUnappliedInput(state)).toBe(false);
   });
 
   it("saves the current planning brief for the selected project", async () => {
@@ -176,6 +179,81 @@ describe("planningStore", () => {
     );
     expect(init?.method).toBe("PUT");
     expect(JSON.parse(String(init?.body))).toEqual(persistedBrief);
+    expect(usePlanningStore.getState().briefSaveStatus).toBe("saved");
+  });
+
+  it("reports autosave failure separately and clears it on retry", async () => {
+    usePlanningStore.setState({ selectedProjectId: project.id, projectStatus: "ready" });
+    usePlanningStore.getState().setRequirementText("Changed input");
+    vi.mocked(fetch).mockResolvedValueOnce(jsonResponse({ detail: "Save unavailable" }, 503));
+    await usePlanningStore.getState().saveCurrentPlanningBrief();
+    expect(usePlanningStore.getState()).toMatchObject({
+      briefSaveStatus: "error", briefSaveErrorMessage: "Save unavailable", projectErrorMessage: null,
+      requirementText: "Changed input",
+    });
+    vi.mocked(fetch).mockResolvedValueOnce(jsonResponse(persistedBrief));
+    await usePlanningStore.getState().saveCurrentPlanningBrief();
+    expect(usePlanningStore.getState()).toMatchObject({ briefSaveStatus: "saved", briefSaveErrorMessage: null });
+  });
+
+  it("orders autosaves and does not acknowledge newer input with an older response", async () => {
+    usePlanningStore.setState({ selectedProjectId: project.id, projectStatus: "ready" });
+    usePlanningStore.getState().setRequirementText("First input");
+    let finishFirst!: (response: Response) => void;
+    vi.mocked(fetch).mockImplementationOnce(() => new Promise((resolve) => { finishFirst = resolve; }))
+      .mockResolvedValueOnce(jsonResponse(persistedBrief));
+    const first = usePlanningStore.getState().saveCurrentPlanningBrief();
+    await vi.waitFor(() => expect(usePlanningStore.getState().briefSaveStatus).toBe("saving"));
+    usePlanningStore.getState().setRequirementText("Newer input");
+    const second = usePlanningStore.getState().saveCurrentPlanningBrief();
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(usePlanningStore.getState().briefSaveStatus).toBe("dirty");
+    finishFirst(jsonResponse(persistedBrief));
+    await Promise.all([first, second]);
+    expect(JSON.parse(String(vi.mocked(fetch).mock.calls[1]![1]?.body)).requirement).toBe("Newer input");
+    expect(usePlanningStore.getState().briefSaveStatus).toBe("saved");
+  });
+
+  it("ignores autosave errors from a previously selected project", async () => {
+    usePlanningStore.setState({ selectedProjectId: project.id, projectStatus: "ready" });
+    let finish!: (response: Response) => void;
+    vi.mocked(fetch).mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
+    const saving = usePlanningStore.getState().saveCurrentPlanningBrief();
+    await vi.waitFor(() => expect(usePlanningStore.getState().briefSaveStatus).toBe("saving"));
+    usePlanningStore.setState({ selectedProjectId: "another-project", briefSaveStatus: "idle" });
+    finish(jsonResponse({ detail: "Old request failed" }, 503));
+    await saving;
+    expect(usePlanningStore.getState()).toMatchObject({ briefSaveStatus: "idle", briefSaveErrorMessage: null });
+  });
+
+  it("compares input with the result snapshot independently of draft and result edit saves", async () => {
+    usePlanningStore.setState({
+      selectedProjectId: project.id, projectStatus: "ready", planningResult,
+      resultPlanningBrief: persistedBrief, requirementText: persistedBrief.requirement,
+      selectedModel: persistedBrief.selectedModel,
+      planningBrief: { ...persistedBrief.brief, actionItems: [{ necessity: "required", text: "Implement tests" }] },
+    });
+    expect(hasUnappliedInput(usePlanningStore.getState())).toBe(false);
+    usePlanningStore.getState().setRequirementText("Changed input");
+    vi.mocked(fetch).mockResolvedValueOnce(jsonResponse(persistedBrief));
+    await usePlanningStore.getState().saveCurrentPlanningBrief();
+    expect(hasUnappliedInput(usePlanningStore.getState())).toBe(true);
+    usePlanningStore.getState().setRequirementText("  Build a test plan  ");
+    usePlanningStore.getState().setPlanningBriefField("context", ["Web application", "  "]);
+    expect(hasUnappliedInput(usePlanningStore.getState())).toBe(false);
+    usePlanningStore.getState().setSelectedModel("gpt-5-mini");
+    expect(hasUnappliedInput(usePlanningStore.getState())).toBe(true);
+  });
+
+  it("detects an unapplied persisted draft after loading the project again", async () => {
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(jsonResponse(planningResult))
+      .mockResolvedValueOnce(jsonResponse({ ...persistedBrief, requirement: "New draft" }))
+      .mockResolvedValueOnce(jsonResponse(planningHistory))
+      .mockResolvedValueOnce(jsonResponse(persistedBrief));
+    await usePlanningStore.getState().selectProject(project.id);
+    expect(usePlanningStore.getState().briefSaveStatus).toBe("saved");
+    expect(hasUnappliedInput(usePlanningStore.getState())).toBe(true);
   });
 
   it("sends the selected model through the project generation request", async () => {

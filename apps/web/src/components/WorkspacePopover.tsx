@@ -1,16 +1,18 @@
 "use client";
 
 import { useEffect, useRef, type ReactNode } from "react";
+import { WorkspaceIcon } from "./WorkspaceIcon";
 
 interface WorkspacePopoverProps {
   label: string;
+  trigger?: ReactNode;
   children: ReactNode;
   className?: string;
   openOn?: string | null;
   closeOn?: string | null;
 }
 
-export function WorkspacePopover({ label, children, className = "", openOn, closeOn }: WorkspacePopoverProps) {
+export function WorkspacePopover({ label, trigger, children, className = "", openOn, closeOn }: WorkspacePopoverProps) {
   const ref = useRef<HTMLDetailsElement>(null);
   useEffect(() => {
     if (closeOn && ref.current) ref.current.open = false;
@@ -39,11 +41,11 @@ export function WorkspacePopover({ label, children, className = "", openOn, clos
   }, []);
   return (
     <details className={`workspace-popover ${className}`} ref={ref}>
-      <summary className="button">{label}</summary>
+      <summary className={`button${trigger ? " button--icon" : ""}`} aria-label={label} title={label}>{trigger ?? label}</summary>
       <div className="workspace-popover__content">
         <div className="workspace-popover__heading"><strong>{label}</strong><button type="button" aria-label={`${label} 닫기`} onClick={() => {
           if (ref.current) { ref.current.open = false; ref.current.querySelector("summary")?.focus(); }
-        }}>닫기</button></div>
+        }}><WorkspaceIcon name="close" /></button></div>
         {children}
       </div>
     </details>

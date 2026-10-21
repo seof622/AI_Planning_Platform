@@ -47,7 +47,7 @@ test("downloads saved, edited and historical plans without saving or restoring a
   const edited = await downloadText("나의 계획-계획-v2-편집중.md");
   expect(edited).toContain("저장 전 노드 수정");
   expect(edited).toContain("저장 전 편집 포함");
-  await expect(page.getByText("저장하지 않은 변경", { exact: true })).toBeVisible();
+  await expect(page.locator(".workspace__save-state")).toHaveAttribute("aria-label", "결과 편집 미저장");
   await expect(page.getByLabel("계획 버전").locator("option")).toHaveCount(2);
 
   page.once("dialog", (dialog) => dialog.accept());

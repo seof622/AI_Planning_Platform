@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { DependencyType } from "@ai-planning-platform/shared";
-import { getSelectedNode, usePlanningStore } from "../store/planningStore";
+import { getSelectedNode, hasUnappliedInput, usePlanningStore } from "../store/planningStore";
 import { NodeDetailPanel } from "./NodeDetailPanel";
 import { PlanningCanvas } from "./PlanningCanvas";
 import { PlanningHistoryPanel } from "./PlanningHistoryPanel";
@@ -12,6 +12,7 @@ import { RoadmapPanel } from "./RoadmapPanel";
 import { GraphEditPanel } from "./GraphEditPanel";
 import { PlanningExportPanel } from "./PlanningExportPanel";
 import { versionLabel } from "../lib/planningVersions";
+import { WorkspaceIcon } from "./WorkspaceIcon";
 
 const statusLabels = {
   empty: "비어 있음",
@@ -24,6 +25,8 @@ const statusLabels = {
 export function PlanningWorkspace() {
   const [connectionType, setConnectionType] = useState<DependencyType>("requires");
   const {
+    briefSaveStatus,
+    briefSaveErrorMessage,
     addNode,
     removeNode,
     addEdge,
@@ -48,6 +51,7 @@ export function PlanningWorkspace() {
     planningBrief,
     planningHistory,
     planningResult,
+    resultPlanningBrief,
     projectErrorMessage,
     projects,
     projectStatus,
@@ -79,6 +83,12 @@ export function PlanningWorkspace() {
   const selectedNode = getSelectedNode(planningResult, selectedNodeId);
   const hasUnsavedEdits = graphEditStatus !== "idle";
   const isBusy = status === "loading" || graphEditStatus === "saving";
+  const inputNeedsGeneration = hasUnappliedInput({
+    planningResult, resultPlanningBrief, requirementText, planningBrief, selectedModel,
+  });
+  const resultSaveLabel = graphEditStatus === "saving" ? "결과 편집 저장 중…"
+    : graphEditStatus === "error" ? "결과 편집 저장 실패"
+    : hasUnsavedEdits ? "결과 편집 미저장" : "결과 편집 저장됨";
   function confirmDiscardEdits(): boolean {
     return !hasUnsavedEdits || window.confirm("미저장 편집이 있습니다. 변경 내용을 버리고 이동할까요?");
   }
@@ -101,7 +111,8 @@ export function PlanningWorkspace() {
     if (
       !selectedProjectId ||
       projectStatus !== "ready" ||
-      isViewingHistoricalResult
+      isViewingHistoricalResult ||
+      briefSaveStatus !== "dirty"
     ) {
       return;
     }
@@ -111,6 +122,7 @@ export function PlanningWorkspace() {
     return () => window.clearTimeout(timeoutId);
   }, [
     planningBrief,
+    briefSaveStatus,
     isViewingHistoricalResult,
     projectStatus,
     requirementText,
@@ -126,7 +138,7 @@ export function PlanningWorkspace() {
           <span className="workspace__brand-mark" aria-hidden="true">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M6 6h12M6 6v12m0 0h12" stroke="currentColor" strokeWidth="1.5"/><rect x="3" y="3" width="6" height="6" rx="2" fill="currentColor"/><rect x="15" y="3" width="6" height="6" rx="2" fill="currentColor"/><rect x="3" y="15" width="6" height="6" rx="2" fill="currentColor"/><rect x="15" y="15" width="6" height="6" rx="2" fill="currentColor"/></svg>
           </span>
-          <div><h1>플랜노트</h1><span>생각에서 실행까지</span></div>
+          <div><h1>플랜노트</h1></div>
         </div>
         <ProjectPanel
           errorMessage={projectErrorMessage}
@@ -137,8 +149,11 @@ export function PlanningWorkspace() {
           selectedProjectId={selectedProjectId}
         />
         <div className="workspace__header-status">
-          {planningResult ? <span className={`workspace__save-state${hasUnsavedEdits ? " workspace__save-state--dirty" : ""}`}>{graphEditStatus === "saving" ? "저장 중…" : hasUnsavedEdits ? "저장하지 않은 변경" : "저장된 상태"}</span> : null}
-          <span className={`workspace__status workspace__status--${status}`}><span aria-hidden="true" />{statusLabels[status]}</span>
+          {planningResult ? <span role="status" aria-label={resultSaveLabel} title={resultSaveLabel} className={`workspace__save-state${hasUnsavedEdits ? " workspace__save-state--dirty" : ""}`}>
+            <WorkspaceIcon name={graphEditStatus === "saving" ? "refresh" : graphEditStatus === "error" ? "alert" : hasUnsavedEdits ? "circle" : "check"} />
+            <span aria-hidden="true">{graphEditStatus === "saving" ? "저장 중" : graphEditStatus === "error" ? "저장 실패" : hasUnsavedEdits ? "미저장" : "저장됨"}</span>
+          </span> : null}
+          {status !== "ready" ? <span className={`workspace__status workspace__status--${status}`}><span aria-hidden="true" />{statusLabels[status]}</span> : null}
         </div>
       </header>
       <div className="workspace__toolbar" aria-label="계획 작업 도구">
@@ -167,6 +182,12 @@ export function PlanningWorkspace() {
       <div className="workspace__body">
         <div className="workspace__sidebar">
           <RequirementPanel
+            briefSaveStatus={briefSaveStatus}
+            briefSaveErrorMessage={briefSaveErrorMessage}
+            onRetryBriefSave={saveCurrentPlanningBrief}
+            hasResult={planningResult !== null}
+            hasUnappliedInput={inputNeedsGeneration}
+            isViewingHistoricalResult={isViewingHistoricalResult}
             generatedModel={planningResult?.metadata.model}
             hasSelectedProject={selectedProjectId !== null}
             isLoading={isBusy}

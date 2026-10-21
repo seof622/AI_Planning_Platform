@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { mockPlanningResult } from "@ai-planning-platform/shared";
+import type { ProjectPlanningBrief } from "@ai-planning-platform/shared";
 
 // Layout checks use a fixture so they do not create or modify personal projects.
 test.beforeEach(async ({ page }) => {
@@ -27,6 +28,9 @@ test("desktop workspace fits the viewport and keeps canvas, roadmap and inspecto
   await expect(page.locator(".workspace__header").getByLabel("프로젝트", { exact: true })).toBeVisible();
   await expect(page.locator(".workspace__toolbar").getByLabel("계획 버전", { exact: true })).toBeVisible();
   await expect(page.locator(".workspace__toolbar").getByRole("button", { name: "Markdown 내보내기" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Markdown 내보내기", exact: true })).toHaveText("");
+  await expect(page.locator(".history-panel__details > summary")).toHaveAccessibleName("버전 정보·비교");
+  await expect(page.locator(".history-panel__details > summary")).toHaveText("");
   await expect(page.locator(".canvas-shell").getByRole("button", { name: "노드 추가", exact: true })).toBeVisible();
   await expect(page.locator(".workspace__sidebar > *")).toHaveCount(1);
   await expect(page.locator(".workspace__sidebar").getByRole("heading", { name: "계획 입력" })).toBeVisible();
@@ -87,7 +91,7 @@ test("desktop workspace fits the viewport and keeps canvas, roadmap and inspecto
   await expect(page.locator(".brief-options > summary")).toContainText("제약 있음");
   await page.locator(".brief-options > summary").click();
   await expect(page.getByLabel("제약 조건", { exact: true })).toHaveValue("주말에만 진행");
-  const generate = page.getByRole("button", { name: "계획 생성", exact: true });
+  const generate = page.getByRole("button", { name: "새 버전으로 다시 생성", exact: true });
   const beforeScroll = await generate.boundingBox();
   await page.locator(".requirement-form__body").evaluate((body) => { body.scrollTop = body.scrollHeight; });
   expect(await generate.boundingBox()).toEqual(beforeScroll);
@@ -100,6 +104,7 @@ test("mobile workspace has no horizontal overflow and keeps editor controls usab
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
   await expect(page.getByRole("button", { name: "노드 추가", exact: true })).toBeEnabled();
+  await expect(page.locator(".workspace__save-state")).toBeVisible();
   await page.locator(".project-panel__new > summary").click();
   const createBounds = await page.locator(".project-panel__new .workspace-popover__content").boundingBox();
   expect(createBounds!.x).toBeGreaterThanOrEqual(0);
@@ -129,12 +134,60 @@ test("compact desktop keeps the toolbar and generation action inside the workspa
   const bounds = await page.evaluate(() => ({ width: document.documentElement.scrollWidth, height: document.documentElement.scrollHeight }));
   expect(bounds.width).toBeLessThanOrEqual(1024);
   expect(bounds.height).toBeLessThanOrEqual(768);
-  const generate = await page.getByRole("button", { name: "계획 생성", exact: true }).boundingBox();
+  const generate = await page.getByRole("button", { name: "새 버전으로 다시 생성", exact: true }).boundingBox();
   expect(generate!.y + generate!.height).toBeLessThanOrEqual(768);
   const toolbar = page.locator(".graph-edit-panel");
-  await expect(toolbar.getByRole("button", { name: "그래프 새 버전 저장", exact: true })).toBeVisible();
+  await expect(toolbar.getByRole("button", { name: "변경 내용을 새 버전으로 저장", exact: true })).toBeVisible();
   await toolbar.locator(".graph-edit-panel__help > summary").click();
+  await expect(page.getByText("저장은 노드·연결·로드맵 편집 전체를 새 버전으로 기록합니다. 입력 초안은 별도로 자동 저장됩니다.")).toBeVisible();
   await expect(page.getByRole("button", { name: "연결 도움말 닫기", exact: true })).toBeInViewport();
   await page.getByRole("button", { name: "연결 도움말 닫기", exact: true }).click();
   await testInfo.attach("workspace-compact-desktop", { body: await page.screenshot({ fullPage: true }), contentType: "image/png" });
+});
+
+test("draft retry, unapplied inputs and the full result save scope remain distinct", async ({ page }, testInfo) => {
+  let savedBrief: ProjectPlanningBrief | null = null;
+  let shouldFail = true;
+  await page.route("http://localhost:8000/projects/**/planning-brief", async (route) => {
+    if (route.request().method() === "PUT") {
+      if (shouldFail) {
+        shouldFail = false;
+        await route.fulfill({ status: 503, json: { detail: "초안 저장 연결 실패" } });
+      } else {
+        savedBrief = route.request().postDataJSON();
+        await route.fulfill({ json: savedBrief });
+      }
+    } else if (savedBrief && !new URL(route.request().url()).pathname.includes("/planning-results/")) {
+      await route.fulfill({ json: savedBrief });
+    } else await route.fallback();
+  });
+  await page.goto("/");
+  await expect(page.locator(".react-flow__node").first()).toBeVisible();
+  const generate = page.getByRole("button", { name: "새 버전으로 다시 생성", exact: true });
+  await expect(generate).toBeDisabled();
+  await expect(generate).toHaveAccessibleDescription(/해야 할 일을 1개 이상 입력해 주세요/);
+  await page.getByLabel("계획 요구사항", { exact: true }).fill("입력을 바꾼 계획");
+  await expect(page.getByText("입력 변경됨", { exact: true })).toBeVisible();
+  await expect(page.getByLabel("입력 초안 저장 상태")).toContainText("입력 초안 자동 저장 실패");
+  await expect(page.locator(".workspace__save-state")).toHaveAttribute("aria-label", "결과 편집 저장됨");
+  await page.getByRole("button", { name: "입력 초안 저장 재시도", exact: true }).click();
+  await expect(page.getByLabel("입력 초안 저장 상태")).toContainText("입력 초안 자동 저장됨");
+  await page.reload();
+  await expect(page.getByLabel("계획 요구사항", { exact: true })).toHaveValue("입력을 바꾼 계획");
+  await expect(page.getByText("입력 변경됨", { exact: true })).toBeVisible();
+  await page.getByLabel("해야 할 일 1", { exact: true }).fill("첫 단계 준비");
+  await expect(generate).toBeEnabled();
+  await page.locator(".react-flow__node").first().click();
+  await page.getByLabel("Node 이름", { exact: true }).fill("결과 노드 수정");
+  await page.getByLabel("1단계 제목", { exact: true }).fill("결과 단계 수정");
+  const saves = page.getByRole("button", { name: "변경 내용을 새 버전으로 저장", exact: true });
+  await expect(saves).toHaveCount(3);
+  for (const button of await saves.all()) {
+    await expect(button).toBeEnabled();
+    await expect(button).toHaveAccessibleDescription("노드·연결·로드맵 편집 전체 저장");
+    await expect(button).toHaveText("저장");
+  }
+  await expect(page.locator(".workspace__save-state")).toHaveAttribute("aria-label", "결과 편집 미저장");
+  await expect(page.getByLabel("입력 초안 저장 상태")).toContainText("입력 초안 자동 저장됨");
+  await testInfo.attach("save-generation-guidance", { body: await page.screenshot({ fullPage: true }), contentType: "image/png" });
 });

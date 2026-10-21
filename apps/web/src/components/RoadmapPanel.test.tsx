@@ -56,7 +56,7 @@ describe("RoadmapPanel", () => {
     await user.selectOptions(screen.getByLabelText("1단계 우선순위"), "low");
     await user.selectOptions(screen.getByLabelText("1단계 예상 작업량"), "medium");
     await user.click(screen.getByRole("button", { name: "요구사항 정리 뒤로 이동" }));
-    await user.click(screen.getByRole("button", { name: "로드맵 새 버전 저장" }));
+    await user.click(screen.getByRole("button", { name: "변경 내용을 새 버전으로 저장" }));
 
     expect(onChange).toHaveBeenCalledWith("step-one", { title: "" });
     expect(onChange).toHaveBeenCalledWith("step-one", { priority: "low" });
@@ -90,6 +90,6 @@ describe("RoadmapPanel", () => {
       errorMessage={null} onChange={vi.fn()} onMove={vi.fn()} onSave={vi.fn()} onAdd={vi.fn()} onDelete={vi.fn()} />);
     expect(screen.getByText(/단계가 없습니다/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "단계 추가" })).toBeEnabled();
-    expect(screen.getByRole("button", { name: "로드맵 새 버전 저장" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "변경 내용을 새 버전으로 저장" })).toBeEnabled();
   });
 });

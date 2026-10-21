@@ -18,10 +18,10 @@ test("roadmap structure, dependency ordering, reference cleanup and empty roadma
   }
   async function save() {
     const response = page.waitForResponse((item) => item.url().endsWith("/edit") && item.request().method() === "POST");
-    await panel.getByRole("button", { name: "로드맵 새 버전 저장", exact: true }).click();
+    await panel.getByRole("button", { name: "변경 내용을 새 버전으로 저장", exact: true }).click();
     const saved = await response;
     expect(saved.status()).toBe(200);
-    await expect(panel.getByRole("button", { name: "로드맵 새 버전 저장", exact: true })).toBeDisabled();
+    await expect(panel.getByRole("button", { name: "변경 내용을 새 버전으로 저장", exact: true })).toBeDisabled();
     return saved.json() as Promise<PlanningResult>;
   }
   await open();

@@ -19,7 +19,7 @@ async function openProject(page: Page, id: string) {
 }
 async function clickSave(page: Page, status: number) {
   const saved = page.waitForResponse((response) => response.url().endsWith("/edit") && response.request().method() === "POST");
-  await page.getByRole("button", { name: "편집본 새 버전 저장", exact: true }).click();
+  await page.locator(".detail-drawer").getByRole("button", { name: "변경 내용을 새 버전으로 저장", exact: true }).click();
   expect((await saved).status()).toBe(status);
 }
 
