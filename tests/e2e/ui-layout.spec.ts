@@ -65,16 +65,16 @@ test("desktop workspace fits the viewport and keeps canvas, roadmap and inspecto
   });
   expect(inspectorBounds.graphRight).toBeLessThan(inspectorBounds.inspectorLeft);
   expect(inspectorBounds.inspectorRight).toBeLessThanOrEqual(1440);
-  // All nodes stay within the resized canvas instead of disappearing behind the inspector.
+  // Opening the inspector preserves the current view; explicit fit shows all nodes again.
+  await page.getByRole("button", { name: "전체 보기", exact: true }).click();
   await expect(async () => {
-    const fits = await page.locator(".canvas-shell").evaluate((canvas) => {
+    expect(await page.locator(".react-flow").evaluate((canvas) => {
       const area = canvas.getBoundingClientRect();
       return [...canvas.querySelectorAll(".react-flow__node")].every((node) => {
         const box = node.getBoundingClientRect();
         return box.left >= area.left && box.right <= area.right;
       });
-    });
-    expect(fits).toBe(true);
+    })).toBe(true);
   }).toPass();
 
   // Project creation and version details are available on demand, with keyboard dismissal.

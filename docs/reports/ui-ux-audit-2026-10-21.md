@@ -184,7 +184,8 @@
 - 로딩·실패 복구(항목 3)는 [로딩·복구 보고서](loading-recovery-implementation-report.md)의 범위로 구현했다.
 - 로드맵 읽기 보기와 선택 기반 상세 편집(항목 4)은 [로드맵 읽기 보고서](roadmap-reading-implementation-report.md)의 범위로 구현했다.
 - 그래프·로드맵 집중 보기, 입력 패널 접기와 크기 조절(항목 5)은 [집중 보기·크기 조절 보고서](workspace-focus-resize-implementation-report.md)의 범위로 구현했다.
-- 다음 우선순위는 편집 실행 취소·다시 실행과 캔버스 위치 유지(항목 8)다.
+- 편집 실행 취소·다시 실행과 캔버스 위치 유지(항목 8)는 2026-10-26 [실행 취소·캔버스 위치 보고서](undo-viewport-implementation-report.md)의 범위로 구현했다.
+- 다음 우선순위는 관련 노드·단계 강조와 노드 검색·유형 필터(항목 7)다.
 
 ## 권장 진행 순서
 

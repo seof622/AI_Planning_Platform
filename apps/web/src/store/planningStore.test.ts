@@ -192,6 +192,167 @@ describe("planningStore", () => {
     expect(usePlanningStore.getState().briefSaveStatus).toBe("saved");
   });
 
+  it("groups continuous field typing and returns to the saved state without changing input or version metadata", () => {
+    setLoadedResult();
+    const store = usePlanningStore.getState();
+    store.selectNode("node-test");
+    store.updateNode("node-test", { label: "A" });
+    store.updateNode("node-test", { label: "AB" });
+    store.finishEditGroup();
+    store.updateNode("node-test", { description: "Changed description" });
+    expect(usePlanningStore.getState().editPast).toHaveLength(2);
+    store.setRequirementText("Keep this input");
+    store.undoEdit();
+    expect(usePlanningStore.getState().planningResult?.nodes[0]).toMatchObject({ label: "AB", description: "Test node" });
+    store.undoEdit();
+    expect(usePlanningStore.getState()).toMatchObject({ graphEditStatus: "idle", requirementText: "Keep this input",
+      selectedPlanningResultId: "planning-result-latest", selectedNodeId: "node-test" });
+    store.redoEdit();
+    store.redoEdit();
+    expect(usePlanningStore.getState().planningResult?.nodes[0]).toMatchObject({ label: "AB", description: "Changed description" });
+    expect(usePlanningStore.getState().graphEditStatus).toBe("dirty");
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("undoes node deletion together with its edges and roadmap references", () => {
+    const original = structuredClone(mockPlanningResult);
+    usePlanningStore.setState({ planningResult: original, status: "ready" });
+    const store = usePlanningStore.getState();
+    const id = original.nodes[0]!.id;
+    store.selectNode(id);
+    store.removeNode(id);
+    expect(usePlanningStore.getState().planningResult?.edges.some((edge) => edge.source === id || edge.target === id)).toBe(false);
+    store.undoEdit();
+    expect(usePlanningStore.getState().planningResult).toEqual(original);
+    expect(usePlanningStore.getState().selectedNodeId).toBe(id);
+    store.redoEdit();
+    expect(usePlanningStore.getState().planningResult?.nodes.some((node) => node.id === id)).toBe(false);
+    expect(usePlanningStore.getState().selectedNodeId).toBeNull();
+    expect(validatePlanningResult(usePlanningStore.getState().planningResult!).valid).toBe(true);
+  });
+
+  it("undoes roadmap deletion with dependent references and replays structural edits in order", () => {
+    const original = structuredClone(mockPlanningResult);
+    usePlanningStore.setState({ planningResult: original, status: "ready" });
+    const store = usePlanningStore.getState();
+    store.removeRoadmapStep(original.roadmap[0]!.id);
+    store.addNode();
+    const nodeId = usePlanningStore.getState().selectedNodeId!;
+    store.updateNodePosition(nodeId, 120, 240);
+    store.addEdge(original.nodes[0]!.id, nodeId, "requires");
+    store.addRoadmapStep();
+    const final = usePlanningStore.getState().planningResult;
+    for (let i = 0; i < 5; i++) store.undoEdit();
+    expect(usePlanningStore.getState().planningResult).toEqual(original);
+    expect(usePlanningStore.getState().graphEditStatus).toBe("idle");
+    for (let i = 0; i < 5; i++) store.redoEdit();
+    expect(usePlanningStore.getState().planningResult).toEqual(final);
+    expect(validatePlanningResult(final!).valid).toBe(true);
+  });
+
+  it("ignores rejected and unchanged edits, clears redo on a new edit and bounds history", () => {
+    setLoadedResult();
+    const store = usePlanningStore.getState();
+    store.updateNode("node-test", { label: "Test node" });
+    store.updateNodePosition("node-test", 0, 0);
+    store.addEdge("node-test", "node-test", "requires");
+    expect(usePlanningStore.getState().editPast).toHaveLength(0);
+    store.updateNode("node-test", { label: "Changed" });
+    store.undoEdit();
+    store.updateNodePosition("node-test", 30, 40);
+    expect(usePlanningStore.getState().editFuture).toHaveLength(0);
+    for (let i = 0; i < 110; i++) store.updateNodePosition("node-test", i, 0);
+    expect(usePlanningStore.getState().editPast).toHaveLength(100);
+  });
+
+  it("replays connection changes and roadmap reference and order edits without losing consistency", () => {
+    const original = structuredClone(mockPlanningResult);
+    usePlanningStore.setState({ planningResult: original, status: "ready" });
+    const store = usePlanningStore.getState();
+    store.updateEdge(original.edges[0]!.id, { dependencyType: "related" });
+    store.removeEdge(original.edges[0]!.id);
+    store.updateRoadmapStep(original.roadmap[0]!.id, { componentNodeIds: [] });
+    store.updateRoadmapStep(original.roadmap[2]!.id, { dependsOn: [original.roadmap[0]!.id] });
+    store.moveRoadmapStep(original.roadmap[1]!.id, 1);
+    const final = usePlanningStore.getState().planningResult;
+    const count = usePlanningStore.getState().editPast.length;
+    expect(count).toBe(5);
+    for (let i = 0; i < count; i++) store.undoEdit();
+    expect(usePlanningStore.getState().planningResult).toEqual(original);
+    for (let i = 0; i < count; i++) store.redoEdit();
+    expect(usePlanningStore.getState().planningResult).toEqual(final);
+    expect(validatePlanningResult(final!).valid).toBe(true);
+  });
+
+  it("keeps the concurrency conflict and token when undoing or redoing a failed save", async () => {
+    setLoadedResult();
+    const store = usePlanningStore.getState();
+    store.updateNode("node-test", { label: "Local edit" });
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(jsonResponse({ detail: { code: "planning_version_conflict", message: "Conflict", latestResultId: "other-head" } }, 409))
+      .mockResolvedValueOnce(jsonResponse([{ ...planningHistory[0]!, id: "other-head" }, ...planningHistory]));
+    await store.saveGraphEdits();
+    store.undoEdit();
+    store.redoEdit();
+    expect(usePlanningStore.getState()).toMatchObject({ graphEditStatus: "dirty", versionConflict: "edit",
+      conflictLatestResultId: "other-head", expectedLatestResultId: "planning-result-latest" });
+    await store.saveGraphEdits();
+    expect(fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it("retains undo across saves and compares dirty state with the newly saved content", async () => {
+    setLoadedResult();
+    const store = usePlanningStore.getState();
+    store.updateNode("node-test", { label: "Saved edit" });
+    const result = { ...usePlanningStore.getState().planningResult!, metadata: { ...planningResult.metadata, resultId: "saved-edit" } };
+    vi.mocked(fetch).mockResolvedValueOnce(jsonResponse(result))
+      .mockResolvedValueOnce(jsonResponse([{ ...planningHistory[0]!, id: "saved-edit" }, ...planningHistory]));
+    await store.saveGraphEdits();
+    const revision = usePlanningStore.getState().canvasRevision;
+    store.undoEdit();
+    expect(usePlanningStore.getState()).toMatchObject({ graphEditStatus: "dirty", selectedPlanningResultId: "saved-edit" });
+    expect(usePlanningStore.getState().planningResult?.metadata.resultId).toBe("saved-edit");
+    store.redoEdit();
+    expect(usePlanningStore.getState().graphEditStatus).toBe("idle");
+    expect(usePlanningStore.getState().canvasRevision).toBe(revision);
+  });
+
+  it("blocks history during saving/loading and preserves history after failed version lookup", async () => {
+    setLoadedResult();
+    const store = usePlanningStore.getState();
+    store.updateNode("node-test", { label: "Local edit" });
+    usePlanningStore.setState({ graphEditStatus: "saving" });
+    store.undoEdit();
+    store.updateNode("node-test", { label: "Forbidden" });
+    expect(usePlanningStore.getState().planningResult?.nodes[0]?.label).toBe("Local edit");
+    usePlanningStore.setState({ graphEditStatus: "dirty" });
+    let complete!: (response: Response) => void;
+    vi.mocked(fetch).mockReturnValueOnce(new Promise((resolve) => { complete = resolve; }))
+      .mockResolvedValueOnce(jsonResponse(persistedBrief));
+    const loading = store.selectPlanningResult("missing-version");
+    store.undoEdit();
+    expect(usePlanningStore.getState().planningResult?.nodes[0]?.label).toBe("Local edit");
+    complete(jsonResponse({ detail: "Lookup failed" }, 503));
+    await loading;
+    expect(usePlanningStore.getState().editPast).toHaveLength(1);
+    store.undoEdit();
+    expect(usePlanningStore.getState().planningResult).toEqual(planningResult);
+    expect(usePlanningStore.getState().graphEditStatus).toBe("idle");
+  });
+
+  it("resets local history only after a successful version change or explicit reset", async () => {
+    setLoadedResult();
+    const store = usePlanningStore.getState();
+    store.updateNode("node-test", { label: "Local edit" });
+    const revision = usePlanningStore.getState().canvasRevision;
+    vi.mocked(fetch).mockResolvedValueOnce(jsonResponse(planningResult)).mockResolvedValueOnce(jsonResponse(persistedBrief));
+    await store.selectPlanningResult("other-version");
+    expect(usePlanningStore.getState()).toMatchObject({ editPast: [], editFuture: [], savedEditSnapshot: null, canvasRevision: revision + 1 });
+    store.updateNode("node-test", { label: "Another edit" });
+    store.resetToEmpty();
+    expect(usePlanningStore.getState()).toMatchObject({ editPast: [], editFuture: [], planningResult: null });
+  });
+
   it("reports autosave failure separately and clears it on retry", async () => {
     usePlanningStore.setState({ selectedProjectId: project.id, projectStatus: "ready" });
     usePlanningStore.getState().setRequirementText("Changed input");

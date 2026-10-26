@@ -69,6 +69,11 @@ test("Graph and Roadmap edits persist as new versions through browser reload", a
     await page.mouse.down();
     await page.mouse.move(box!.x + box!.width / 2 + 70, box!.y + 65, { steps: 12 });
     await page.mouse.up();
+    const movedPosition = await node.evaluate((element) => (element as HTMLElement).style.transform);
+    await page.getByRole("button", { name: "편집 실행 취소", exact: true }).click();
+    await expect(node).toHaveCSS("transform", `matrix(1, 0, 0, 1, ${original.nodes[0].position.x}, ${original.nodes[0].position.y})`);
+    await page.getByRole("button", { name: "편집 다시 실행", exact: true }).click();
+    await expect.poll(() => node.evaluate((element) => (element as HTMLElement).style.transform)).toBe(movedPosition);
     graphResult = await saveEdit(page, ".detail-drawer");
     const editedNode = graphResult.nodes.find((item: any) => item.id === nodeId);
     expect(editedNode).toMatchObject({

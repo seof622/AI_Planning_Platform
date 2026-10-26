@@ -114,7 +114,34 @@ function toDraft(
   };
 }
 
+type EditSnapshot = Pick<PlanningResult, "nodes" | "edges" | "roadmap"> & {
+  selectedNodeId: string | null;
+  selectedRoadmapStepId: string | null;
+};
+
+function snapshot(state: PlanningState): EditSnapshot {
+  return { nodes: state.planningResult!.nodes, edges: state.planningResult!.edges,
+    roadmap: state.planningResult!.roadmap, selectedNodeId: state.selectedNodeId,
+    selectedRoadmapStepId: state.selectedRoadmapStepId };
+}
+
+function sameContent(left: EditSnapshot, right: EditSnapshot): boolean {
+  return JSON.stringify([left.nodes, left.edges, left.roadmap])
+    === JSON.stringify([right.nodes, right.edges, right.roadmap]);
+}
+
+const emptyEditHistory = { editPast: [] as EditSnapshot[], editFuture: [] as EditSnapshot[],
+  savedEditSnapshot: null as EditSnapshot | null, editGroup: null as string | null };
+
 interface PlanningState {
+  editPast: EditSnapshot[];
+  editFuture: EditSnapshot[];
+  savedEditSnapshot: EditSnapshot | null;
+  editGroup: string | null;
+  canvasRevision: number;
+  undoEdit: () => void;
+  redoEdit: () => void;
+  finishEditGroup: () => void;
   pendingOperation: PlanningOperation | null;
   failedOperation: PlanningOperation | null;
   retryFailedOperation: () => Promise<void>;
@@ -200,7 +227,46 @@ export const usePlanningStore = create<PlanningState>((set, get) => {
     set({ pendingOperation: operation, failedOperation: null, errorMessage: null });
     return operation;
   }
+  // Keep graph and roadmap references in the same undo transaction.
+  function edit(change: (state: PlanningState) => Partial<PlanningState>, group: string | null = null) {
+    set((state) => {
+      if (!state.planningResult || state.status !== "ready" || state.pendingOperation || state.graphEditStatus === "saving") return state;
+      const patch = change(state);
+      if (!patch.planningResult || patch.planningResult === state.planningResult) return patch;
+      const before = snapshot(state);
+      const after = snapshot({ ...state, ...patch });
+      if (sameContent(before, after)) return state;
+      const saved = state.savedEditSnapshot ?? before;
+      return { ...patch, savedEditSnapshot: saved,
+        graphEditStatus: sameContent(saved, after) ? "idle" : "dirty",
+        editPast: group && state.editGroup === group ? state.editPast : [...state.editPast, before].slice(-100),
+        editFuture: [], editGroup: group };
+    });
+  }
+  function travel(direction: "undo" | "redo") {
+    set((state) => {
+      if (!state.planningResult || state.status !== "ready" || state.pendingOperation || state.graphEditStatus === "saving") return state;
+      const source = direction === "undo" ? state.editPast : state.editFuture;
+      const target = source.at(-1);
+      if (!target) return state;
+      const current = snapshot(state);
+      return {
+        planningResult: { ...state.planningResult, nodes: target.nodes, edges: target.edges, roadmap: target.roadmap },
+        selectedNodeId: target.nodes.some((node) => node.id === target.selectedNodeId) ? target.selectedNodeId : null,
+        selectedRoadmapStepId: target.roadmap.some((step) => step.id === target.selectedRoadmapStepId) ? target.selectedRoadmapStepId : null,
+        editPast: direction === "undo" ? source.slice(0, -1) : [...state.editPast, current].slice(-100),
+        editFuture: direction === "redo" ? source.slice(0, -1) : [...state.editFuture, current].slice(-100),
+        editGroup: null, graphEditErrorMessage: null,
+        graphEditStatus: state.savedEditSnapshot && sameContent(state.savedEditSnapshot, target) ? "idle" : "dirty",
+      };
+    });
+  }
   return ({
+  ...emptyEditHistory,
+  canvasRevision: 0,
+  undoEdit: () => travel("undo"),
+  redoEdit: () => travel("redo"),
+  finishEditGroup: () => set({ editGroup: null }),
   pendingOperation: null,
   failedOperation: null,
   async retryFailedOperation() {
@@ -329,6 +395,8 @@ export const usePlanningStore = create<PlanningState>((set, get) => {
 
       set({
         planningResult: result,
+        ...emptyEditHistory,
+        canvasRevision: get().canvasRevision + 1,
         pendingOperation: null,
         failedOperation: null,
         versionConflict: null,
@@ -384,6 +452,8 @@ export const usePlanningStore = create<PlanningState>((set, get) => {
         set({
           pendingOperation: null,
           planningResult: null,
+          ...emptyEditHistory,
+          canvasRevision: get().canvasRevision + 1,
           requirementText: "",
           selectedProjectId: null,
           status: "empty",
@@ -471,6 +541,8 @@ export const usePlanningStore = create<PlanningState>((set, get) => {
       planningBrief: initialPlanningBrief,
       planningHistory: [],
       planningResult: null,
+      ...emptyEditHistory,
+      canvasRevision: get().canvasRevision + 1,
       requirementText: "",
       selectedNodeId: null,
       selectedRoadmapStepId: null,
@@ -509,6 +581,8 @@ export const usePlanningStore = create<PlanningState>((set, get) => {
         resultPlanningBrief: restored.planningBrief,
         planningBrief: toDraft(restored.planningBrief),
         planningResult: restored.result,
+        ...emptyEditHistory,
+        canvasRevision: get().canvasRevision + 1,
         graphEditErrorMessage: null,
         graphEditStatus: "idle",
         requirementText: restored.planningBrief.requirement,
@@ -603,6 +677,7 @@ export const usePlanningStore = create<PlanningState>((set, get) => {
         graphEditStatus: "idle",
         isViewingHistoricalResult: false,
         planningResult: result,
+        savedEditSnapshot: { ...snapshot(state), nodes: result.nodes, edges: result.edges, roadmap: result.roadmap }, editGroup: null,
         status: result.nodes.length > 0 ? "ready" : "empty",
       });
       await get().loadPlanningHistory(state.selectedProjectId);
@@ -644,6 +719,8 @@ export const usePlanningStore = create<PlanningState>((set, get) => {
       isViewingHistoricalResult: false,
       planningHistory: [],
       planningResult: null,
+      ...emptyEditHistory,
+      canvasRevision: get().canvasRevision + 1,
       projectErrorMessage: null,
       projectStatus: "loading",
       requirementText: "",
@@ -682,6 +759,8 @@ export const usePlanningStore = create<PlanningState>((set, get) => {
         pendingOperation: null,
         planningHistory: history,
         planningResult: result,
+        ...emptyEditHistory,
+        canvasRevision: get().canvasRevision + 1,
         resultPlanningBrief: resultBrief,
         briefSaveStatus: persistedBrief ? "saved" : "idle",
         historyStatus: "ready",
@@ -737,6 +816,8 @@ export const usePlanningStore = create<PlanningState>((set, get) => {
           ? toDraft(historicalBrief)
           : initialPlanningBrief,
         planningResult: result,
+        ...emptyEditHistory,
+        canvasRevision: get().canvasRevision + 1,
         resultPlanningBrief: historicalBrief,
         briefSaveStatus: "idle",
         requirementText:
@@ -767,13 +848,13 @@ export const usePlanningStore = create<PlanningState>((set, get) => {
     }
   },
   selectNode(nodeId) {
-    set({ selectedNodeId: nodeId, selectedRoadmapStepId: null });
+    set({ selectedNodeId: nodeId, selectedRoadmapStepId: null, editGroup: null });
   },
   selectRoadmapStep(stepId) {
-    set({ selectedRoadmapStepId: stepId, selectedNodeId: null });
+    set({ selectedRoadmapStepId: stepId, selectedNodeId: null, editGroup: null });
   },
   addNode() {
-    set((state) => {
+    edit((state) => {
       const result = state.planningResult;
       if (!result || state.status !== "ready" || state.graphEditStatus === "saving") return state;
       const anchor = result.nodes.find((node) => node.id === state.selectedNodeId)
@@ -791,7 +872,7 @@ export const usePlanningStore = create<PlanningState>((set, get) => {
     });
   },
   removeNode(nodeId) {
-    set((state) => {
+    edit((state) => {
       const result = state.planningResult;
       if (!result || state.status !== "ready" || state.graphEditStatus === "saving"
         || !result.nodes.some((node) => node.id === nodeId)) return state;
@@ -814,7 +895,7 @@ export const usePlanningStore = create<PlanningState>((set, get) => {
     });
   },
   addEdge(source, target, dependencyType) {
-    set((state) => {
+    edit((state) => {
       const result = state.planningResult;
       if (!result || state.status !== "ready" || state.graphEditStatus === "saving") return state;
       if (!result.nodes.some((node) => node.id === source) || !result.nodes.some((node) => node.id === target)) {
@@ -832,7 +913,7 @@ export const usePlanningStore = create<PlanningState>((set, get) => {
     });
   },
   updateEdge(edgeId, changes) {
-    set((state) => {
+    edit((state) => {
       const result = state.planningResult;
       const original = result?.edges.find((edge) => edge.id === edgeId);
       if (!result || !original || state.status !== "ready" || state.graphEditStatus === "saving") return state;
@@ -852,7 +933,7 @@ export const usePlanningStore = create<PlanningState>((set, get) => {
     });
   },
   removeEdge(edgeId) {
-    set((state) => {
+    edit((state) => {
       const result = state.planningResult;
       if (!result || state.status !== "ready" || state.graphEditStatus === "saving"
         || !result.edges.some((edge) => edge.id === edgeId)) return state;
@@ -863,7 +944,7 @@ export const usePlanningStore = create<PlanningState>((set, get) => {
     });
   },
   updateNode(nodeId, changes) {
-    set((state) => {
+    edit((state) => {
       if (!state.planningResult) {
         return state;
       }
@@ -877,10 +958,11 @@ export const usePlanningStore = create<PlanningState>((set, get) => {
           ),
         },
       };
-    });
+    }, Object.keys(changes).length === 1 && ["label", "description", "category"].includes(Object.keys(changes)[0]!)
+      ? `updateNode:${nodeId}:${Object.keys(changes)[0]}` : null);
   },
   updateNodePosition(nodeId, x, y) {
-    set((state) => {
+    edit((state) => {
       if (!state.planningResult) {
         return state;
       }
@@ -899,7 +981,7 @@ export const usePlanningStore = create<PlanningState>((set, get) => {
     });
   },
   addRoadmapStep() {
-    set((state) => {
+    edit((state) => {
       const result = state.planningResult;
       if (!result || state.status !== "ready" || state.graphEditStatus === "saving") return state;
       const step: RoadmapStep = {
@@ -912,7 +994,7 @@ export const usePlanningStore = create<PlanningState>((set, get) => {
     });
   },
   removeRoadmapStep(stepId) {
-    set((state) => {
+    edit((state) => {
       const result = state.planningResult;
       if (!result || state.status !== "ready" || state.graphEditStatus === "saving"
         || !result.roadmap.some((step) => step.id === stepId)) return state;
@@ -925,7 +1007,7 @@ export const usePlanningStore = create<PlanningState>((set, get) => {
     });
   },
   updateRoadmapStep(stepId, changes) {
-    set((state) => {
+    edit((state) => {
       const result = state.planningResult;
       if (!result || state.status !== "ready" || state.graphEditStatus === "saving"
         || !result.roadmap.some((step) => step.id === stepId)) return state;
@@ -944,10 +1026,11 @@ export const usePlanningStore = create<PlanningState>((set, get) => {
           roadmap,
         },
       };
-    });
+    }, Object.keys(changes).length === 1 && ["title", "description"].includes(Object.keys(changes)[0]!)
+      ? `updateRoadmapStep:${stepId}:${Object.keys(changes)[0]}` : null);
   },
   moveRoadmapStep(stepId, direction) {
-    set((state) => {
+    edit((state) => {
       if (!state.planningResult || state.graphEditStatus === "saving" || state.status !== "ready") {
         return state;
       }
@@ -988,6 +1071,8 @@ export const usePlanningStore = create<PlanningState>((set, get) => {
       failedOperation: null,
       errorMessage: message,
       planningResult: null,
+      ...emptyEditHistory,
+      canvasRevision: get().canvasRevision + 1,
       selectedNodeId: null,
       selectedRoadmapStepId: null,
       status: "error",

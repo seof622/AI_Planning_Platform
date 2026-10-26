@@ -4,8 +4,13 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   Background,
   Controls,
+  ControlButton,
   MiniMap,
   ReactFlow,
+  useNodes,
+  useNodesState,
+  useNodesInitialized,
+  useReactFlow,
   type Node,
   type NodeMouseHandler,
   type ReactFlowProps,
@@ -20,6 +25,7 @@ import { toReactFlowEdges, toReactFlowNodes } from "../lib/reactFlowMapping";
 import type { PlanningStatus } from "../store/planningStore";
 
 interface PlanningCanvasProps {
+  resultRevision: number;
   hidden?: boolean;
   toolbar?: ReactNode;
   feedback?: ReactNode;
@@ -49,7 +55,26 @@ type NodeStyleWithAccent = Node["style"] & {
   "--node-accent"?: string;
 };
 
+// Wait for measured nodes and a visible canvas before fitting a new result once.
+function FitNewResult({ revision, hidden, nodes }: { revision: number; hidden: boolean; nodes: Node[] }) {
+  const currentNodes = useNodes();
+  const initialized = useNodesInitialized();
+  const { fitView, viewportInitialized } = useReactFlow();
+  const fittedRevision = useRef<number | null>(null);
+  useEffect(() => {
+    // The external result can render before React Flow has adopted its positions.
+    if (currentNodes !== nodes || !initialized || !viewportInitialized || hidden || fittedRevision.current === revision) return;
+    const frame = requestAnimationFrame(() => {
+      fittedRevision.current = revision;
+      void fitView({ padding: 0.14, maxZoom: 1.4 });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [currentNodes, nodes, initialized, viewportInitialized, hidden, revision, fitView]);
+  return null;
+}
+
 export function PlanningCanvas({
+  resultRevision,
   hidden = false,
   toolbar,
   feedback,
@@ -73,31 +98,31 @@ export function PlanningCanvas({
   const reconnectingEdgeId = useRef<string | null>(null);
   const nodes = useMemo(() => (result ? toReactFlowNodes(result) : []), [result]);
   const edges = useMemo(() => (result ? toReactFlowEdges(result) : []), [result]);
+  const [flowNodes, setFlowNodes, onNodesChange] = useNodesState<Node>(nodes);
   useEffect(() => {
-    const frame = requestAnimationFrame(() => { void flow?.fitView({ padding: 0.14 }); });
-    return () => cancelAnimationFrame(frame);
-  }, [flow, nodes.length]);
-  useEffect(() => {
-    if (!flow || !shellRef.current) return;
-    let frame = 0;
-    const observer = new ResizeObserver(() => {
-      cancelAnimationFrame(frame);
-      frame = requestAnimationFrame(() => { void flow.fitView({ padding: 0.14 }); });
+    // Keep React Flow's measured dimensions and live drag state out of saved data.
+    setFlowNodes((previous) => {
+      const measured = new Map(previous.map((node) => [node.id, node.measured]));
+      return nodes.map((node) => ({ ...node, measured: measured.get(node.id), selected: node.id === selectedNodeId }));
     });
-    observer.observe(shellRef.current);
-    const viewport = shellRef.current.querySelector(".react-flow");
-    if (viewport) observer.observe(viewport);
-    return () => { observer.disconnect(); cancelAnimationFrame(frame); };
+  }, [nodes, selectedNodeId, setFlowNodes]);
+  useEffect(() => {
+    const viewport = shellRef.current?.querySelector<HTMLElement>(".react-flow");
+    if (!flow || !viewport) return;
+    let previous: { width: number; height: number } | null = null;
+    const observer = new ResizeObserver(() => {
+      const width = viewport.clientWidth, height = viewport.clientHeight;
+      if (!width || !height) return;
+      if (previous) {
+        const current = flow.getViewport();
+        void flow.setViewport({ ...current, x: current.x + (width - previous.width) / 2,
+          y: current.y + (height - previous.height) / 2 });
+      }
+      previous = { width, height };
+    });
+    observer.observe(viewport);
+    return () => observer.disconnect();
   }, [flow]);
-
-  const selectedNodes = useMemo(
-    () =>
-      nodes.map((node) => ({
-        ...node,
-        selected: node.id === selectedNodeId,
-      })),
-    [nodes, selectedNodeId],
-  );
 
   const handleNodeClick: NodeMouseHandler = (_event, node) => {
     setSelectedEdgeId(null);
@@ -161,7 +186,15 @@ export function PlanningCanvas({
           const reconnecting = result.edges.find((edge) => edge.id === reconnectingEdgeId.current);
           return !result.edges.some((edge) => edge.id !== reconnecting?.id && edge.source === connection.source && edge.target === connection.target);
         }}
-        nodes={selectedNodes}
+        nodes={flowNodes}
+        onNodesChange={(changes) => {
+          onNodesChange(changes);
+          for (const change of changes) {
+            if (change.type === "position" && change.position && change.dragging === false) {
+              onMoveNode(change.id, change.position.x, change.position.y);
+            }
+          }
+        }}
         edges={editableEdges}
         edgeTypes={edgeTypes}
         nodeTypes={nodeTypes}
@@ -169,13 +202,16 @@ export function PlanningCanvas({
         onEdgeClick={(_event, edge) => selectEdge(edge.id)}
         onNodeDragStop={handleNodeDragStop}
         onPaneClick={() => { onSelectNode(null); setSelectedEdgeId(null); }}
-        fitView
-        fitViewOptions={{ padding: 0.14 }}
         minZoom={0.25}
         maxZoom={1.4}
       >
+        <FitNewResult revision={resultRevision} hidden={hidden} nodes={flowNodes} />
         <Background gap={24} size={1} color="#cfd8d2" />
-        <Controls position="bottom-left" />
+        <Controls position="bottom-left" showFitView={false}>
+          <ControlButton aria-label="전체 보기" title="전체 보기" onClick={() => { void flow?.fitView({ padding: 0.14, maxZoom: 1.4 }); }}>
+            <WorkspaceIcon name="fit" />
+          </ControlButton>
+        </Controls>
         {showMiniMap ? <MiniMap
           style={{ width: 128, height: 80 }}
           maskColor="rgba(242, 245, 241, 0.6)"

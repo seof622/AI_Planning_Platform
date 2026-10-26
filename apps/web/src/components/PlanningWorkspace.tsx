@@ -35,6 +35,12 @@ export function PlanningWorkspace() {
   const canvasAreaRef = useRef<HTMLDivElement>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
   const {
+    editPast,
+    editFuture,
+    undoEdit,
+    redoEdit,
+    finishEditGroup,
+    canvasRevision,
     pendingOperation,
     failedOperation,
     retryFailedOperation,
@@ -195,7 +201,15 @@ export function PlanningWorkspace() {
   ]);
 
   return (
-    <main className="workspace" style={{
+    <main className="workspace" onBlurCapture={finishEditGroup} onKeyDown={(event) => {
+      if (event.defaultPrevented || event.nativeEvent.isComposing || event.altKey || !(event.ctrlKey || event.metaKey)) return;
+      const target = event.target;
+      if (target instanceof HTMLElement && target.closest('input, textarea, select, [contenteditable]:not([contenteditable="false"]), [role="textbox"]')) return;
+      const key = event.key.toLowerCase();
+      if (key !== "z" && key !== "y") return;
+      event.preventDefault();
+      if (key === "y" || event.shiftKey) redoEdit(); else undoEdit();
+    }} style={{
       "--input-width": `${layout.inputWidth}px`, "--detail-width": `${layout.detailWidth}px`,
       "--graph-size": `${layout.graphShare}fr`, "--roadmap-size": `${100 - layout.graphShare}fr`,
     } as CSSProperties}>
@@ -239,6 +253,16 @@ export function PlanningWorkspace() {
             onResolveConflict={resolveVersionConflict}
           />
           <div className="workspace__view-tools">
+            <div className="workspace__view-switch" role="group" aria-label="편집 기록">
+              <button className="button button--icon" type="button" aria-label="편집 실행 취소" title="편집 실행 취소 (Ctrl/⌘+Z)"
+                aria-keyshortcuts="Control+Z Meta+Z" disabled={isBusy || !editPast.length} onClick={undoEdit}>
+                <WorkspaceIcon name="undo" />
+              </button>
+              <button className="button button--icon" type="button" aria-label="편집 다시 실행" title="편집 다시 실행 (Ctrl+Y / Ctrl/⌘+Shift+Z)"
+                aria-keyshortcuts="Control+Y Control+Shift+Z Meta+Shift+Z" disabled={isBusy || !editFuture.length} onClick={redoEdit}>
+                <WorkspaceIcon name="redo" />
+              </button>
+            </div>
             <button className="button button--icon" type="button" aria-controls="workspace-input"
               aria-expanded={!layout.inputCollapsed} aria-label={layout.inputCollapsed ? "계획 입력 펼치기" : "계획 입력 접기"}
               title={layout.inputCollapsed ? "계획 입력 펼치기" : "계획 입력 접기"}
@@ -303,6 +327,7 @@ export function PlanningWorkspace() {
         <div ref={canvasAreaRef} className={`workspace__canvas-area${selectedNode || selectedStep ? " workspace__canvas-area--detail-open" : ""}`}>
           <div ref={resultsRef} className={`workspace__results workspace__results--${view}`}>
           <PlanningCanvas
+            resultRevision={canvasRevision}
             hidden={view === "roadmap"}
             feedback={view !== "roadmap" ? feedback : undefined}
             errorMessage={errorMessage}

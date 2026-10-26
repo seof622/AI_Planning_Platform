@@ -102,6 +102,14 @@ test("failed regeneration keeps the graph, roadmap, selection and edits until ex
   await page.getByLabel("Node 이름", { exact: true }).fill("유지할 노드 편집");
   await openRoadmapStep(page, 1);
   await page.getByLabel("1단계 제목", { exact: true }).fill("유지할 단계 편집");
+  async function readViewport() {
+    return page.locator(".react-flow").evaluate((canvas) => {
+      const matrix = new DOMMatrixReadOnly(canvas.querySelector<HTMLElement>(".react-flow__viewport")!.style.transform);
+      return { zoom: matrix.a, x: (canvas.clientWidth / 2 - matrix.e) / matrix.a,
+        y: (canvas.clientHeight / 2 - matrix.f) / matrix.a };
+    });
+  }
+  const originalViewport = await readViewport();
   page.once("dialog", (dialog) => dialog.accept());
   await page.getByRole("button", { name: "새 버전으로 다시 생성", exact: true }).click();
   await expect(page.getByRole("status", { name: "AI 생성 중", exact: true })).toBeVisible();
@@ -122,15 +130,11 @@ test("failed regeneration keeps the graph, roadmap, selection and edits until ex
   await expect(page.getByLabel("계획 요구사항", { exact: true })).toHaveValue(original.requirement!.content);
   await expect(page.locator(".workspace__save-state")).toHaveAttribute("aria-label", "결과 편집 미저장");
   await expect(async () => {
-    expect(await page.locator(".canvas-shell > .react-flow").evaluate((viewport) => {
-      const bounds = viewport.getBoundingClientRect();
-      return [...viewport.querySelectorAll(".react-flow__node")].every((node) => {
-        const box = node.getBoundingClientRect();
-        return box.left >= bounds.left && box.right <= bounds.right
-          && box.top >= bounds.top && box.bottom <= bounds.bottom;
-      });
-    })).toBe(true);
-  }).toPass();
+    const retained = await readViewport();
+    expect(retained.zoom).toBeCloseTo(originalViewport.zoom, 5);
+    expect(retained.x).toBeCloseTo(originalViewport.x, 0);
+    expect(retained.y).toBeCloseTo(originalViewport.y, 0);
+  }).toPass({ timeout: 10_000 });
   await testInfo.attach("retained-result-after-generation-error", { body: await page.screenshot({ fullPage: true }), contentType: "image/png" });
   page.once("dialog", (dialog) => dialog.accept());
   await failure.getByRole("button", { name: "다시 시도", exact: true }).click();

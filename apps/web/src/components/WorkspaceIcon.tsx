@@ -1,6 +1,9 @@
 import type { ReactNode } from "react";
 
 const shapes = {
+  undo: <path d="m9 4-6 6 6 6M3 10h11a6 6 0 0 1 0 12" />,
+  redo: <path d="m15 4 6 6-6 6M21 10H10a6 6 0 0 0 0 12" />,
+  fit: <><path d="M9 3H3v6m12-6h6v6M3 15v6h6m12-6v6h-6" /><rect x="8" y="8" width="8" height="8" rx="1" /></>,
   panels: <><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M3 12h18" /></>,
   graph: <><rect x="3" y="8" width="5" height="8" rx="1" /><rect x="16" y="3" width="5" height="6" rx="1" /><rect x="16" y="15" width="5" height="6" rx="1" /><path d="M8 12h4V6h4m-4 6v6h4" /></>,
   list: <><path d="M9 6h12M9 12h12M9 18h12M3 6h1M3 12h1M3 18h1" /></>,
