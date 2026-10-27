@@ -92,8 +92,8 @@ export function RoadmapStepDetailPanel({ step, roadmap, nodes, disabled, saveBlo
         </fieldset>
       </details>
       <div className="roadmap-step-editor__order-actions">
-        <button className="button" aria-label={`${step.title} 앞으로 이동`} disabled={index === 0} type="button" onClick={() => onMove(step.id, -1)}>↑ 위로</button>
-        <button className="button" aria-label={`${step.title} 뒤로 이동`} disabled={index === sorted.length - 1} type="button" onClick={() => onMove(step.id, 1)}>↓ 아래로</button>
+        <button className="button" aria-label={`${step.title} 앞으로 이동`} disabled={index === 0} type="button" onClick={() => onMove(step.id, -1)}>← 앞으로</button>
+        <button className="button" aria-label={`${step.title} 뒤로 이동`} disabled={index === sorted.length - 1} type="button" onClick={() => onMove(step.id, 1)}>→ 뒤로</button>
       </div>
     </fieldset>
     {errorMessage ? <p className="form-field__error" role="alert">{errorMessage}</p> : null}

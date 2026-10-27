@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useRef, type PointerEvent, type ReactNode } from "react";
 import type { ComponentNode, RoadmapStep } from "@ai-planning-platform/shared";
 import { priorityLabels } from "../lib/planningLabels";
 import type { PlanningStatus } from "../store/planningStore";
@@ -32,6 +32,8 @@ export function RoadmapPanel({ hidden = false, feedback, disabled = false, loadi
   editErrorMessage, editStatus, errorMessage, selectedStepId, onSelect, onAdd, onSave, roadmap, status,
 }: RoadmapPanelProps) {
   const stepsRef = useRef<HTMLOListElement>(null);
+  const dragRef = useRef<{ pointerId: number; x: number; y: number; scrollLeft: number; dragging: boolean } | null>(null);
+  const suppressClickRef = useRef(false);
   const sortedRoadmap = [...roadmap].sort((left, right) => left.order - right.order);
   const selectedOrder = roadmap.find((step) => step.id === selectedStepId)?.order;
   const orderById = new Map(roadmap.map((step) => [step.id, step.order]));
@@ -42,17 +44,31 @@ export function RoadmapPanel({ hidden = false, feedback, disabled = false, loadi
     && (editStatus === "dirty" || editStatus === "error")
     && roadmap.every((step) => step.title.trim() && step.description.trim());
 
+  function endDrag(event: PointerEvent<HTMLOListElement>) {
+    if (dragRef.current?.pointerId !== event.pointerId) return;
+    dragRef.current = null;
+    delete event.currentTarget.dataset.dragging;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+  }
+
   useEffect(() => {
     const list = stepsRef.current;
     const row = list && [...list.children].find((item) => selectedStepId
       ? (item as HTMLElement).dataset.stepId === selectedStepId
       : selectedNodeId && (item as HTMLElement).dataset.related === "true") as HTMLElement | undefined;
-    if (!list || !row) return;
-    // Scroll just the list, keeping the editor and the page in place.
-    if (row.offsetTop < list.scrollTop) list.scrollTop = row.offsetTop;
-    else if (row.offsetTop + row.offsetHeight > list.scrollTop + list.clientHeight) {
-      list.scrollTop = row.offsetTop + row.offsetHeight - list.clientHeight;
-    }
+    if (!list || !row || hidden) return;
+    // Keep the selected card visible without scrolling the page or editor.
+    const reveal = () => {
+      if (row.offsetLeft < list.scrollLeft) list.scrollLeft = row.offsetLeft;
+      else if (row.offsetLeft + row.offsetWidth > list.scrollLeft + list.clientWidth) {
+        list.scrollLeft = row.offsetLeft + row.offsetWidth - list.clientWidth;
+      }
+    };
+    reveal();
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(reveal);
+    observer.observe(list);
+    return () => observer.disconnect();
   }, [selectedStepId, selectedOrder, selectedNodeId, hidden]);
 
   return <section className="roadmap" id="planning-roadmap" hidden={hidden} aria-label="계획 로드맵">
@@ -78,7 +94,40 @@ export function RoadmapPanel({ hidden = false, feedback, disabled = false, loadi
       {status === "empty" ? <p className="status-view__copy">계획을 생성하세요.</p> : null}
     </div></div> : <>
       {roadmap.length === 0 ? <p className="roadmap__empty">단계가 없습니다. 단계 추가로 로드맵을 만들어 보세요.</p> : null}
-      <ol className="roadmap__steps" ref={stepsRef}>
+      <ol className="roadmap__steps" ref={stepsRef} aria-label="로드맵 단계"
+        onPointerDown={(event) => {
+          suppressClickRef.current = false;
+          // Touch keeps the browser's native scrolling and momentum.
+          if (event.pointerType === "touch" || !event.isPrimary || event.button !== 0
+            || event.currentTarget.scrollWidth <= event.currentTarget.clientWidth) return;
+          dragRef.current = { pointerId: event.pointerId, x: event.clientX, y: event.clientY,
+            scrollLeft: event.currentTarget.scrollLeft, dragging: false };
+        }}
+        onPointerMove={(event) => {
+          const drag = dragRef.current;
+          if (!drag || drag.pointerId !== event.pointerId) return;
+          if (event.buttons === 0) { endDrag(event); return; }
+          const dx = event.clientX - drag.x;
+          const dy = event.clientY - drag.y;
+          if (!drag.dragging) {
+            if (Math.abs(dy) > Math.max(6, Math.abs(dx))) { dragRef.current = null; return; }
+            if (Math.abs(dx) < 6) return;
+            drag.dragging = true;
+            suppressClickRef.current = true;
+            event.currentTarget.setPointerCapture(event.pointerId);
+            event.currentTarget.dataset.dragging = "true";
+          }
+          event.preventDefault();
+          event.currentTarget.scrollLeft = drag.scrollLeft - dx;
+        }}
+        onPointerUp={endDrag} onPointerCancel={endDrag} onLostPointerCapture={endDrag}
+        onPointerLeave={() => { if (!dragRef.current?.dragging) dragRef.current = null; }}
+        onClickCapture={(event) => {
+          if (!suppressClickRef.current || event.detail === 0) return;
+          suppressClickRef.current = false;
+          event.preventDefault();
+          event.stopPropagation();
+        }}>
         {sortedRoadmap.map((step) => <li className="roadmap-step" key={step.id} data-step-id={step.id}
           data-related={selectedNode && step.componentNodeIds?.includes(selectedNode.id) ? "true" : undefined}>
           <button className="roadmap-step__select" type="button"

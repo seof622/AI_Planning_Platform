@@ -213,6 +213,26 @@ test("ten roadmap steps are readable and share a single selected-item editor wit
   await expect(roadmap.locator(".roadmap-step")).toHaveCount(10);
   await expect(roadmap.locator("input, textarea, select")).toHaveCount(0);
   await expect(page.locator(".detail-drawer--open")).toHaveCount(0);
+  const cards = await roadmap.locator(".roadmap-step").evaluateAll((items) => items.map((item) => {
+    const box = item.getBoundingClientRect();
+    return { x: box.x, y: box.y };
+  }));
+  expect(cards[1]!.x).toBeGreaterThan(cards[0]!.x);
+  expect(cards[1]!.y).toBe(cards[0]!.y);
+  const list = roadmap.getByRole("list", { name: "로드맵 단계", exact: true });
+  const firstButton = roadmap.locator(".roadmap-step__select").first();
+  const start = await firstButton.boundingBox();
+  await page.mouse.move(start!.x + 180, start!.y + 50);
+  await page.mouse.down();
+  await page.mouse.move(start!.x - 60, start!.y + 50, { steps: 12 });
+  await page.mouse.up();
+  await expect.poll(() => list.evaluate((element) => element.scrollLeft)).toBeGreaterThan(150);
+  await expect(page.locator(".detail-drawer--open")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "편집 실행 취소", exact: true })).toBeDisabled();
+  // A regular click after dragging must still select a card.
+  await roadmap.locator(".roadmap-step__select").nth(1).click();
+  await expect(page.getByLabel("2단계 제목", { exact: true })).toHaveValue("2번째 실행");
+  await page.getByRole("button", { name: "단계 편집 닫기", exact: true }).click();
   const last = roadmap.locator('[data-step-id="reading-10"] > button');
   await last.focus();
   await page.keyboard.press("Enter");
@@ -238,7 +258,8 @@ test("ten roadmap steps are readable and share a single selected-item editor wit
   }));
   expect(bounds.pageWidth).toBeLessThanOrEqual(1440);
   expect(bounds.pageHeight).toBeLessThanOrEqual(960);
-  expect(bounds.listScrollWidth).toBeLessThanOrEqual(bounds.listWidth);
+  expect(bounds.listScrollWidth).toBeGreaterThan(bounds.listWidth);
+  await expect(last).toBeInViewport({ ratio: 1 });
   await testInfo.attach("roadmap-reading-desktop", { body: await page.screenshot({ fullPage: true }), contentType: "image/png" });
 });
 
@@ -378,5 +399,28 @@ test("mobile roadmap selection opens one bounded editor and closing keeps the ed
   await editor.getByRole("button", { name: "단계 편집 닫기", exact: true }).click();
   await expect(page.getByRole("button", { name: "1단계 모바일에서 수정한 단계 편집", exact: true })).toBeFocused();
   await expect(page.locator(".detail-drawer--open")).toHaveCount(0);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+  const list = page.getByRole("list", { name: "로드맵 단계", exact: true });
+  await list.scrollIntoViewIfNeeded();
+  const box = await list.boundingBox();
+  const touch = await page.context().newCDPSession(page);
+  await touch.send("Emulation.setTouchEmulationEnabled", { enabled: true });
+  const x = box!.x + box!.width - 30;
+  const y = box!.y + 60;
+  await touch.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x, y }] });
+  for (let step = 1; step <= 10; step++) {
+    await touch.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{ x: x - step * 22, y }] });
+  }
+  await touch.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+  await expect.poll(() => list.evaluate((element) => element.scrollLeft)).toBeGreaterThan(100);
+  await expect(page.locator(".detail-drawer--open")).toHaveCount(0);
+  await touch.send("Emulation.setTouchEmulationEnabled", { enabled: false });
+  await touch.detach();
+  const last = page.locator(".roadmap-step__select").last();
+  await last.focus();
+  await page.keyboard.press("Enter");
+  await editor.getByRole("button", { name: "단계 편집 닫기", exact: true }).click();
+  await expect(last).toBeFocused();
+  await expect(last).toBeInViewport({ ratio: 1 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
 });
