@@ -95,6 +95,7 @@ export function RoadmapPanel({ hidden = false, feedback, disabled = false, loadi
     </div></div> : <>
       {roadmap.length === 0 ? <p className="roadmap__empty">단계가 없습니다. 단계 추가로 로드맵을 만들어 보세요.</p> : null}
       <ol className="roadmap__steps" ref={stepsRef} aria-label="로드맵 단계"
+        data-emphasis={relatedCount > 0 || selectedOrder !== undefined ? "true" : undefined}
         onPointerDown={(event) => {
           suppressClickRef.current = false;
           // Touch keeps the browser's native scrolling and momentum.
@@ -129,6 +130,7 @@ export function RoadmapPanel({ hidden = false, feedback, disabled = false, loadi
           event.stopPropagation();
         }}>
         {sortedRoadmap.map((step) => <li className="roadmap-step" key={step.id} data-step-id={step.id}
+          data-emphasized={step.id === selectedStepId || (selectedNode && step.componentNodeIds?.includes(selectedNode.id)) ? "true" : undefined}
           data-related={selectedNode && step.componentNodeIds?.includes(selectedNode.id) ? "true" : undefined}>
           <button className="roadmap-step__select" type="button"
             aria-label={`${step.order}단계 ${step.title.trim() || "제목 없음"} 편집`}
