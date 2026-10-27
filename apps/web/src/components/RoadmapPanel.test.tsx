@@ -36,6 +36,20 @@ describe("RoadmapPanel", () => {
     await userEvent.click(screen.getByRole("button", { name: "변경 내용을 새 버전으로 저장" }));
     expect(save).toHaveBeenCalledOnce();
   });
+  it("highlights related steps separately from selection and navigates without editing a step", async () => {
+    const navigate = vi.fn();
+    const select = vi.fn();
+    const { container, rerender } = render(<RoadmapPanel {...baseProps} nodes={mockPlanningResult.nodes}
+      selectedNodeId="node-graph-canvas" onNavigateNode={navigate} onSelect={select} />);
+    expect(container.querySelectorAll('[data-related="true"]')).toHaveLength(2);
+    expect(screen.getByRole("status", { name: "관련 로드맵 단계" })).toHaveTextContent("관련 2단계");
+    await userEvent.click(screen.getByRole("button", { name: "1단계 관련 노드 그래프 캔버스 위치로 이동" }));
+    expect(navigate).toHaveBeenCalledWith("node-graph-canvas");
+    expect(select).not.toHaveBeenCalled();
+    rerender(<RoadmapPanel {...baseProps} nodes={mockPlanningResult.nodes} selectedNodeId="missing-node" onNavigateNode={navigate} />);
+    expect(container.querySelectorAll('[data-related="true"]')).toHaveLength(0);
+    expect(screen.queryByRole("status", { name: "관련 로드맵 단계" })).not.toBeInTheDocument();
+  });
   it("can save an empty roadmap and add the first step", async () => {
     const add = vi.fn();
     render(<RoadmapPanel {...baseProps} roadmap={[]} editStatus="dirty" onAdd={add} />);

@@ -1,13 +1,16 @@
 "use client";
 
 import { useEffect, useRef, type ReactNode } from "react";
-import type { RoadmapStep } from "@ai-planning-platform/shared";
+import type { ComponentNode, RoadmapStep } from "@ai-planning-platform/shared";
 import { priorityLabels } from "../lib/planningLabels";
 import type { PlanningStatus } from "../store/planningStore";
 import { WorkspaceIcon } from "./WorkspaceIcon";
 import { ResultSaveButton } from "./ResultSaveButton";
 
 interface RoadmapPanelProps {
+  nodes?: ComponentNode[];
+  selectedNodeId?: string | null;
+  onNavigateNode?: (nodeId: string) => void;
   hidden?: boolean;
   feedback?: ReactNode;
   disabled?: boolean;
@@ -25,26 +28,32 @@ interface RoadmapPanelProps {
 }
 
 export function RoadmapPanel({ hidden = false, feedback, disabled = false, loadingLabel = "불러오는 중", saveBlocked = false,
+  nodes = [], selectedNodeId, onNavigateNode,
   editErrorMessage, editStatus, errorMessage, selectedStepId, onSelect, onAdd, onSave, roadmap, status,
 }: RoadmapPanelProps) {
   const stepsRef = useRef<HTMLOListElement>(null);
   const sortedRoadmap = [...roadmap].sort((left, right) => left.order - right.order);
   const selectedOrder = roadmap.find((step) => step.id === selectedStepId)?.order;
   const orderById = new Map(roadmap.map((step) => [step.id, step.order]));
+  const nodeById = new Map(nodes.map((node) => [node.id, node]));
+  const selectedNode = selectedNodeId ? nodeById.get(selectedNodeId) : null;
+  const relatedCount = selectedNode ? roadmap.filter((step) => step.componentNodeIds?.includes(selectedNode.id)).length : 0;
   const canSave = status === "ready" && !disabled && !saveBlocked
     && (editStatus === "dirty" || editStatus === "error")
     && roadmap.every((step) => step.title.trim() && step.description.trim());
 
   useEffect(() => {
     const list = stepsRef.current;
-    const row = list && [...list.children].find((item) => (item as HTMLElement).dataset.stepId === selectedStepId) as HTMLElement | undefined;
+    const row = list && [...list.children].find((item) => selectedStepId
+      ? (item as HTMLElement).dataset.stepId === selectedStepId
+      : selectedNodeId && (item as HTMLElement).dataset.related === "true") as HTMLElement | undefined;
     if (!list || !row) return;
     // Scroll just the list, keeping the editor and the page in place.
     if (row.offsetTop < list.scrollTop) list.scrollTop = row.offsetTop;
     else if (row.offsetTop + row.offsetHeight > list.scrollTop + list.clientHeight) {
       list.scrollTop = row.offsetTop + row.offsetHeight - list.clientHeight;
     }
-  }, [selectedStepId, selectedOrder, hidden]);
+  }, [selectedStepId, selectedOrder, selectedNodeId, hidden]);
 
   return <section className="roadmap" id="planning-roadmap" hidden={hidden} aria-label="계획 로드맵">
     <div className="roadmap__header">
@@ -58,6 +67,9 @@ export function RoadmapPanel({ hidden = false, feedback, disabled = false, loadi
         <ResultSaveButton className="roadmap__save" disabled={!canSave} saving={editStatus === "saving"} onSave={onSave} />
       </div>
     </div>
+    {selectedNode ? <p className="roadmap__related-status" role="status" aria-label="관련 로드맵 단계">
+      {selectedNode.label} · 관련 {relatedCount}단계
+    </p> : null}
     {feedback}
     {editErrorMessage ? <p className="form-field__error" role="alert">{editErrorMessage}</p> : null}
     {status !== "ready" ? <div className="status-view"><div className="status-view__box">
@@ -67,7 +79,8 @@ export function RoadmapPanel({ hidden = false, feedback, disabled = false, loadi
     </div></div> : <>
       {roadmap.length === 0 ? <p className="roadmap__empty">단계가 없습니다. 단계 추가로 로드맵을 만들어 보세요.</p> : null}
       <ol className="roadmap__steps" ref={stepsRef}>
-        {sortedRoadmap.map((step) => <li className="roadmap-step" key={step.id} data-step-id={step.id}>
+        {sortedRoadmap.map((step) => <li className="roadmap-step" key={step.id} data-step-id={step.id}
+          data-related={selectedNode && step.componentNodeIds?.includes(selectedNode.id) ? "true" : undefined}>
           <button className="roadmap-step__select" type="button"
             aria-label={`${step.order}단계 ${step.title.trim() || "제목 없음"} 편집`}
             aria-pressed={step.id === selectedStepId} aria-controls={step.id === selectedStepId ? "workspace-detail" : undefined}
@@ -75,7 +88,9 @@ export function RoadmapPanel({ hidden = false, feedback, disabled = false, loadi
             onClick={() => onSelect(step.id === selectedStepId ? null : step.id)}>
             <span className="roadmap-step__order" aria-hidden="true">{step.order}</span>
             <span className="roadmap-step__content">
-              <span className="roadmap-step__title">{step.title.trim() || "제목 없음"}</span>
+              <span className="roadmap-step__title">{step.title.trim() || "제목 없음"}
+                {selectedNode && step.componentNodeIds?.includes(selectedNode.id) ? <span className="roadmap-step__related-label">관련</span> : null}
+              </span>
               <span className="roadmap-step__description">{step.description}</span>
               {step.dependsOn.length ? <span className="roadmap-step__dependencies">
                 선행 {step.dependsOn.map((id) => orderById.get(id)).join(" · ")}
@@ -83,6 +98,15 @@ export function RoadmapPanel({ hidden = false, feedback, disabled = false, loadi
             </span>
             <span className={`pill pill--${step.priority}`} title={`우선순위 ${priorityLabels[step.priority]}`}>{priorityLabels[step.priority]}</span>
           </button>
+          {onNavigateNode && step.componentNodeIds?.some((id) => nodeById.has(id)) ? <div className="roadmap-step__nodes" aria-label={`${step.order}단계 관련 노드 탐색`}>
+            {step.componentNodeIds.map((id) => {
+              const node = nodeById.get(id);
+              return node ? <button type="button" key={id} title={node.label} disabled={disabled || editStatus === "saving"}
+                aria-label={`${step.order}단계 관련 노드 ${node.label} 위치로 이동`} onClick={() => onNavigateNode(id)}>
+                <WorkspaceIcon name="graph" /><span>{node.label || "이름 없음"}</span>
+              </button> : null;
+            })}
+          </div> : null}
         </li>)}
       </ol>
     </>}

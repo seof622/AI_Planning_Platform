@@ -8,6 +8,7 @@ import { WorkspaceIcon } from "./WorkspaceIcon";
 type StepChanges = Partial<Pick<RoadmapStep, "title" | "description" | "priority" | "estimatedEffort" | "dependsOn" | "componentNodeIds">>;
 
 interface RoadmapStepDetailPanelProps {
+  onNavigateNode?: (nodeId: string) => void;
   step: RoadmapStep | null;
   roadmap: RoadmapStep[];
   nodes: ComponentNode[];
@@ -23,7 +24,7 @@ interface RoadmapStepDetailPanelProps {
 }
 
 export function RoadmapStepDetailPanel({ step, roadmap, nodes, disabled, saveBlocked, editStatus, errorMessage,
-  onClose, onChange, onMove, onDelete, onSave,
+  onClose, onChange, onMove, onDelete, onSave, onNavigateNode,
 }: RoadmapStepDetailPanelProps) {
   if (!step) return null;
   const sorted = [...roadmap].sort((left, right) => left.order - right.order);
@@ -37,6 +38,12 @@ export function RoadmapStepDetailPanel({ step, roadmap, nodes, disabled, saveBlo
       <h2 className="panel__title">단계 편집 <span className="pill">{step.order}</span></h2>
       <button type="button" aria-label="단계 편집 닫기" title="단계 편집 닫기" onClick={onClose}><WorkspaceIcon name="close" /></button>
     </div>
+    {onNavigateNode && step.componentNodeIds?.length ? <nav className="roadmap-step__nodes roadmap-step-editor__navigation" aria-label="관련 노드로 이동">
+      {nodes.filter((node) => step.componentNodeIds?.includes(node.id)).map((node) => <button type="button" key={node.id} disabled={locked}
+        aria-label={`관련 노드 ${node.label} 위치로 이동`} title={node.label} onClick={() => onNavigateNode(node.id)}>
+        <WorkspaceIcon name="graph" /><span>{node.label || "이름 없음"}</span>
+      </button>)}
+    </nav> : null}
     <fieldset className="detail-list roadmap-step-editor__fields" disabled={locked}>
       <label className="form-field">
         <span className="form-field__label">제목</span>

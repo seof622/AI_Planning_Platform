@@ -23,9 +23,14 @@ import { StatusView } from "./StatusView";
 import { WorkspaceIcon } from "./WorkspaceIcon";
 import { toReactFlowEdges, toReactFlowNodes } from "../lib/reactFlowMapping";
 import type { PlanningStatus } from "../store/planningStore";
+import { filterGraphNodes, type NodeFocusRequest, type NodeTypeFilter } from "../lib/graphNavigation";
+import { NodeSearch } from "./NodeSearch";
 
 interface PlanningCanvasProps {
   resultRevision: number;
+  focusRequest: NodeFocusRequest | null;
+  relatedNodeIds?: string[];
+  onNavigateNode: (nodeId: string) => void;
   hidden?: boolean;
   toolbar?: ReactNode;
   feedback?: ReactNode;
@@ -56,7 +61,7 @@ type NodeStyleWithAccent = Node["style"] & {
 };
 
 // Wait for measured nodes and a visible canvas before fitting a new result once.
-function FitNewResult({ revision, hidden, nodes }: { revision: number; hidden: boolean; nodes: Node[] }) {
+function FitNewResult({ revision, hidden, nodes, focusRequest }: { revision: number; hidden: boolean; nodes: Node[]; focusRequest: NodeFocusRequest | null }) {
   const currentNodes = useNodes();
   const initialized = useNodesInitialized();
   const { fitView, viewportInitialized } = useReactFlow();
@@ -64,17 +69,48 @@ function FitNewResult({ revision, hidden, nodes }: { revision: number; hidden: b
   useEffect(() => {
     // The external result can render before React Flow has adopted its positions.
     if (currentNodes !== nodes || !initialized || !viewportInitialized || hidden || fittedRevision.current === revision) return;
+    // Explicit navigation takes precedence when a result is first revealed.
+    if (focusRequest && nodes.some((node) => node.id === focusRequest.nodeId && !node.hidden)) {
+      fittedRevision.current = revision;
+      return;
+    }
     const frame = requestAnimationFrame(() => {
       fittedRevision.current = revision;
       void fitView({ padding: 0.14, maxZoom: 1.4 });
     });
     return () => cancelAnimationFrame(frame);
-  }, [currentNodes, nodes, initialized, viewportInitialized, hidden, revision, fitView]);
+  }, [currentNodes, nodes, initialized, viewportInitialized, hidden, revision, fitView, focusRequest]);
+  return null;
+}
+
+function FocusRequestedNode({ request, hidden, nodes, shellRef }: {
+  request: NodeFocusRequest | null; hidden: boolean; nodes: Node[]; shellRef: { current: HTMLElement | null };
+}) {
+  const currentNodes = useNodes();
+  const initialized = useNodesInitialized();
+  const { getInternalNode, getViewport, setCenter, viewportInitialized } = useReactFlow();
+  const handled = useRef<NodeFocusRequest | null>(null);
+  useEffect(() => {
+    if (!request || request === handled.current || hidden || !initialized || !viewportInitialized || currentNodes !== nodes) return;
+    const node = getInternalNode(request.nodeId);
+    if (!node || node.hidden || !node.measured.width || !node.measured.height) return;
+    const frame = requestAnimationFrame(() => {
+      handled.current = request;
+      void setCenter(node.internals.positionAbsolute.x + node.measured.width! / 2,
+        node.internals.positionAbsolute.y + node.measured.height! / 2,
+        { zoom: Math.max(0.85, getViewport().zoom) });
+      shellRef.current?.querySelector<HTMLElement>(`.react-flow__node[data-id="${CSS.escape(request.nodeId)}"]`)?.focus({ preventScroll: true });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [request, hidden, initialized, viewportInitialized, currentNodes, nodes, getInternalNode, getViewport, setCenter, shellRef]);
   return null;
 }
 
 export function PlanningCanvas({
   resultRevision,
+  focusRequest,
+  relatedNodeIds,
+  onNavigateNode,
   hidden = false,
   toolbar,
   feedback,
@@ -95,6 +131,24 @@ export function PlanningCanvas({
   const [showMiniMap, setShowMiniMap] = useState(false);
   const shellRef = useRef<HTMLElement>(null);
   const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
+  const [filter, setFilter] = useState({ revision: resultRevision, query: "", type: "all" as NodeTypeFilter });
+  const query = filter.revision === resultRevision ? filter.query : "";
+  const type = filter.revision === resultRevision ? filter.type : "all";
+  const filtering = query.trim() !== "" || type !== "all";
+  const matches = useMemo(() => filterGraphNodes(result?.nodes ?? [], query, type), [result, query, type]);
+  const visibleIds = useMemo(() => new Set(matches.map((node) => node.id)), [matches]);
+  const activeFocus = !disabled && focusRequest?.revision === resultRevision ? focusRequest : null;
+  const revealedRequest = useRef<NodeFocusRequest | null>(null);
+  function changeFilter(nextQuery: string, nextType: NodeTypeFilter) {
+    setFilter({ revision: resultRevision, query: nextQuery, type: nextType });
+    setSelectedEdgeId(null);
+  }
+  useEffect(() => {
+    if (!activeFocus || revealedRequest.current === activeFocus || !result?.nodes.some((node) => node.id === activeFocus.nodeId)) return;
+    revealedRequest.current = activeFocus;
+    setSelectedEdgeId(null);
+    if (!visibleIds.has(activeFocus.nodeId)) setFilter({ revision: resultRevision, query: "", type: "all" });
+  }, [activeFocus, result, visibleIds, resultRevision]);
   const reconnectingEdgeId = useRef<string | null>(null);
   const nodes = useMemo(() => (result ? toReactFlowNodes(result) : []), [result]);
   const edges = useMemo(() => (result ? toReactFlowEdges(result) : []), [result]);
@@ -103,9 +157,11 @@ export function PlanningCanvas({
     // Keep React Flow's measured dimensions and live drag state out of saved data.
     setFlowNodes((previous) => {
       const measured = new Map(previous.map((node) => [node.id, node.measured]));
-      return nodes.map((node) => ({ ...node, measured: measured.get(node.id), selected: node.id === selectedNodeId }));
+      return nodes.map((node) => ({ ...node, measured: measured.get(node.id), selected: node.id === selectedNodeId,
+        hidden: !visibleIds.has(node.id), className: relatedNodeIds?.includes(node.id) ? "planning-node--related" : undefined,
+        ariaLabel: `${node.data.label}${relatedNodeIds?.includes(node.id) ? ", 선택한 단계의 관련 노드" : ""}` }));
     });
-  }, [nodes, selectedNodeId, setFlowNodes]);
+  }, [nodes, selectedNodeId, setFlowNodes, visibleIds, relatedNodeIds]);
   useEffect(() => {
     const viewport = shellRef.current?.querySelector<HTMLElement>(".react-flow");
     if (!flow || !viewport) return;
@@ -134,6 +190,7 @@ export function PlanningCanvas({
   }
   const editableEdges = edges.map((edge) => ({
     ...edge,
+    hidden: !visibleIds.has(edge.source) || !visibleIds.has(edge.target),
     selected: !selectedNodeId && edge.id === selectedEdgeId,
     reconnectable: !disabled && !selectedNodeId && edge.id === selectedEdgeId,
     data: {
@@ -164,15 +221,24 @@ export function PlanningCanvas({
         <div><h2>구조 캔버스</h2></div>
         <div className="canvas-heading__tools">
           <span className="canvas-heading__count">{result.nodes.length}개 노드<span aria-hidden="true"> · </span>{result.edges.length}개 연결</span>
+          <NodeSearch key={resultRevision} query={query} type={type} matches={matches} total={result.nodes.length}
+            disabled={disabled} onChange={changeFilter} onNavigate={onNavigateNode} />
           <button className="canvas-heading__map-toggle" type="button" aria-label={showMiniMap ? "미니맵 숨기기" : "미니맵 표시"} aria-pressed={showMiniMap}
             title={showMiniMap ? "미니맵 숨기기" : "미니맵 표시"} onClick={() => setShowMiniMap((value) => !value)}><WorkspaceIcon name="map" /></button>
         </div>
       </div>
       {toolbar}
+      {filtering ? <div className="graph-filter-status" role="status" aria-label="노드 필터 상태">
+        <span>{matches.length ? `${matches.length} / ${result.nodes.length}개 노드 표시` : "일치하는 노드 없음"}</span>
+        {selectedNodeId && !visibleIds.has(selectedNodeId) ? <button type="button" disabled={disabled}
+          onClick={() => onNavigateNode(selectedNodeId)}>선택한 노드 표시</button> : null}
+        <button type="button" disabled={disabled} onClick={() => changeFilter("", "all")}>필터 초기화</button>
+      </div> : null}
       {feedback}
       <ReactFlow
         onInit={setFlow}
         nodesDraggable={!disabled}
+        autoPanOnNodeFocus={false}
         nodesConnectable={!disabled}
         deleteKeyCode={null}
         onConnect={(connection) => onConnect(connection.source, connection.target)}
@@ -205,10 +271,11 @@ export function PlanningCanvas({
         minZoom={0.25}
         maxZoom={1.4}
       >
-        <FitNewResult revision={resultRevision} hidden={hidden} nodes={flowNodes} />
+        <FitNewResult revision={resultRevision} hidden={hidden} nodes={flowNodes} focusRequest={activeFocus} />
+        <FocusRequestedNode request={activeFocus} hidden={hidden} nodes={flowNodes} shellRef={shellRef} />
         <Background gap={24} size={1} color="#cfd8d2" />
         <Controls position="bottom-left" showFitView={false}>
-          <ControlButton aria-label="전체 보기" title="전체 보기" onClick={() => { void flow?.fitView({ padding: 0.14, maxZoom: 1.4 }); }}>
+          <ControlButton aria-label="전체 보기" title={filtering ? "표시된 노드 전체 보기" : "전체 보기"} disabled={matches.length === 0} onClick={() => { void flow?.fitView({ padding: 0.14, maxZoom: 1.4 }); }}>
             <WorkspaceIcon name="fit" />
           </ControlButton>
         </Controls>

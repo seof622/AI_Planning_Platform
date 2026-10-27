@@ -19,6 +19,7 @@ import { operationLabels } from "../lib/planningOperations";
 import { getGenerationBlocker } from "../lib/planningInput";
 import { defaultWorkspaceLayout, layoutLimits, useWorkspaceLayout } from "../lib/useWorkspaceLayout";
 import { WorkspaceResizeHandle } from "./WorkspaceResizeHandle";
+import type { NodeFocusRequest } from "../lib/graphNavigation";
 
 const statusLabels = {
   empty: "비어 있음",
@@ -29,6 +30,7 @@ const statusLabels = {
 };
 
 export function PlanningWorkspace() {
+  const [nodeFocusRequest, setNodeFocusRequest] = useState<NodeFocusRequest | null>(null);
   const [connectionType, setConnectionType] = useState<DependencyType>("requires");
   const { layout, setLayout, resetLayout } = useWorkspaceLayout();
   const bodyRef = useRef<HTMLDivElement>(null);
@@ -111,6 +113,12 @@ export function PlanningWorkspace() {
   const selectedStep = planningResult?.roadmap.find((step) => step.id === selectedRoadmapStepId) ?? null;
   const hasUnsavedEdits = graphEditStatus !== "idle";
   const isBusy = status === "loading" || graphEditStatus === "saving";
+  function navigateToNode(nodeId: string) {
+    if (isBusy || !planningResult?.nodes.some((node) => node.id === nodeId)) return;
+    selectNode(nodeId);
+    if (view === "roadmap") setLayout((previous) => ({ ...previous, view: "both" }));
+    setNodeFocusRequest((previous) => ({ nodeId, revision: canvasRevision, sequence: (previous?.sequence ?? 0) + 1 }));
+  }
   const resultStatus = planningResult && (pendingOperation || failedOperation) ? (planningResult.nodes.length ? "ready" : "empty") : status;
   const loadingLabel = pendingOperation?.kind === "generate" ? "생성 중"
     : pendingOperation?.kind === "restore" ? "복원 중"
@@ -328,6 +336,9 @@ export function PlanningWorkspace() {
           <div ref={resultsRef} className={`workspace__results workspace__results--${view}`}>
           <PlanningCanvas
             resultRevision={canvasRevision}
+            focusRequest={nodeFocusRequest}
+            relatedNodeIds={selectedStep?.componentNodeIds}
+            onNavigateNode={navigateToNode}
             hidden={view === "roadmap"}
             feedback={view !== "roadmap" ? feedback : undefined}
             errorMessage={errorMessage}
@@ -357,6 +368,9 @@ export function PlanningWorkspace() {
               return (event.clientY - box.top - 8) / (box.height - 16) * 100;
             }} /> : null}
           <RoadmapPanel
+            nodes={planningResult?.nodes}
+            selectedNodeId={selectedNodeId}
+            onNavigateNode={navigateToNode}
             hidden={view === "graph"}
             feedback={view === "roadmap" ? feedback : undefined}
             disabled={isBusy}
@@ -378,6 +392,7 @@ export function PlanningWorkspace() {
             onChange={(value) => resize("detailWidth", value)} onReset={() => resize("detailWidth", defaultWorkspaceLayout.detailWidth)}
             fromPointer={(event) => (canvasAreaRef.current?.getBoundingClientRect().right ?? 0) - event.clientX - 8} /> : null}
           <RoadmapStepDetailPanel
+            onNavigateNode={navigateToNode}
             key={selectedStep?.id}
             step={selectedStep} roadmap={planningResult?.roadmap ?? []} nodes={planningResult?.nodes ?? []}
             disabled={isBusy} saveBlocked={versionConflict !== null} editStatus={graphEditStatus}
