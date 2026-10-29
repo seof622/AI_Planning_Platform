@@ -20,6 +20,7 @@ import { getGenerationBlocker } from "../lib/planningInput";
 import { defaultWorkspaceLayout, layoutLimits, useWorkspaceLayout } from "../lib/useWorkspaceLayout";
 import { WorkspaceResizeHandle } from "./WorkspaceResizeHandle";
 import type { NodeFocusRequest } from "../lib/graphNavigation";
+import { useWorkspacePositionPersistence } from "../lib/useWorkspacePositionPersistence";
 
 const statusLabels = {
   empty: "비어 있음",
@@ -30,6 +31,7 @@ const statusLabels = {
 };
 
 export function PlanningWorkspace() {
+  useWorkspacePositionPersistence();
   const [nodeFocusRequest, setNodeFocusRequest] = useState<NodeFocusRequest | null>(null);
   const [connectionType, setConnectionType] = useState<DependencyType>("requires");
   const { layout, setLayout, resetLayout } = useWorkspaceLayout();
@@ -43,6 +45,7 @@ export function PlanningWorkspace() {
     redoEdit,
     finishEditGroup,
     canvasRevision,
+    workspaceRestore,
     pendingOperation,
     failedOperation,
     retryFailedOperation,
@@ -335,6 +338,8 @@ export function PlanningWorkspace() {
         <div ref={canvasAreaRef} className={`workspace__canvas-area${selectedNode || selectedStep ? " workspace__canvas-area--detail-open" : ""}`}>
           <div ref={resultsRef} className={`workspace__results workspace__results--${view}`}>
           <PlanningCanvas
+            positionProjectId={selectedProjectId}
+            workspaceRestore={workspaceRestore}
             resultRevision={canvasRevision}
             focusRequest={nodeFocusRequest}
             relatedNodeIds={selectedStep?.componentNodeIds}
@@ -368,6 +373,9 @@ export function PlanningWorkspace() {
               return (event.clientY - box.top - 8) / (box.height - 16) * 100;
             }} /> : null}
           <RoadmapPanel
+            positionProjectId={selectedProjectId}
+            resultRevision={canvasRevision}
+            workspaceRestore={workspaceRestore}
             nodes={planningResult?.nodes}
             selectedNodeId={selectedNodeId}
             onNavigateNode={navigateToNode}

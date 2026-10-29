@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   Background,
   Controls,
@@ -25,8 +25,11 @@ import { toReactFlowEdges, toReactFlowNodes } from "../lib/reactFlowMapping";
 import type { PlanningStatus } from "../store/planningStore";
 import { filterGraphNodes, type NodeFocusRequest, type NodeTypeFilter } from "../lib/graphNavigation";
 import { NodeSearch } from "./NodeSearch";
+import { writeWorkspacePosition, type WorkspaceRestore, type WorkspacePosition } from "../lib/workspacePosition";
 
 interface PlanningCanvasProps {
+  positionProjectId?: string | null;
+  workspaceRestore?: WorkspaceRestore | null;
   resultRevision: number;
   focusRequest: NodeFocusRequest | null;
   relatedNodeIds?: string[];
@@ -61,10 +64,13 @@ type NodeStyleWithAccent = Node["style"] & {
 };
 
 // Wait for measured nodes and a visible canvas before fitting a new result once.
-function FitNewResult({ revision, hidden, nodes, focusRequest }: { revision: number; hidden: boolean; nodes: Node[]; focusRequest: NodeFocusRequest | null }) {
+function FitNewResult({ revision, hidden, nodes, focusRequest, savedViewport, onReady }: {
+  revision: number; hidden: boolean; nodes: Node[]; focusRequest: NodeFocusRequest | null;
+  savedViewport: WorkspacePosition["viewport"]; onReady: () => void;
+}) {
   const currentNodes = useNodes();
   const initialized = useNodesInitialized();
-  const { fitView, viewportInitialized } = useReactFlow();
+  const { fitView, setCenter, viewportInitialized } = useReactFlow();
   const fittedRevision = useRef<number | null>(null);
   useEffect(() => {
     // The external result can render before React Flow has adopted its positions.
@@ -72,14 +78,18 @@ function FitNewResult({ revision, hidden, nodes, focusRequest }: { revision: num
     // Explicit navigation takes precedence when a result is first revealed.
     if (focusRequest && nodes.some((node) => node.id === focusRequest.nodeId && !node.hidden)) {
       fittedRevision.current = revision;
+      onReady();
       return;
     }
     const frame = requestAnimationFrame(() => {
       fittedRevision.current = revision;
-      void fitView({ padding: 0.14, maxZoom: 1.4 });
+      const move = savedViewport
+        ? setCenter(savedViewport.x, savedViewport.y, { zoom: savedViewport.zoom })
+        : fitView({ padding: 0.14, maxZoom: 1.4 });
+      void move.then(onReady);
     });
     return () => cancelAnimationFrame(frame);
-  }, [currentNodes, nodes, initialized, viewportInitialized, hidden, revision, fitView, focusRequest]);
+  }, [currentNodes, nodes, initialized, viewportInitialized, hidden, revision, fitView, setCenter, focusRequest, savedViewport, onReady]);
   return null;
 }
 
@@ -107,6 +117,8 @@ function FocusRequestedNode({ request, hidden, nodes, shellRef }: {
 }
 
 export function PlanningCanvas({
+  positionProjectId,
+  workspaceRestore,
   resultRevision,
   focusRequest,
   relatedNodeIds,
@@ -130,6 +142,24 @@ export function PlanningCanvas({
   const [flow, setFlow] = useState<ReactFlowInstance | null>(null);
   const [showMiniMap, setShowMiniMap] = useState(false);
   const shellRef = useRef<HTMLElement>(null);
+  const readyRevision = useRef<number | null>(null);
+  const activeRevision = useRef(resultRevision);
+  activeRevision.current = resultRevision;
+  const savedViewport = workspaceRestore?.revision === resultRevision ? workspaceRestore.position.viewport : null;
+  const rememberViewport = useCallback(() => {
+    if (!flow || !positionProjectId || disabled || hidden || readyRevision.current !== resultRevision || activeRevision.current !== resultRevision) return;
+    const element = shellRef.current?.querySelector<HTMLElement>(".react-flow");
+    if (!element?.clientWidth || !element.clientHeight) return;
+    const { x, y, zoom } = flow.getViewport();
+    writeWorkspacePosition(positionProjectId, { viewport: {
+      x: (element.clientWidth / 2 - x) / zoom, y: (element.clientHeight / 2 - y) / zoom, zoom,
+    } });
+  }, [flow, positionProjectId, disabled, hidden, resultRevision]);
+  const viewportReady = useCallback(() => {
+    if (activeRevision.current !== resultRevision) return;
+    readyRevision.current = resultRevision;
+    rememberViewport();
+  }, [resultRevision, rememberViewport]);
   const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
   const [filter, setFilter] = useState({ revision: resultRevision, query: "", type: "all" as NodeTypeFilter });
   const query = filter.revision === resultRevision ? filter.query : "";
@@ -237,6 +267,7 @@ export function PlanningCanvas({
       {feedback}
       <ReactFlow
         onInit={setFlow}
+        onMoveEnd={rememberViewport}
         nodesDraggable={!disabled}
         autoPanOnNodeFocus={false}
         nodesConnectable={!disabled}
@@ -271,7 +302,8 @@ export function PlanningCanvas({
         minZoom={0.25}
         maxZoom={1.4}
       >
-        <FitNewResult revision={resultRevision} hidden={hidden} nodes={flowNodes} focusRequest={activeFocus} />
+        <FitNewResult revision={resultRevision} hidden={hidden} nodes={flowNodes} focusRequest={activeFocus}
+          savedViewport={savedViewport} onReady={viewportReady} />
         <FocusRequestedNode request={activeFocus} hidden={hidden} nodes={flowNodes} shellRef={shellRef} />
         <Background gap={24} size={1} color="#cfd8d2" />
         <Controls position="bottom-left" showFitView={false}>

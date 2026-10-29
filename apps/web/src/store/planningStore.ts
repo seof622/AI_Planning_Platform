@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { readLastProject, restoreWorkspacePosition, writeLastProject, type WorkspaceRestore } from "../lib/workspacePosition";
 import { sortRoadmapByDependencies } from "../lib/roadmapEditing";
 import type { PlanningOperation, PlanningOperationTarget } from "../lib/planningOperations";
 import type {
@@ -139,6 +140,7 @@ interface PlanningState {
   savedEditSnapshot: EditSnapshot | null;
   editGroup: string | null;
   canvasRevision: number;
+  workspaceRestore: WorkspaceRestore | null;
   undoEdit: () => void;
   redoEdit: () => void;
   finishEditGroup: () => void;
@@ -264,6 +266,7 @@ export const usePlanningStore = create<PlanningState>((set, get) => {
   return ({
   ...emptyEditHistory,
   canvasRevision: 0,
+  workspaceRestore: null,
   undoEdit: () => travel("undo"),
   redoEdit: () => travel("redo"),
   finishEditGroup: () => set({ editGroup: null }),
@@ -445,7 +448,7 @@ export const usePlanningStore = create<PlanningState>((set, get) => {
       const projects = await listProjects();
       if (get().pendingOperation !== operation) return;
       set({ projects, projectStatus: "ready" });
-      const firstProject = projects[0];
+      const firstProject = projects.find((project) => project.id === readLastProject()) ?? projects[0];
       if (firstProject) {
         await get().selectProject(firstProject.id);
       } else {
@@ -748,6 +751,7 @@ export const usePlanningStore = create<PlanningState>((set, get) => {
       if (get().pendingOperation !== operation) return;
       const resultModel = result?.metadata.model;
       const persistedModel = persistedBrief?.selectedModel;
+      const position = restoreWorkspacePosition(projectId, result, resultId ?? null);
       const restorableModel =
         persistedModel && get().models.some((model) => model.id === persistedModel)
           ? persistedModel
@@ -756,6 +760,9 @@ export const usePlanningStore = create<PlanningState>((set, get) => {
             : get().selectedModel;
       set({
         planningBrief: toDraft(persistedBrief),
+        workspaceRestore: { revision: get().canvasRevision + 1, position },
+        selectedNodeId: position.selectedNodeId,
+        selectedRoadmapStepId: position.selectedStepId,
         pendingOperation: null,
         planningHistory: history,
         planningResult: result,
@@ -772,6 +779,7 @@ export const usePlanningStore = create<PlanningState>((set, get) => {
         expectedLatestResultId: result?.metadata.resultId ?? history[0]?.id ?? null,
         status: result && result.nodes.length > 0 ? "ready" : "empty",
       });
+      writeLastProject(projectId);
     } catch (error) {
       if (get().pendingOperation !== operation) return;
       set({

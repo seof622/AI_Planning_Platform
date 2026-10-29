@@ -186,7 +186,7 @@
 - 그래프·로드맵 집중 보기, 입력 패널 접기와 크기 조절(항목 5)은 [집중 보기·크기 조절 보고서](workspace-focus-resize-implementation-report.md)의 범위로 구현했다.
 - 편집 실행 취소·다시 실행과 캔버스 위치 유지(항목 8)는 2026-10-26 [실행 취소·캔버스 위치 보고서](undo-viewport-implementation-report.md)의 범위로 구현했다.
 - 관련 노드·단계 강조와 노드 검색·유형 필터(항목 7)는 2026-10-27 [연결 탐색 보고서](graph-navigation-implementation-report.md)의 범위로 구현했다.
-- 다음 우선순위는 프로젝트별 마지막 작업 위치 복원이다.
+- 프로젝트별 마지막 작업 위치 복원은 2026-10-29 [작업 위치 복원 보고서](workspace-position-implementation-report.md)의 범위로 구현했다.
 
 ## 권장 진행 순서
 

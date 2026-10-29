@@ -6,8 +6,12 @@ import { priorityLabels } from "../lib/planningLabels";
 import type { PlanningStatus } from "../store/planningStore";
 import { WorkspaceIcon } from "./WorkspaceIcon";
 import { ResultSaveButton } from "./ResultSaveButton";
+import { writeWorkspacePosition, type WorkspaceRestore } from "../lib/workspacePosition";
 
 interface RoadmapPanelProps {
+  positionProjectId?: string | null;
+  resultRevision?: number;
+  workspaceRestore?: WorkspaceRestore | null;
   nodes?: ComponentNode[];
   selectedNodeId?: string | null;
   onNavigateNode?: (nodeId: string) => void;
@@ -28,10 +32,12 @@ interface RoadmapPanelProps {
 }
 
 export function RoadmapPanel({ hidden = false, feedback, disabled = false, loadingLabel = "불러오는 중", saveBlocked = false,
+  positionProjectId, resultRevision = 0, workspaceRestore,
   nodes = [], selectedNodeId, onNavigateNode,
   editErrorMessage, editStatus, errorMessage, selectedStepId, onSelect, onAdd, onSave, roadmap, status,
 }: RoadmapPanelProps) {
   const stepsRef = useRef<HTMLOListElement>(null);
+  const restoredRevision = useRef<number | null>(null);
   const dragRef = useRef<{ pointerId: number; x: number; y: number; scrollLeft: number; dragging: boolean } | null>(null);
   const suppressClickRef = useRef(false);
   const sortedRoadmap = [...roadmap].sort((left, right) => left.order - right.order);
@@ -56,20 +62,28 @@ export function RoadmapPanel({ hidden = false, feedback, disabled = false, loadi
     const row = list && [...list.children].find((item) => selectedStepId
       ? (item as HTMLElement).dataset.stepId === selectedStepId
       : selectedNodeId && (item as HTMLElement).dataset.related === "true") as HTMLElement | undefined;
-    if (!list || !row || hidden) return;
+    if (!list || hidden || status !== "ready") return;
     // Keep the selected card visible without scrolling the page or editor.
     const reveal = () => {
+      if (!row) return;
       if (row.offsetLeft < list.scrollLeft) list.scrollLeft = row.offsetLeft;
       else if (row.offsetLeft + row.offsetWidth > list.scrollLeft + list.clientWidth) {
         list.scrollLeft = row.offsetLeft + row.offsetWidth - list.clientWidth;
       }
     };
-    reveal();
+    if (restoredRevision.current !== resultRevision) {
+      restoredRevision.current = resultRevision;
+      if (workspaceRestore?.revision === resultRevision) list.scrollLeft = workspaceRestore.position.roadmapScrollLeft;
+      else { list.scrollLeft = 0; reveal(); }
+    } else reveal();
     if (typeof ResizeObserver === "undefined") return;
-    const observer = new ResizeObserver(reveal);
+    let width = list.clientWidth;
+    const observer = new ResizeObserver(() => {
+      if (list.clientWidth !== width) { width = list.clientWidth; reveal(); }
+    });
     observer.observe(list);
     return () => observer.disconnect();
-  }, [selectedStepId, selectedOrder, selectedNodeId, hidden]);
+  }, [selectedStepId, selectedOrder, selectedNodeId, hidden, status, resultRevision, workspaceRestore]);
 
   return <section className="roadmap" id="planning-roadmap" hidden={hidden} aria-label="계획 로드맵">
     <div className="roadmap__header">
@@ -95,6 +109,11 @@ export function RoadmapPanel({ hidden = false, feedback, disabled = false, loadi
     </div></div> : <>
       {roadmap.length === 0 ? <p className="roadmap__empty">단계가 없습니다. 단계 추가로 로드맵을 만들어 보세요.</p> : null}
       <ol className="roadmap__steps" ref={stepsRef} aria-label="로드맵 단계"
+        onScroll={(event) => {
+          if (positionProjectId && !disabled && !hidden && restoredRevision.current === resultRevision) {
+            writeWorkspacePosition(positionProjectId, { roadmapScrollLeft: event.currentTarget.scrollLeft });
+          }
+        }}
         data-emphasis={relatedCount > 0 || selectedOrder !== undefined ? "true" : undefined}
         onPointerDown={(event) => {
           suppressClickRef.current = false;

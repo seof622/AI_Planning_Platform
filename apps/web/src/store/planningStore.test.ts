@@ -109,6 +109,7 @@ function setLoadedResult() {
 
 describe("planningStore", () => {
   beforeEach(() => {
+    localStorage.clear();
     usePlanningStore.setState(usePlanningStore.getInitialState(), true);
     vi.stubGlobal("fetch", vi.fn());
   });
