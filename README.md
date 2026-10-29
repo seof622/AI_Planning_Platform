@@ -104,6 +104,20 @@ AI_Planning_Platform/
 
 ## 6. Docker 로컬 실행
 
+Windows에서는 Node.js와 Docker Desktop을 설치하고 Docker Desktop을 켠 뒤,
+저장소 루트에서 다음 명령으로 DB·API·웹을 함께 실행합니다.
+
+```powershell
+npm.cmd run dev
+```
+
+시작 스크립트는 `.env`가 없으면 예시 설정을 복사하고, Node 의존성이 없으면 설치합니다.
+API 이미지를 빌드하고 DB와 API의 정상 상태를 확인한 뒤 웹 개발 서버를 시작합니다.
+화면은 `http://localhost:3000`에서 열 수 있습니다. AI 생성에는 루트 `.env`의
+`OPENAI_API_KEY` 설정이 필요합니다. 키를 변경했다면 실행 명령을 다시 실행하세요.
+웹 서버는 `Ctrl+C`, API와 DB는 `docker compose stop`으로 종료합니다.
+기존 데이터는 Docker 볼륨에 유지됩니다.
+
 API와 PostgreSQL 로컬 런타임은 Docker Compose로 실행할 수 있습니다.
 
 ```bash
