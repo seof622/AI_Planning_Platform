@@ -331,12 +331,15 @@ summary { cursor: pointer; }
 .canvas-shell .react-flow__minimap { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; background: white; }
 
 .custom-node {
-  width: 240px; border: 1px solid var(--node-border); border-top: 3px solid var(--node-accent);
+  width: 240px; border: 1px solid var(--node-border); border-top-color: var(--node-accent);
   border-radius: 12px; background: white; color: var(--text); box-shadow: 0 3px 10px rgba(34,55,42,0.06); overflow: visible;
+  transition: box-shadow 240ms ease, border-color 200ms ease;
 }
-.custom-node[aria-selected="true"] { outline: 2px solid var(--accent); outline-offset: 3px; box-shadow: 0 5px 16px rgba(35,81,60,0.1); }
-.planning-node--related .custom-node { outline: 2px dashed var(--accent); outline-offset: 4px; box-shadow: 0 5px 16px rgba(35,81,60,0.12); }
-.custom-node__body { padding: 15px; }
+.canvas-shell .react-flow__node-componentNode { background: transparent !important; transition: opacity 200ms ease, filter 200ms ease; }
+.react-flow__nodes:has(> .react-flow__node:is(.selected, .planning-node--related)) > .react-flow__node:not(.selected, .planning-node--related) { opacity: 0.42; filter: grayscale(0.85) blur(0.35px); }
+.react-flow__nodes:has(> .react-flow__node:is(.selected, .planning-node--related)) > .react-flow__node:not(.selected, .planning-node--related):focus-within { opacity: 1; filter: none; }
+.react-flow__node:focus-visible .custom-node { outline: 2px solid var(--accent); outline-offset: 2px; }
+.custom-node__body { padding: 17px 15px 15px; }
 .custom-node__meta { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 11px; }
 .pill { display: inline-flex; align-items: center; min-height: 21px; max-width: 100%; padding: 2px 7px; border-radius: 5px; background: var(--surface-muted); color: #5e7264; font-size: 10px; font-weight: 500; }
 .pill--high { background: #fbefed; color: #9e5145; }
@@ -376,8 +379,12 @@ summary { cursor: pointer; }
 .roadmap__steps[data-dragging="true"] { cursor: grabbing; }
 .roadmap-step { position: relative; flex: 0 0 min(280px, 100%); min-width: 0; min-height: 0; overflow-y: auto; border: 1px solid var(--border); border-radius: 14px; background: #f9fbf9; transition: opacity 200ms ease, filter 200ms ease, transform 240ms ease, box-shadow 240ms ease, border-color 200ms ease; }
 .roadmap__steps[data-emphasis="true"] { background: linear-gradient(180deg, #f7faf8, #eef4f0); }
-.roadmap-step[data-emphasized="true"] {
-  z-index: 1; border-color: transparent; transform: translateY(-3px);
+.roadmap-step[data-emphasized="true"] { z-index: 1; transform: translateY(-3px); }
+/* Share the emphasis surface without moving graph handles away from their edges. */
+.roadmap-step[data-emphasized="true"],
+.custom-node[aria-selected="true"],
+.planning-node--related .custom-node {
+  border-color: transparent;
   background: radial-gradient(ellipse at 15% 0%, rgba(255,255,255,0.95), transparent 65%), linear-gradient(145deg, #ffffff 5%, #f4faf6 52%, #e1efe5 100%);
   box-shadow: inset 0 1px 0 #fff, inset 0 -2px 4px rgba(49,78,57,0.06), 0 3px 5px rgba(39,65,47,0.06), 0 10px 20px rgba(39,65,47,0.14);
   animation: roadmap-emphasis 3.8s ease-in-out infinite;
@@ -385,14 +392,18 @@ summary { cursor: pointer; }
 .roadmap-step[data-emphasized="true"] > .roadmap-step__select,
 .roadmap-step[data-emphasized="true"] > .roadmap-step__select:hover:not(:disabled) { background: transparent; border-color: transparent; }
 .roadmap-step[data-emphasized="true"] .roadmap-step__order { border-color: transparent; background: linear-gradient(145deg, #606879, #303744); color: white; box-shadow: inset 0 1px 0 rgba(255,255,255,0.25), 0 2px 4px rgba(34,42,58,0.16); }
-.roadmap-step[data-emphasized="true"] .roadmap-step__title { color: #252c39; font-weight: 600; }
+.roadmap-step[data-emphasized="true"] .roadmap-step__title,
+.custom-node[aria-selected="true"] .custom-node__title,
+.planning-node--related .custom-node__title { color: #252c39; font-weight: 600; }
 .roadmap-step[data-emphasized="true"] .roadmap-step__dependencies { color: #687181; }
 .roadmap-step[data-emphasized="true"] .roadmap-step__nodes button { color: #525d70; border-color: rgba(76,86,107,0.12); background: rgba(255,255,255,0.75); }
 .roadmap__steps[data-emphasis="true"] > .roadmap-step:not([data-emphasized="true"]) { opacity: 0.42; filter: grayscale(0.85) blur(0.35px); }
 .roadmap__steps[data-emphasis="true"] > .roadmap-step:not([data-emphasized="true"]):focus-within { opacity: 1; filter: none; }
 @media (hover: hover) {
-  .roadmap-step:has(> .roadmap-step__select:not(:disabled)):hover { border-color: #8fb5a0; }
-  .roadmap__steps[data-emphasis="true"] > .roadmap-step:not([data-emphasized="true"]):hover { opacity: 0.88; filter: none; }
+  .roadmap-step:has(> .roadmap-step__select:not(:disabled)):hover,
+  .react-flow__node:hover .custom-node { border-color: #628d7a; animation-play-state: paused; }
+  .roadmap__steps[data-emphasis="true"] > .roadmap-step:not([data-emphasized="true"]):hover { opacity: 1; filter: none; }
+  .react-flow__nodes:has(> .react-flow__node:is(.selected, .planning-node--related)) > .react-flow__node:not(.selected, .planning-node--related):hover { opacity: 1; filter: none; }
 }
 .roadmap-step:has(> .roadmap-step__select:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
 .roadmap-step__select:focus-visible { outline: none; }
