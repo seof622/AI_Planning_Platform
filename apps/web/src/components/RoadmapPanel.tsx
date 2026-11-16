@@ -6,6 +6,7 @@ import { priorityLabels } from "../lib/planningLabels";
 import type { PlanningStatus } from "../store/planningStore";
 import { WorkspaceIcon } from "./WorkspaceIcon";
 import { ResultSaveButton } from "./ResultSaveButton";
+import { useCardDoubleTap, useContentReader } from "./ContentReader";
 import { writeWorkspacePosition, type WorkspaceRestore } from "../lib/workspacePosition";
 
 interface RoadmapPanelProps {
@@ -36,6 +37,11 @@ export function RoadmapPanel({ hidden = false, feedback, disabled = false, loadi
   nodes = [], selectedNodeId, onNavigateNode,
   editErrorMessage, editStatus, errorMessage, selectedStepId, onSelect, onAdd, onSave, roadmap, status,
 }: RoadmapPanelProps) {
+  const reader = useContentReader();
+  const touchReading = useCardDoubleTap(".roadmap-step", (card) => {
+    const anchor = card.querySelector<HTMLButtonElement>(".roadmap-step__select");
+    if (anchor && !anchor.disabled && card.dataset.stepId) reader?.open("step", card.dataset.stepId, anchor);
+  });
   const stepsRef = useRef<HTMLOListElement>(null);
   const restoredRevision = useRef<number | null>(null);
   const dragRef = useRef<{ pointerId: number; x: number; y: number; scrollLeft: number; dragging: boolean } | null>(null);
@@ -109,6 +115,7 @@ export function RoadmapPanel({ hidden = false, feedback, disabled = false, loadi
     </div></div> : <>
       {roadmap.length === 0 ? <p className="roadmap__empty">단계가 없습니다. 단계 추가로 로드맵을 만들어 보세요.</p> : null}
       <ol className="roadmap__steps" ref={stepsRef} aria-label="로드맵 단계"
+        {...touchReading}
         onScroll={(event) => {
           if (positionProjectId && !disabled && !hidden && restoredRevision.current === resultRevision) {
             writeWorkspacePosition(positionProjectId, { roadmapScrollLeft: event.currentTarget.scrollLeft });
@@ -133,6 +140,7 @@ export function RoadmapPanel({ hidden = false, feedback, disabled = false, loadi
             if (Math.abs(dy) > Math.max(6, Math.abs(dx))) { dragRef.current = null; return; }
             if (Math.abs(dx) < 6) return;
             drag.dragging = true;
+            reader?.cancelSelection();
             suppressClickRef.current = true;
             event.currentTarget.setPointerCapture(event.pointerId);
             event.currentTarget.dataset.dragging = "true";
@@ -149,13 +157,32 @@ export function RoadmapPanel({ hidden = false, feedback, disabled = false, loadi
           event.stopPropagation();
         }}>
         {sortedRoadmap.map((step) => <li className="roadmap-step" key={step.id} data-step-id={step.id}
+          title="더블클릭 또는 Alt+Enter로 전체 읽기"
+          onDoubleClick={(event) => {
+            if (disabled || editStatus === "saving" || (event.target instanceof Element
+              && event.target.closest("button:not(.roadmap-step__select), a, input, select, textarea"))) return;
+            event.preventDefault();
+            event.stopPropagation();
+            const anchor = event.currentTarget.querySelector<HTMLButtonElement>(".roadmap-step__select");
+            if (anchor) reader?.open("step", step.id, anchor);
+          }}
           data-emphasized={step.id === selectedStepId || (selectedNode && step.componentNodeIds?.includes(selectedNode.id)) ? "true" : undefined}
           data-related={selectedNode && step.componentNodeIds?.includes(selectedNode.id) ? "true" : undefined}>
           <button className="roadmap-step__select" type="button"
+            aria-keyshortcuts="Alt+Enter"
+            onKeyDown={(event) => {
+              if (!event.altKey || event.key !== "Enter") return;
+              event.preventDefault();
+              event.stopPropagation();
+              reader?.open("step", step.id, event.currentTarget);
+            }}
             aria-label={`${step.order}단계 ${step.title.trim() || "제목 없음"} 편집`}
             aria-pressed={step.id === selectedStepId} aria-controls={step.id === selectedStepId ? "workspace-detail" : undefined}
             disabled={disabled || editStatus === "saving"}
-            onClick={() => onSelect(step.id === selectedStepId ? null : step.id)}>
+            onClick={(event) => {
+              const select = () => onSelect(step.id === selectedStepId ? null : step.id);
+              if (reader) reader.select(event, select); else select();
+            }}>
             <span className="roadmap-step__order" aria-hidden="true">{step.order}</span>
             <span className="roadmap-step__content">
               <span className="roadmap-step__title">{step.title.trim() || "제목 없음"}

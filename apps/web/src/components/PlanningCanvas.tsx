@@ -18,6 +18,7 @@ import {
 } from "@xyflow/react";
 import type { DependencyEdge, DependencyType, PlanningResult } from "@ai-planning-platform/shared";
 import { ComponentNodeCard } from "./ComponentNodeCard";
+import { useCardDoubleTap, useContentReader } from "./ContentReader";
 import { LabeledDependencyEdge } from "./LabeledDependencyEdge";
 import { StatusView } from "./StatusView";
 import { WorkspaceIcon } from "./WorkspaceIcon";
@@ -139,6 +140,7 @@ export function PlanningCanvas({
   selectedNodeId,
   status,
 }: PlanningCanvasProps) {
+  const reader = useContentReader();
   const [flow, setFlow] = useState<ReactFlowInstance | null>(null);
   const [showMiniMap, setShowMiniMap] = useState(false);
   const shellRef = useRef<HTMLElement>(null);
@@ -188,6 +190,7 @@ export function PlanningCanvas({
     setFlowNodes((previous) => {
       const measured = new Map(previous.map((node) => [node.id, node.measured]));
       return nodes.map((node) => ({ ...node, measured: measured.get(node.id), selected: node.id === selectedNodeId,
+        domAttributes: { "aria-keyshortcuts": "Alt+Enter" },
         hidden: !visibleIds.has(node.id), className: relatedNodeIds?.includes(node.id) ? "planning-node--related" : undefined,
         ariaLabel: `${node.data.label}${relatedNodeIds?.includes(node.id) ? ", 선택한 단계의 관련 노드" : ""}` }));
     });
@@ -210,10 +213,24 @@ export function PlanningCanvas({
     return () => observer.disconnect();
   }, [flow]);
 
-  const handleNodeClick: NodeMouseHandler = (_event, node) => {
-    setSelectedEdgeId(null);
-    onSelectNode(node.id);
+  const handleNodeClick: NodeMouseHandler = (event, node) => {
+    const select = () => { setSelectedEdgeId(null); onSelectNode(node.id); };
+    if (reader) reader.select(event, select); else select();
   };
+  const handleNodeDoubleClick: NodeMouseHandler = (event, node) => {
+    if (event.target instanceof Element && event.target.closest(".react-flow__handle, button")) return;
+    event.preventDefault();
+    event.stopPropagation();
+    readNode(node.id, event.currentTarget as HTMLElement);
+  };
+  function readNode(id: string, anchor: HTMLElement) {
+    // React Flow may select on pointer down; reading keeps the workspace selection intact.
+    setFlowNodes((previous) => previous.map((item) => ({ ...item, selected: item.id === selectedNodeId })));
+    reader?.open("node", id, anchor);
+  }
+  const touchReading = useCardDoubleTap(".react-flow__node", (node) => {
+    if (node.dataset.id) readNode(node.dataset.id, node);
+  });
   function selectEdge(edgeId: string) {
     setSelectedEdgeId(edgeId);
     onSelectNode(null);
@@ -246,7 +263,16 @@ export function PlanningCanvas({
   }
 
   return (
-    <section className="canvas-shell" id="planning-canvas" hidden={hidden} ref={shellRef} aria-label="계획 의존성 그래프">
+    <section className="canvas-shell" id="planning-canvas" hidden={hidden} ref={shellRef} aria-label="계획 의존성 그래프"
+      {...touchReading}
+      onKeyDownCapture={(event) => {
+        if (!event.altKey || event.key !== "Enter" || !(event.target instanceof Element)) return;
+        const node = event.target.closest<HTMLElement>(".react-flow__node");
+        if (!node?.dataset.id) return;
+        event.preventDefault();
+        event.stopPropagation();
+        reader?.open("node", node.dataset.id, node);
+      }}>
       <div className="canvas-heading">
         <div><h2>구조 캔버스</h2></div>
         <div className="canvas-heading__tools">
@@ -296,6 +322,8 @@ export function PlanningCanvas({
         edgeTypes={edgeTypes}
         nodeTypes={nodeTypes}
         onNodeClick={handleNodeClick}
+        onNodeDoubleClick={handleNodeDoubleClick}
+        onNodeDragStart={() => reader?.cancelSelection()}
         onEdgeClick={(_event, edge) => selectEdge(edge.id)}
         onNodeDragStop={handleNodeDragStop}
         onPaneClick={() => { onSelectNode(null); setSelectedEdgeId(null); }}

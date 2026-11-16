@@ -6,7 +6,7 @@ import { nodeTypeLabels, priorityLabels } from "../lib/planningLabels";
 
 export function ComponentNodeCard({ data, selected }: NodeProps<PlanningFlowNode>) {
   return (
-    <div className="custom-node" aria-selected={selected}>
+    <div className="custom-node nopan" aria-selected={selected} title="더블클릭 또는 Alt+Enter로 전체 읽기">
       <Handle type="target" position={Position.Left} aria-label={`${data.label} 연결 도착점`} title="다른 노드의 연결을 여기에 놓으세요" />
       <div className="custom-node__body">
         <div className="custom-node__meta">

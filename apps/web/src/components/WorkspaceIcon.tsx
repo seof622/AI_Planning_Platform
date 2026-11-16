@@ -2,6 +2,9 @@ import type { ReactNode } from "react";
 
 const shapes = {
   search: <><circle cx="10" cy="10" r="6" /><path d="m15 15 6 6" /></>,
+  expand: <><path d="M14 3h7v7M21 3l-8 8M10 21H3v-7m0 7 8-8" /></>,
+  collapse: <><path d="M21 3l-8 8m0-7v7h7M3 21l8-8m0 7v-7H4" /></>,
+  edit: <><path d="m15 5 4 4M4 20l4-1L21 6a2.8 2.8 0 0 0-4-4L4 15l-1 6Z" /></>,
   undo: <path d="m9 4-6 6 6 6M3 10h11a6 6 0 0 1 0 12" />,
   redo: <path d="m15 4 6 6-6 6M21 10H10a6 6 0 0 0 0 12" />,
   fit: <><path d="M9 3H3v6m12-6h6v6M3 15v6h6m12-6v6h-6" /><rect x="8" y="8" width="8" height="8" rx="1" /></>,

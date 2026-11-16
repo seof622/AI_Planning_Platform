@@ -21,6 +21,7 @@ import { defaultWorkspaceLayout, layoutLimits, useWorkspaceLayout } from "../lib
 import { WorkspaceResizeHandle } from "./WorkspaceResizeHandle";
 import type { NodeFocusRequest } from "../lib/graphNavigation";
 import { useWorkspacePositionPersistence } from "../lib/useWorkspacePositionPersistence";
+import { ContentReaderProvider } from "./ContentReader";
 
 const statusLabels = {
   empty: "비어 있음",
@@ -212,6 +213,11 @@ export function PlanningWorkspace() {
   ]);
 
   return (
+    <ContentReaderProvider scope={`${selectedProjectId}:${canvasRevision}`} nodes={planningResult?.nodes ?? []}
+      roadmap={planningResult?.roadmap ?? []} disabled={isBusy} onEdit={(kind, id) => {
+        if (kind === "node") selectNode(id); else selectRoadmapStep(id);
+        requestAnimationFrame(() => document.querySelector<HTMLInputElement>("#workspace-detail input")?.focus({ preventScroll: true }));
+      }}>
     <main className="workspace" onBlurCapture={finishEditGroup} onKeyDown={(event) => {
       if (event.defaultPrevented || event.nativeEvent.isComposing || event.altKey || !(event.ctrlKey || event.metaKey)) return;
       const target = event.target;
@@ -431,5 +437,6 @@ export function PlanningWorkspace() {
       </div>
 
     </main>
+    </ContentReaderProvider>
   );
 }
