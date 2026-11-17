@@ -16,11 +16,13 @@ describe("PlanningOperationFeedback", () => {
     expect(screen.getByRole("timer")).toHaveTextContent("0초");
     act(() => { vi.advanceTimersByTime(65_000); });
     expect(screen.getByRole("timer")).toHaveTextContent("1분 5초");
+    expect(screen.getByRole("status", { name: "AI 생성 중" })).toHaveClass("workspace__status");
     expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
     rerender(<PlanningOperationFeedback {...props}
       pending={{ kind: "version", projectId: "project", resultId: "older", startedAt: Date.now() }} />);
     expect(screen.getByRole("status", { name: "버전 불러오는 중" })).toBeVisible();
     expect(screen.getByRole("timer")).toHaveTextContent("0초");
+    expect(screen.queryByText(/생성이 계속 진행 중이에요/)).not.toBeInTheDocument();
   });
 
   it("explains the retained result and offers explicit retry and dismissal", async () => {

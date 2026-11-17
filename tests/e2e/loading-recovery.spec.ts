@@ -112,6 +112,7 @@ test("failed regeneration keeps the graph, roadmap, selection and edits until ex
   const originalViewport = await readViewport();
   page.once("dialog", (dialog) => dialog.accept());
   await page.getByRole("button", { name: "새 버전으로 다시 생성", exact: true }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
   await expect(page.getByRole("status", { name: "AI 생성 중", exact: true })).toBeVisible();
   await expect(page.locator(".react-flow__node").first()).toContainText("유지할 노드 편집");
   await expect(page.getByLabel("Node 이름", { exact: true })).toHaveCount(0);
@@ -120,11 +121,19 @@ test("failed regeneration keeps the graph, roadmap, selection and edits until ex
   await expect(page.getByLabel("계획 요구사항", { exact: true })).toBeDisabled();
   await expect(page.getByRole("button", { name: "생성 중", exact: true })).toBeDisabled();
   await expect(page.getByRole("timer")).toContainText(/\d+초/);
+  await expect(page.locator("#planning-canvas")).toHaveAttribute("data-generating", "true");
+  await expect(page.locator("#planning-roadmap")).toHaveAttribute("data-generating", "true");
+  await expect(page.locator("#planning-canvas .design-workshop")).toBeVisible();
+  await expect(page.locator("#planning-roadmap .roadmap-workshop")).toBeVisible();
+  await testInfo.attach("regenerating-existing-result", { body: await page.screenshot(), contentType: "image/png" });
   expect(control.generationCalls).toBe(1);
   release();
   const failure = page.getByRole("alert", { name: "AI 생성 실패", exact: true });
   await expect(failure).toContainText("기존 결과 유지");
   await expect(failure).toContainText("AI 서비스에 연결하지 못했습니다.");
+  await expect(page.locator("#planning-canvas")).toHaveAttribute("data-generating", "false");
+  await expect(page.locator("#planning-roadmap")).toHaveAttribute("data-generating", "false");
+  await expect(page.locator(".generation-preview")).toHaveCount(0);
   await expect(page.getByLabel("1단계 제목", { exact: true })).toBeEnabled();
   await expect(page.getByLabel("계획 버전", { exact: true })).toHaveValue("original");
   await expect(page.getByLabel("계획 요구사항", { exact: true })).toHaveValue(original.requirement!.content);
@@ -144,6 +153,99 @@ test("failed regeneration keeps the graph, roadmap, selection and edits until ex
   expect(control.generationCalls).toBe(2);
 });
 
+test("generation keeps distinct animated workshops inside the graph and roadmap panels at every screen size", async ({ page }, testInfo) => {
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => { release = resolve; });
+  const { control } = await setupRecoveryFixture(page, { empty: true, generationGate: gate });
+  await page.goto("/");
+  await page.getByRole("button", { name: "계획 생성", exact: true }).click();
+  const graph = page.locator("#planning-canvas");
+  const roadmap = page.locator("#planning-roadmap");
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(page.locator(".workspace__header").getByRole("status", { name: "AI 생성 중", exact: true })).toBeVisible();
+  await expect(page.locator(".workspace__results .operation-feedback")).toHaveCount(0);
+  await expect(page.getByText("AI 구성 중", { exact: true })).toHaveCount(0);
+  await expect(graph.locator(".status-view")).toHaveCount(0);
+  await expect(page.getByRole("status", { name: "AI 생성 중", exact: true })).toBeVisible();
+  await expect(graph).toHaveAttribute("aria-busy", "true");
+  await expect(roadmap).toHaveAttribute("aria-busy", "true");
+  await expect(graph.locator(".design-workshop")).toBeVisible();
+  await expect(graph.locator(".roadmap-workshop")).toHaveCount(0);
+  await expect(roadmap.locator(".roadmap-workshop")).toBeVisible();
+  await expect(roadmap.locator(".design-workshop")).toHaveCount(0);
+  await expect(page.locator(".react-flow__node")).toHaveCount(0);
+  await expect(page.getByRole("progressbar")).toHaveCount(0);
+  async function timeline(time: number) {
+    await page.locator(".generation-preview").evaluateAll((scenes, at) => scenes.forEach((scene) =>
+      scene.getAnimations({ subtree: true }).forEach((animation) => { animation.pause(); animation.currentTime = at; })), time);
+  }
+  async function bounded() {
+    for (const panel of [graph, roadmap]) {
+      const bounds = (await panel.boundingBox())!;
+      for (const child of [panel.locator(".generation-preview"), panel.locator(".generation-preview > svg")]) {
+        const box = (await child.boundingBox())!;
+        expect(box.width).toBeGreaterThan(100);
+        expect(box.height).toBeGreaterThan(30);
+        expect(box.x).toBeGreaterThanOrEqual(bounds.x);
+        expect(box.y).toBeGreaterThanOrEqual(bounds.y);
+        expect(box.x + box.width).toBeLessThanOrEqual(bounds.x + bounds.width);
+        expect(box.y + box.height).toBeLessThanOrEqual(bounds.y + bounds.height);
+      }
+    }
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  }
+  await timeline(0);
+  const firstPosition = await graph.locator(".design-workshop__plotter").evaluate((tool) => getComputedStyle(tool).transform);
+  const firstPress = await roadmap.locator(".roadmap-workshop__press").evaluate((tool) => getComputedStyle(tool).transform);
+  await expect(graph.locator(".design-workshop__module--3")).toHaveCSS("opacity", "0");
+  await expect(roadmap.locator(".roadmap-workshop__card--2")).toHaveCSS("opacity", "0");
+  await timeline(9400);
+  expect(await graph.locator(".design-workshop__plotter").evaluate((tool) => getComputedStyle(tool).transform)).not.toBe(firstPosition);
+  expect(await roadmap.locator(".roadmap-workshop__press").evaluate((tool) => getComputedStyle(tool).transform)).not.toBe(firstPress);
+  await expect(graph.locator(".design-workshop__module--3")).toHaveCSS("opacity", "1");
+  await expect(roadmap.locator(".roadmap-workshop__card--2")).toHaveCSS("opacity", "1");
+  await expect(roadmap.locator(".roadmap-workshop__stamp--2")).toHaveCSS("opacity", "1");
+  await bounded();
+  await testInfo.attach("panel-workshops-desktop", { body: await page.screenshot({ path: "build/local-runtime/panel-workshops-desktop.png" }), contentType: "image/png" });
+  await page.setViewportSize({ width: 1024, height: 768 });
+  await bounded();
+  await testInfo.attach("panel-workshops-compact", { body: await page.screenshot({ path: "build/local-runtime/panel-workshops-compact.png" }), contentType: "image/png" });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await bounded();
+  await testInfo.attach("panel-workshops-mobile", { body: await page.screenshot({ path: "build/local-runtime/panel-workshops-mobile.png", fullPage: true }), contentType: "image/png" });
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  expect(await graph.locator(".design-workshop__plotter").evaluate((tool) => getComputedStyle(tool).animationName)).toBe("none");
+  expect(await roadmap.locator(".roadmap-workshop__press").evaluate((tool) => getComputedStyle(tool).animationName)).toBe("none");
+  await expect(graph.locator(".design-workshop__module--3")).toHaveCSS("opacity", "1");
+  await expect(roadmap.locator(".roadmap-workshop__card--2")).toHaveCSS("opacity", "1");
+  release();
+  await expect(page.locator(".react-flow__node").first()).toContainText("재생성된 노드");
+  await expect(page.locator(".generation-preview")).toHaveCount(0);
+  await expect(graph).toHaveAttribute("aria-busy", "false");
+  await expect(roadmap).toHaveAttribute("aria-busy", "false");
+  await expect(page.getByRole("status", { name: "AI 생성 중", exact: true })).toHaveCount(0);
+  expect(control.generationCalls).toBe(1);
+});
+
+test("regeneration keeps the right workshop and generation notice in focused graph and roadmap views", async ({ page }) => {
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => { release = resolve; });
+  const { control } = await setupRecoveryFixture(page, { generationGate: gate });
+  await page.goto("/");
+  await page.getByRole("button", { name: "새 버전으로 다시 생성", exact: true }).click();
+  await page.getByRole("button", { name: "그래프 집중 보기", exact: true }).click();
+  await expect(page.locator("#planning-canvas .design-workshop")).toBeVisible();
+  await expect(page.locator("#planning-roadmap")).toBeHidden();
+  await expect(page.getByRole("status", { name: "AI 생성 중", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "로드맵 집중 보기", exact: true }).click();
+  await expect(page.locator("#planning-roadmap .roadmap-workshop")).toBeVisible();
+  await expect(page.locator("#planning-canvas")).toBeHidden();
+  await expect(page.getByRole("status", { name: "AI 생성 중", exact: true })).toBeVisible();
+  release();
+  await expect(page.locator(".generation-preview")).toHaveCount(0);
+  await expect(page.locator("#planning-roadmap .roadmap__steps")).toBeVisible();
+  expect(control.generationCalls).toBe(1);
+});
 test("initial failure retains the input and the empty view leads to the first input", async ({ page }) => {
   const { control, original } = await setupRecoveryFixture(page, { empty: true, generationFailures: 1 });
   await page.goto("/");

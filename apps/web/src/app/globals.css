@@ -111,7 +111,9 @@ summary { cursor: pointer; }
   border: 1px solid var(--border); border-radius: 8px; background: var(--surface);
   font-size: 12px; font-weight: 500; color: var(--text-muted); white-space: nowrap;
 }
-.workspace__status > span { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.workspace__status > span[aria-hidden="true"] { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.workspace__status > .workspace-icon { width: 14px; height: 14px; }
+.workspace__status-elapsed { padding-left: 8px; border-left: 1px solid var(--border); color: var(--text-muted); font-size: 11px; font-variant-numeric: tabular-nums; }
 .workspace__status--ready { color: var(--accent); }
 .workspace__status--loading { color: var(--info); }
 .workspace__status--error { color: var(--danger); }
@@ -323,7 +325,7 @@ summary { cursor: pointer; }
 .graph-filter-status button { min-height: 26px; padding: 3px 7px; border: 1px solid #b8d2c2; border-radius: 5px; background: white; color: var(--accent-strong); font-size: 11px; }
 .history-panel__metadata summary { font-size: 11px; color: var(--text-muted); }
 .history-panel__metadata p { margin-top: 8px; }
-.canvas-shell > .react-flow { flex: 1; height: auto; min-height: 0; }
+.canvas-content > .react-flow { flex: 1; height: auto; min-height: 0; }
 .canvas-shell .react-flow__pane { cursor: grab; }
 .canvas-shell .react-flow__attribution { border-radius: 5px; background: rgba(255,255,255,0.8); font-size: 9px; }
 .canvas-shell .react-flow__controls { border: 1px solid var(--border); border-radius: 9px; box-shadow: var(--shadow); overflow: hidden; }
@@ -490,7 +492,63 @@ summary { cursor: pointer; }
 .operation-feedback--inline.operation-feedback--error { grid-template-columns: minmax(0, 1fr) auto; align-items: center; }
 .operation-feedback--inline.operation-feedback--error > .operation-feedback__heading { grid-column: 1 / -1; }
 .operation-feedback--error .operation-feedback__heading > .button { min-height: 26px; height: 26px; width: 26px; min-width: 26px; padding: 3px; }
-
+.canvas-content, .roadmap-content { position: relative; display: flex; flex-direction: column; flex: 1; min-height: 0; min-width: 0; overflow: hidden; }
+.generation-preview { position: absolute; z-index: 5; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0; min-width: 0; padding: 8px 18px 12px; overflow: hidden; background: radial-gradient(ellipse at 50% 65%, #e6f2ea, #f8faf6 75%); }
+.generation-preview--roadmap { border-radius: 10px; background: radial-gradient(ellipse at 50% 60%, #f1f4e7, #fbfcf7 80%); }
+.generation-preview::before { content: ""; position: absolute; inset: 0; pointer-events: none; opacity: 0.4; background-image: radial-gradient(#abc8b5 0.7px, transparent 0.7px); background-size: 24px 24px; mask-image: radial-gradient(ellipse, #000, transparent 75%); }
+.generation-preview > svg { position: relative; display: block; flex: 1; width: 100%; height: 0; min-height: 0; max-width: 760px; }
+.generation-preview > .roadmap-workshop { max-width: 900px; }
+.generation-preview > p { position: relative; display: flex; align-items: center; justify-content: center; gap: 8px; flex-shrink: 0; max-width: 100%; margin: 2px 0 0; color: #658171; text-align: center; font-size: 11px; line-height: 1.6; }
+.generation-preview__activity { display: inline-flex; align-items: center; flex-shrink: 0; gap: 3px; height: 14px; }
+.generation-preview__activity > i { width: 3px; height: 10px; border-radius: 2px; background: #76ab89; animation: workshop-activity 1.4s ease-in-out infinite; }
+.generation-preview__activity > i:nth-child(2) { animation-delay: 0.2s; }
+.generation-preview__activity > i:nth-child(3) { animation-delay: 0.4s; }
+.design-workshop__connections path { stroke-dasharray: 1; animation: workshop-connect 12s ease-in-out infinite; }
+.design-workshop__module { animation: workshop-module-first 12s cubic-bezier(0.2, 0.8, 0.3, 1) infinite; }
+.design-workshop__module--1 { animation-name: workshop-module-second; }
+.design-workshop__module--2 { animation-name: workshop-module-third; }
+.design-workshop__module--3 { animation-name: workshop-module-fourth; }
+.design-workshop__module-spark { opacity: 0; animation: workshop-spark 12s ease-out infinite; }
+.design-workshop__module--1 .design-workshop__module-spark { animation-delay: 1.92s; }
+.design-workshop__module--2 .design-workshop__module-spark { animation-delay: 3.84s; }
+.design-workshop__module--3 .design-workshop__module-spark { animation-delay: 5.76s; }
+.design-workshop__plotter { animation: workshop-plotter 12s cubic-bezier(0.45, 0, 0.25, 1) infinite; }
+.design-workshop__robot { animation: workshop-hover 3s ease-in-out infinite; }
+.design-workshop__eyes { transform-box: fill-box; transform-origin: center; animation: workshop-blink 4.8s infinite; }
+.design-workshop__signal { animation: generation-breathe 1.6s ease-in-out infinite; }
+.design-workshop__particles circle { animation: workshop-particle 3.2s ease-out infinite; animation-delay: var(--particle-delay); }
+.roadmap-workshop__belt { animation: roadmap-belt 2s linear infinite; }
+.roadmap-workshop__route path { stroke-dasharray: 1; animation: workshop-connect 12s ease-in-out infinite; }
+.roadmap-workshop__card { animation: roadmap-card-first 12s ease-out infinite; }
+.roadmap-workshop__card--1 { animation-name: roadmap-card-second; }
+.roadmap-workshop__card--2 { animation-name: roadmap-card-third; }
+.roadmap-workshop__stamp { transform-box: fill-box; transform-origin: center; animation: roadmap-stamp-first 12s ease-out infinite; }
+.roadmap-workshop__stamp--1 { animation-name: roadmap-stamp-second; }
+.roadmap-workshop__stamp--2 { animation-name: roadmap-stamp-third; }
+.roadmap-workshop__press { animation: roadmap-press 12s ease-in-out infinite; }
+.roadmap-workshop__arm { transform-origin: 18px 22px; animation: roadmap-arm 3s ease-in-out infinite; }
+@keyframes generation-breathe { 0%, 100% { opacity: 0.45; } 50% { opacity: 1; } }
+@keyframes workshop-connect { 0%, 14% { stroke-dashoffset: 1; opacity: 0.2; } 68%, 84% { stroke-dashoffset: 0; opacity: 1; } 94%, 100% { stroke-dashoffset: 0; opacity: 0; } }
+@keyframes workshop-module-first { 0%, 5% { transform: translateY(-70px); opacity: 0; } 13%, 84% { transform: translateY(0); opacity: 1; } 94%, 100% { transform: translateY(-8px); opacity: 0; } }
+@keyframes workshop-module-second { 0%, 21% { transform: translateY(-70px); opacity: 0; } 29%, 84% { transform: translateY(0); opacity: 1; } 94%, 100% { transform: translateY(-8px); opacity: 0; } }
+@keyframes workshop-module-third { 0%, 37% { transform: translateY(-70px); opacity: 0; } 45%, 84% { transform: translateY(0); opacity: 1; } 94%, 100% { transform: translateY(-8px); opacity: 0; } }
+@keyframes workshop-module-fourth { 0%, 53% { transform: translateY(-70px); opacity: 0; } 61%, 84% { transform: translateY(0); opacity: 1; } 94%, 100% { transform: translateY(-8px); opacity: 0; } }
+@keyframes workshop-plotter { 0%, 13%, 100% { transform: translate(0, 0); } 21%, 29% { transform: translate(-113px, 62px); } 37%, 45% { transform: translate(113px, 62px); } 53%, 61% { transform: translate(0, 122px); } 70% { transform: translate(-56px, 92px); } 78% { transform: translate(56px, 31px); } 88% { transform: translate(0, 0); } }
+@keyframes workshop-spark { 0%, 12%, 19%, 100% { opacity: 0; } 14% { opacity: 1; } 18% { opacity: 0; transform: translateY(-7px); } }
+@keyframes workshop-hover { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-7px); } }
+@keyframes workshop-blink { 0%, 42%, 46%, 100% { transform: scaleY(1); } 44% { transform: scaleY(0.1); } }
+@keyframes workshop-particle { 0%, 100% { opacity: 0; transform: translateY(0); } 40% { opacity: 0.65; } 90% { opacity: 0; transform: translateY(-24px); } }
+@keyframes workshop-activity { 0%, 100% { transform: scaleY(0.35); opacity: 0.4; } 50% { transform: scaleY(1); opacity: 1; } }
+@keyframes roadmap-belt { to { stroke-dashoffset: -40; } }
+@keyframes roadmap-card-first { 0%, 5% { opacity: 0; transform: translate(-70px, -10px) rotate(-6deg); } 16%, 84% { opacity: 1; transform: translate(0, 0) rotate(0); } 95%, 100% { opacity: 0; transform: translateX(30px); } }
+@keyframes roadmap-card-second { 0%, 27% { opacity: 0; transform: translate(-70px, -10px) rotate(-6deg); } 38%, 84% { opacity: 1; transform: translate(0, 0) rotate(0); } 95%, 100% { opacity: 0; transform: translateX(30px); } }
+@keyframes roadmap-card-third { 0%, 49% { opacity: 0; transform: translate(-70px, -10px) rotate(-6deg); } 60%, 84% { opacity: 1; transform: translate(0, 0) rotate(0); } 95%, 100% { opacity: 0; transform: translateX(30px); } }
+@keyframes roadmap-stamp-first { 0%, 19% { opacity: 0; transform: scale(1.5); } 23%, 84% { opacity: 1; transform: scale(1); } 95%, 100% { opacity: 0; } }
+@keyframes roadmap-stamp-second { 0%, 41% { opacity: 0; transform: scale(1.5); } 45%, 84% { opacity: 1; transform: scale(1); } 95%, 100% { opacity: 0; } }
+@keyframes roadmap-stamp-third { 0%, 63% { opacity: 0; transform: scale(1.5); } 67%, 84% { opacity: 1; transform: scale(1); } 95%, 100% { opacity: 0; } }
+@keyframes roadmap-press { 0%, 16%, 100% { transform: translate(0, 0); } 21% { transform: translate(0, 27px); } 26% { transform: translate(0, 0); } 38% { transform: translate(185px, 0); } 43% { transform: translate(185px, 27px); } 48% { transform: translate(185px, 0); } 60% { transform: translate(370px, 0); } 65% { transform: translate(370px, 27px); } 70%, 84% { transform: translate(370px, 0); } }
+@keyframes roadmap-arm { 0%, 100% { transform: rotate(-5deg); } 50% { transform: rotate(8deg); } }
+@media (max-width: 900px) { .generation-preview { padding-inline: 8px; } .generation-preview > p { font-size: 10px; } }
 @media (max-height: 850px) and (min-width: 901px) {
   .workspace { min-height: 700px; }
 }

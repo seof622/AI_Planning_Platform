@@ -29,6 +29,11 @@ export function PlanningOperationFeedback({ pending, failed, errorMessage, hasRe
   const elapsed = pending ? Math.max(0, Math.floor((now - pending.startedAt) / 1000)) : 0;
   const elapsedText = elapsed < 60 ? `${elapsed}초` : `${Math.floor(elapsed / 60)}분 ${elapsed % 60}초`;
   if (!pending && !failed) return null;
+  if (pending?.kind === "generate") return <span className="workspace__status workspace__status--loading"
+    role="status" aria-label={operationLabels.generate}>
+    <WorkspaceIcon name="sparkle" />생성 중
+    <span className="workspace__status-elapsed" role="timer" aria-label="경과 시간" aria-live="off">{elapsedText}</span>
+  </span>;
   return <div ref={noticeRef} tabIndex={-1} className={`operation-feedback${hasResult ? " operation-feedback--inline" : ""}${failed ? " operation-feedback--error" : ""}`}
     role={pending ? "status" : "alert"} aria-label={pending ? operationLabels[pending.kind] : operationFailureLabels[failed!.kind]}>
     <div className="operation-feedback__heading">

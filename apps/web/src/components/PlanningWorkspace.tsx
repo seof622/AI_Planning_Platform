@@ -250,7 +250,7 @@ export function PlanningWorkspace() {
             <WorkspaceIcon name={graphEditStatus === "saving" ? "refresh" : graphEditStatus === "error" ? "alert" : hasUnsavedEdits ? "circle" : "check"} />
             <span aria-hidden="true">{graphEditStatus === "saving" ? "저장 중" : graphEditStatus === "error" ? "저장 실패" : hasUnsavedEdits ? "미저장" : "저장됨"}</span>
           </span> : null}
-          {status !== "ready" ? <span className={`workspace__status workspace__status--${status}`}><span aria-hidden="true" />{pendingOperation ? loadingLabel : statusLabels[status]}</span> : null}
+          {pendingOperation?.kind === "generate" ? feedback : status !== "ready" ? <span className={`workspace__status workspace__status--${status}`}><span aria-hidden="true" />{pendingOperation ? loadingLabel : statusLabels[status]}</span> : null}
         </div>
       </header>
       <div className="workspace__toolbar" aria-label="계획 작업 도구">
@@ -351,7 +351,7 @@ export function PlanningWorkspace() {
             relatedNodeIds={selectedStep?.componentNodeIds}
             onNavigateNode={navigateToNode}
             hidden={view === "roadmap"}
-            feedback={view !== "roadmap" ? feedback : undefined}
+            feedback={pendingOperation?.kind !== "generate" && view !== "roadmap" ? feedback : undefined}
             errorMessage={errorMessage}
             onStart={focusPlanningInput}
             hasSelectedProject={selectedProjectId !== null}
@@ -362,6 +362,7 @@ export function PlanningWorkspace() {
                 errorMessage={graphEditErrorMessage} onAddNode={addNode} onSave={saveGraphEdits} />
             ) : null}
             disabled={isBusy}
+            isGenerating={pendingOperation?.kind === "generate"}
             onConnect={(source, target) => addEdge(source, target, connectionType)}
             onUpdateEdge={updateEdge}
             onRemoveEdge={removeEdge}
@@ -386,8 +387,9 @@ export function PlanningWorkspace() {
             selectedNodeId={selectedNodeId}
             onNavigateNode={navigateToNode}
             hidden={view === "graph"}
-            feedback={view === "roadmap" ? feedback : undefined}
+            feedback={pendingOperation?.kind !== "generate" && view === "roadmap" ? feedback : undefined}
             disabled={isBusy}
+            isGenerating={pendingOperation?.kind === "generate"}
             loadingLabel={pendingOperation ? operationLabels[pendingOperation.kind] : undefined}
             selectedStepId={selectedRoadmapStepId}
             onSelect={selectRoadmapStep}

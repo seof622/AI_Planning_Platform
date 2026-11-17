@@ -21,6 +21,7 @@ import { ComponentNodeCard } from "./ComponentNodeCard";
 import { useCardDoubleTap, useContentReader } from "./ContentReader";
 import { LabeledDependencyEdge } from "./LabeledDependencyEdge";
 import { StatusView } from "./StatusView";
+import { GenerationPreview } from "./GenerationPreview";
 import { WorkspaceIcon } from "./WorkspaceIcon";
 import { toReactFlowEdges, toReactFlowNodes } from "../lib/reactFlowMapping";
 import type { PlanningStatus } from "../store/planningStore";
@@ -42,6 +43,7 @@ interface PlanningCanvasProps {
   onStart?: () => void;
   hasSelectedProject?: boolean;
   disabled?: boolean;
+  isGenerating?: boolean;
   onConnect: (source: string, target: string) => void;
   onUpdateEdge: (edgeId: string, changes: Partial<Pick<DependencyEdge, "source" | "target" | "dependencyType">>) => void;
   onRemoveEdge: (edgeId: string) => void;
@@ -131,6 +133,7 @@ export function PlanningCanvas({
   onStart,
   hasSelectedProject,
   disabled = false,
+  isGenerating = false,
   onConnect,
   onUpdateEdge,
   onRemoveEdge,
@@ -256,14 +259,17 @@ export function PlanningCanvas({
 
   if (status !== "ready" || !result) {
     return (
-      <section className="canvas-shell" id="planning-canvas" hidden={hidden} ref={shellRef}>
-        {feedback ?? <StatusView status={status} errorMessage={errorMessage} onStart={onStart} hasSelectedProject={hasSelectedProject} />}
+      <section className="canvas-shell" id="planning-canvas" hidden={hidden} ref={shellRef} aria-busy={isGenerating}>
+        {isGenerating ? <div className="canvas-heading"><h2>구조 캔버스</h2></div> : null}
+        {feedback ?? (!isGenerating ? <StatusView status={status} errorMessage={errorMessage} onStart={onStart} hasSelectedProject={hasSelectedProject} /> : null)}
+        {isGenerating ? <div className="canvas-content"><GenerationPreview kind="graph" /></div> : null}
       </section>
     );
   }
 
   return (
     <section className="canvas-shell" id="planning-canvas" hidden={hidden} ref={shellRef} aria-label="계획 의존성 그래프"
+      aria-busy={isGenerating} data-generating={isGenerating}
       {...touchReading}
       onKeyDownCapture={(event) => {
         if (!event.altKey || event.key !== "Enter" || !(event.target instanceof Element)) return;
@@ -291,6 +297,7 @@ export function PlanningCanvas({
         <button type="button" disabled={disabled} onClick={() => changeFilter("", "all")}>필터 초기화</button>
       </div> : null}
       {feedback}
+      <div className="canvas-content">
       <ReactFlow
         onInit={setFlow}
         onMoveEnd={rememberViewport}
@@ -353,6 +360,8 @@ export function PlanningCanvas({
           zoomable
         /> : null}
       </ReactFlow>
+      {isGenerating ? <GenerationPreview kind="graph" /> : null}
+      </div>
     </section>
   );
 }

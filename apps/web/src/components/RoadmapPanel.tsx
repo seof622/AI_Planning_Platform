@@ -6,6 +6,7 @@ import { priorityLabels } from "../lib/planningLabels";
 import type { PlanningStatus } from "../store/planningStore";
 import { WorkspaceIcon } from "./WorkspaceIcon";
 import { ResultSaveButton } from "./ResultSaveButton";
+import { GenerationPreview } from "./GenerationPreview";
 import { useCardDoubleTap, useContentReader } from "./ContentReader";
 import { writeWorkspacePosition, type WorkspaceRestore } from "../lib/workspacePosition";
 
@@ -19,6 +20,7 @@ interface RoadmapPanelProps {
   hidden?: boolean;
   feedback?: ReactNode;
   disabled?: boolean;
+  isGenerating?: boolean;
   loadingLabel?: string;
   saveBlocked?: boolean;
   editErrorMessage: string | null;
@@ -32,7 +34,7 @@ interface RoadmapPanelProps {
   status: PlanningStatus;
 }
 
-export function RoadmapPanel({ hidden = false, feedback, disabled = false, loadingLabel = "불러오는 중", saveBlocked = false,
+export function RoadmapPanel({ hidden = false, feedback, disabled = false, isGenerating = false, loadingLabel = "불러오는 중", saveBlocked = false,
   positionProjectId, resultRevision = 0, workspaceRestore,
   nodes = [], selectedNodeId, onNavigateNode,
   editErrorMessage, editStatus, errorMessage, selectedStepId, onSelect, onAdd, onSave, roadmap, status,
@@ -91,7 +93,8 @@ export function RoadmapPanel({ hidden = false, feedback, disabled = false, loadi
     return () => observer.disconnect();
   }, [selectedStepId, selectedOrder, selectedNodeId, hidden, status, resultRevision, workspaceRestore]);
 
-  return <section className="roadmap" id="planning-roadmap" hidden={hidden} aria-label="계획 로드맵">
+  return <section className="roadmap" id="planning-roadmap" hidden={hidden} aria-label="계획 로드맵"
+    aria-busy={isGenerating} data-generating={isGenerating}>
     <div className="roadmap__header">
       <h2 className="roadmap__title">로드맵</h2>
       <div className="roadmap__actions">
@@ -108,7 +111,8 @@ export function RoadmapPanel({ hidden = false, feedback, disabled = false, loadi
     </p> : null}
     {feedback}
     {editErrorMessage ? <p className="form-field__error" role="alert">{editErrorMessage}</p> : null}
-    {status !== "ready" ? <div className="status-view"><div className="status-view__box">
+    <div className="roadmap-content">
+    {isGenerating && status !== "ready" ? null : status !== "ready" ? <div className="status-view"><div className="status-view__box">
       <h3 className="status-view__title">{status === "loading" ? loadingLabel : "로드맵 없음"}</h3>
       {status === "error" ? <p className="status-view__copy">{errorMessage ?? "계획 결과를 불러올 수 없습니다."}</p> : null}
       {status === "empty" ? <p className="status-view__copy">계획을 생성하세요.</p> : null}
@@ -207,5 +211,7 @@ export function RoadmapPanel({ hidden = false, feedback, disabled = false, loadi
         </li>)}
       </ol>
     </>}
+    {isGenerating ? <GenerationPreview kind="roadmap" /> : null}
+    </div>
   </section>;
 }
