@@ -117,7 +117,7 @@ function ContentReader({ target, item, onClose, onEdit }: {
   const ref = useRef<HTMLDialogElement>(null);
   const heading = useRef<HTMLHeadingElement>(null);
   const titleId = useId();
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(true);
   const [compact, setCompact] = useState(() => window.matchMedia("(max-width: 900px)").matches);
   const modal = expanded || compact;
   const node = target.kind === "node" ? item as ComponentNode : null;

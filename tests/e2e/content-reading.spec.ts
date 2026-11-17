@@ -54,7 +54,7 @@ async function inBounds(page: Page) {
   expect(box!.y + box!.height).toBeLessThanOrEqual(size.height);
 }
 
-test("node full reading preserves selection, viewport and saved state, with selectable text and a larger reader", async ({ page }, testInfo) => {
+test("node full reading opens directly in a large modal and preserves selection, viewport and saved state", async ({ page }, testInfo) => {
   const { result, writes, errors } = await fixture(page);
   const node = page.locator(`.react-flow__node[data-id="${result.nodes[0]!.id}"]`);
   const trigger = node;
@@ -62,12 +62,17 @@ test("node full reading preserves selection, viewport and saved state, with sele
   const before = await viewport(page);
   const coordinates = await node.getAttribute("style");
   const options = await page.getByLabel("계획 버전", { exact: true }).locator("option").count();
+  await expect(page.getByRole("status", { name: "결과 편집 저장됨", exact: true })).toBeVisible();
   await trigger.dblclick();
   const reader = page.getByRole("dialog", { name: result.nodes[0]!.label });
   await expect(reader).toBeVisible();
+  await expect(reader).toHaveAttribute("aria-modal", "true");
+  await expect(reader).toHaveAttribute("data-expanded", "true");
+  const box = (await reader.boundingBox())!;
+  expect(box.width).toBe(760);
+  expect(Math.abs(box.x + box.width / 2 - page.viewportSize()!.width / 2)).toBeLessThan(1);
   await expect(page.locator("#workspace-detail")).toHaveCount(0);
   await expect(page.locator(".react-flow__node.selected")).toHaveCount(0);
-  await expect(page.getByRole("status", { name: "결과 편집 저장됨", exact: true })).toBeVisible();
   expect(await viewport(page)).toBe(before);
   expect(await node.getAttribute("style")).toBe(coordinates);
   await expect(reader.locator(".content-reader__description")).toHaveText(longDescription);
@@ -82,9 +87,6 @@ test("node full reading preserves selection, viewport and saved state, with sele
   await page.evaluate(() => window.getSelection()?.removeAllRanges());
   await inBounds(page);
   await testInfo.attach("node-reading", { body: await page.screenshot(), contentType: "image/png" });
-  await reader.getByRole("button", { name: "크게 보기", exact: true }).click();
-  await expect(reader).toHaveAttribute("aria-modal", "true");
-  await inBounds(page);
   await reader.locator(".content-reader__body").evaluate((body) => { body.scrollTop = body.scrollHeight; });
   await expect(reader.getByRole("button", { name: "편집", exact: true })).toBeVisible();
   await reader.getByRole("button", { name: "작게 보기", exact: true }).click();
@@ -94,6 +96,7 @@ test("node full reading preserves selection, viewport and saved state, with sele
   await expect(trigger).toBeFocused();
   await page.keyboard.press("Alt+Enter");
   await expect(reader).toBeVisible();
+  await expect(reader).toHaveAttribute("aria-modal", "true");
   await reader.getByRole("button", { name: "전체 읽기 닫기", exact: true }).click();
   await expect(trigger).toBeFocused();
   expect(await viewport(page)).toBe(before);
@@ -116,12 +119,14 @@ test("roadmap reading keeps scroll and unsaved node edits, and explicitly opens 
   await trigger.dblclick();
   const reader = page.getByRole("dialog", { name: "실행 단계 10", exact: true });
   await expect(reader).toBeVisible();
+  await expect(reader).toHaveAttribute("aria-modal", "true");
+  await expect(reader).toHaveAttribute("data-expanded", "true");
   await expect(reader.locator(".content-reader__description")).toHaveText(`10단계 전문\n\n${longDescription}`);
   await expect(page.getByLabel("Node 이름", { exact: true })).toHaveValue("수정 중인 노드");
   await expect(row.locator(".roadmap-step__select")).toHaveAttribute("aria-pressed", "false");
   expect(await viewport(page)).toBe(before);
   expect(await list.evaluate((element) => element.scrollLeft)).toBe(scroll);
-  expect(await page.getByRole("button", { name: "편집 실행 취소", exact: true }).isDisabled()).toBe(undoDisabled);
+  expect(await page.getByRole("button", { name: "편집 실행 취소", exact: true, includeHidden: true }).isDisabled()).toBe(undoDisabled);
   await inBounds(page);
   await testInfo.attach("roadmap-reading", { body: await page.screenshot(), contentType: "image/png" });
   await reader.getByRole("button", { name: "편집", exact: true }).click();
@@ -145,15 +150,17 @@ test("reader closes on outside interaction, hidden sources and version changes w
   const trigger = page.locator(`.react-flow__node[data-id="${result.nodes[0]!.id}"]`);
   await trigger.dblclick();
   await expect(page.getByRole("dialog")).toBeVisible();
-  await page.getByRole("heading", { name: "로드맵", exact: true }).click();
+  await page.mouse.click(5, 5);
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await trigger.dblclick();
+  await page.getByRole("dialog").getByRole("button", { name: "작게 보기", exact: true }).click();
   // Simulate hiding the anchor without pointer interaction outside the reader.
   await page.getByRole("button", { name: "로드맵 집중 보기", exact: true }).focus();
   await page.keyboard.press("Enter");
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await page.getByRole("button", { name: "함께 보기", exact: true }).click();
   await trigger.dblclick();
+  await page.getByRole("dialog").getByRole("button", { name: "작게 보기", exact: true }).click();
   const version = page.getByLabel("계획 버전", { exact: true });
   const old = await version.locator("option").evaluateAll((options) => options.find((option) => option.value !== "reading-current")!.value);
   await version.selectOption(old);
