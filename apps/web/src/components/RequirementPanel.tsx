@@ -2,30 +2,11 @@
 
 import type {
   AIModelOption,
-  PlanType,
-  SuccessCriterion,
+  ReviewRecommendation,
 } from "@ai-planning-platform/shared";
 import type { BriefSaveStatus, PlanningBriefDraft } from "../store/planningStore";
-import { recommendModel } from "../lib/modelRecommendation";
 import { WorkspaceIcon } from "./WorkspaceIcon";
-import { getGenerationBlocker } from "../lib/planningInput";
-
-const planTypeLabels: Record<PlanType, string> = {
-  creative: "창작 / 아이디어",
-  daily: "일상 / 루틴",
-  decision: "선택 / 의사결정",
-  event: "행사 / 여행",
-  learning: "학습 / 성장",
-  project: "프로젝트",
-};
-
-const criterionLabels: Record<SuccessCriterion, string> = {
-  balance: "균형",
-  clarity: "명확함",
-  consistency: "꾸준함",
-  quality: "완성도",
-  speed: "빠른 실행",
-};
+import { criterionLabels, getReviewBlocker, planTypeLabels } from "../lib/planningInput";
 
 const modelLevelLabels = {
   cost: { high: "높음", low: "낮음", medium: "보통" },
@@ -33,13 +14,11 @@ const modelLevelLabels = {
   speed: { balanced: "균형", deliberate: "신중", fast: "빠름" },
 } as const;
 
-const complexityLabels = {
-  balanced: "보통",
-  complex: "복잡함",
-  simple: "간단함",
-} as const;
-
 interface RequirementPanelProps {
+  recommendation?: ReviewRecommendation | null;
+  onOpenReview?: () => void;
+  onOpenHistory?: () => void;
+  hasReview?: boolean;
   briefSaveStatus?: BriefSaveStatus;
   briefSaveErrorMessage?: string | null;
   onRetryBriefSave?: () => Promise<void>;
@@ -54,7 +33,7 @@ interface RequirementPanelProps {
   modelErrorMessage: string | null;
   models: AIModelOption[];
   modelStatus: "idle" | "loading" | "ready" | "error";
-  onGenerate: () => Promise<void>;
+  onReview: () => Promise<void>;
   onReset: () => void;
   onShowError: () => void;
   planningBrief: PlanningBriefDraft;
@@ -69,6 +48,10 @@ interface RequirementPanelProps {
 }
 
 export function RequirementPanel({
+  recommendation = null,
+  onOpenReview,
+  onOpenHistory,
+  hasReview = false,
   briefSaveStatus = "idle",
   briefSaveErrorMessage = null,
   onRetryBriefSave,
@@ -83,7 +66,7 @@ export function RequirementPanel({
   modelErrorMessage,
   models,
   modelStatus,
-  onGenerate,
+  onReview,
   onReset,
   onShowError,
   planningBrief,
@@ -105,7 +88,7 @@ export function RequirementPanel({
   const selectedModelOption = models.find(
     (model) => model.id === selectedModel,
   );
-  const missingInput = getGenerationBlocker({ hasSelectedProject, modelStatus, models, selectedModel, requirementText, planningBrief });
+  const missingInput = getReviewBlocker({ hasSelectedProject, requirementText });
   const canSubmit = !isLoading && missingInput === null;
   const draftStatusText = !hasSelectedProject ? "프로젝트를 선택하면 입력 초안을 자동 저장합니다."
     : isViewingHistoricalResult ? "과거 버전 입력을 보는 중 · 자동 저장 일시 중지"
@@ -114,13 +97,7 @@ export function RequirementPanel({
     : briefSaveStatus === "saved" ? "입력 초안 자동 저장됨"
     : briefSaveStatus === "error" ? "입력 초안 자동 저장 실패"
     : "입력하면 초안을 자동 저장합니다.";
-  const modelRecommendation = recommendModel(
-    models,
-    {
-      ...planningBrief,
-      requirementText,
-    },
-  );
+  const recommendedModel = models.find((model) => model.id === recommendation?.model);
 
   function updateContextItem(index: number, value: string) {
     setPlanningBriefField(
@@ -182,7 +159,7 @@ export function RequirementPanel({
         className="requirement-form"
         onSubmit={(event) => {
           event.preventDefault();
-          if (canSubmit) void onGenerate();
+          if (canSubmit) void onReview();
         }}
       >
         <fieldset className="requirement-form__body" disabled={isLoading}>
@@ -200,7 +177,7 @@ export function RequirementPanel({
 
           <section className="form-field">
             <div className="form-field__header">
-              <span className="form-field__label">상황 / 대상 <span className="form-field__required" title="1개 이상 입력"><span aria-hidden="true">*</span><span className="sr-only">1개 이상</span></span></span>
+              <span className="form-field__label">상황 / 대상 <span className="form-field__hint">선택</span></span>
             </div>
             <div className="repeatable-list">
               {planningBrief.context.map((item, index) => (
@@ -247,7 +224,7 @@ export function RequirementPanel({
 
           <section className="form-field">
             <div className="form-field__header">
-              <span className="form-field__label">해야 할 일 <span className="form-field__required" title="1개 이상 입력"><span aria-hidden="true">*</span><span className="sr-only">1개 이상</span></span></span>
+              <span className="form-field__label">해야 할 일 <span className="form-field__hint">선택 · AI와 보완 가능</span></span>
             </div>
             <div className="repeatable-list">
               {planningBrief.actionItems.map((item, index) => (
@@ -420,7 +397,7 @@ export function RequirementPanel({
               {models.map((model) => (
                 <option key={model.id} value={model.id}>
                   {model.label}
-                  {model.id === modelRecommendation?.model.id ? " · 추천" : ""}
+                  {model.id === recommendation?.model ? " · 추천" : ""}
                 </option>
               ))}
             </select>
@@ -433,16 +410,13 @@ export function RequirementPanel({
               onClick={() => void onRetryModels()}><WorkspaceIcon name="refresh" />모델 다시 불러오기</button> : null}
             <details className="model-details">
               <summary>모델 안내</summary>
-              {modelRecommendation ? (
+              {recommendation && recommendedModel ? (
                 <div className="model-recommendation" aria-label="추천 모델">
                   <span className="model-recommendation__badge">추천</span>
                   <p>
-                    <strong>{modelRecommendation.model.label}</strong>
-                    <span>
-                      계획 복잡도: {complexityLabels[modelRecommendation.complexity]}
-                      {" · "}{modelRecommendation.score}점
-                    </span>
-                    <span>{modelRecommendation.reason}</span>
+                    <strong>{recommendedModel.label}</strong>
+                    <span>{recommendation.reason}</span>
+                    {recommendation.uncertainty ? <span>{recommendation.uncertainty}</span> : null}
                   </p>
                 </div>
               ) : null}
@@ -473,19 +447,23 @@ export function RequirementPanel({
             {hasResult && hasUnappliedInput ? <p className="generation-guidance__changed" title="현재 입력은 아직 결과에 반영되지 않았습니다.">
               <WorkspaceIcon name="refresh" /><span>입력 변경됨</span><span className="sr-only">현재 입력은 아직 결과에 반영되지 않았습니다.</span>
             </p> : null}
-            <p className={!isLoading && !missingInput ? "sr-only" : undefined}>{isLoading ? "현재 작업이 끝나면 생성할 수 있습니다." : missingInput ?? (hasResult ? "현재 입력으로 새 결과 버전을 생성합니다." : "입력한 내용을 바탕으로 계획을 생성합니다.")}</p>
+            <p className={!isLoading && !missingInput ? "sr-only" : undefined}>{isLoading ? "현재 작업이 끝나면 검토할 수 있습니다." : missingInput ?? "AI 피드백과 모델을 확인한 뒤 계획을 생성합니다."}</p>
           </div>
           <button
             className="button button--primary"
             aria-describedby="generation-guidance"
-            aria-label={isLoading ? loadingLabel : hasResult ? "새 버전으로 다시 생성" : "계획 생성"}
-            title={hasResult ? "현재 입력으로 새 결과 버전을 생성합니다." : "계획 생성"}
+            aria-label={isLoading ? loadingLabel : "AI 입력 검토"}
+            title="AI가 입력을 검토하고 모델을 추천합니다."
             type="submit"
             disabled={!canSubmit}
           >
             <WorkspaceIcon name={isLoading ? "refresh" : hasResult ? "refresh" : "sparkle"} className={isLoading ? "workspace-icon--spin" : ""} />
-            {isLoading ? loadingLabel : hasResult ? "다시 생성" : "계획 생성"}
+            {isLoading ? loadingLabel : "AI 입력 검토"}
           </button>
+          <div className="review-panel-links">
+            {hasReview ? <button className="button" type="button" disabled={isLoading} onClick={onOpenReview}>검토 결과 보기</button> : null}
+            <button className="button" type="button" disabled={!hasSelectedProject || isLoading} onClick={onOpenHistory}>검토·추천 이력</button>
+          </div>
         </div>
       </form>
     </aside>

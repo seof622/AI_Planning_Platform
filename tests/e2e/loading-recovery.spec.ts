@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { mockPlanningResult, type PlanningResult, type ProjectPlanningBrief } from "@ai-planning-platform/shared";
 import { openRoadmapStep } from "./roadmapHelpers";
+import { createReviewFixture, reviewAndGenerate } from "./reviewHelpers";
 
 // Recovery failures are simulated locally: no AI calls or personal project writes.
 async function setupRecoveryFixture(page: Page, options: {
@@ -33,7 +34,9 @@ async function setupRecoveryFixture(page: Page, options: {
   const control = { generationCalls: 0, generationFailures: options.generationFailures ?? 0,
     projectFailures: options.projectFailures ?? 0, versionFailures: options.versionFailures ?? 0,
     modelFailures: options.modelFailures ?? 0, historyFailures: 0 };
+  const reviewFixture = createReviewFixture(project.id, () => draft);
   await page.route("http://localhost:8000/**", async (route) => {
+    if (await reviewFixture.route(route)) return;
     const request = route.request();
     const path = new URL(request.url()).pathname;
     if (path === "/planning/models") {
@@ -44,13 +47,13 @@ async function setupRecoveryFixture(page: Page, options: {
         description: "테스트", recommendedFor: "테스트", cost: "low", speed: "fast", quality: "standard" }] } }); return;
     }
     if (path === "/projects") { await route.fulfill({ json: [project] }); return; }
-    if (path.endsWith("/planning/generate")) {
+    if (/\/planning-confirmations\/[^/]+\/generate$/.test(path)) {
       control.generationCalls += 1;
       await options.generationGate;
       if (control.generationFailures-- > 0) {
         await route.fulfill({ status: 503, json: { detail: "AI 서비스에 연결하지 못했습니다." } }); return;
       }
-      const body = request.postDataJSON();
+      const body = reviewFixture.generationBody();
       const id = `generated-${control.generationCalls}`;
       latest = { ...original, requirement: { ...original.requirement!, content: body.requirement },
         nodes: original.nodes.map((node, index) => index === 0 ? { ...node, label: "재생성된 노드" } : node),
@@ -58,7 +61,7 @@ async function setupRecoveryFixture(page: Page, options: {
       results.set(id, latest);
       briefs.set(id, { requirement: body.requirement, brief: body.brief, selectedModel: body.options.model });
       history.unshift({ id, createdAt: latest.metadata.generatedAt, summary: latest.summary, model: "mock", canRestore: true });
-      await route.fulfill({ json: latest }); return;
+      await route.fulfill({ json: reviewFixture.generationResponse(latest, request.postDataJSON().idempotencyKey) }); return;
     }
     if (path.endsWith("/planning-results/latest")) {
       await options.projectGate;
@@ -111,7 +114,7 @@ test("failed regeneration keeps the graph, roadmap, selection and edits until ex
   }
   const originalViewport = await readViewport();
   page.once("dialog", (dialog) => dialog.accept());
-  await page.getByRole("button", { name: "새 버전으로 다시 생성", exact: true }).click();
+  await reviewAndGenerate(page);
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await expect(page.getByRole("status", { name: "AI 생성 중", exact: true })).toBeVisible();
   await expect(page.locator(".react-flow__node").first()).toContainText("유지할 노드 편집");
@@ -158,7 +161,7 @@ test("generation keeps distinct animated workshops inside the graph and roadmap 
   const gate = new Promise<void>((resolve) => { release = resolve; });
   const { control } = await setupRecoveryFixture(page, { empty: true, generationGate: gate });
   await page.goto("/");
-  await page.getByRole("button", { name: "계획 생성", exact: true }).click();
+  await reviewAndGenerate(page);
   const graph = page.locator("#planning-canvas");
   const roadmap = page.locator("#planning-roadmap");
   await expect(page.getByRole("dialog")).toHaveCount(0);
@@ -232,7 +235,7 @@ test("regeneration keeps the right workshop and generation notice in focused gra
   const gate = new Promise<void>((resolve) => { release = resolve; });
   const { control } = await setupRecoveryFixture(page, { generationGate: gate });
   await page.goto("/");
-  await page.getByRole("button", { name: "새 버전으로 다시 생성", exact: true }).click();
+  await reviewAndGenerate(page);
   await page.getByRole("button", { name: "그래프 집중 보기", exact: true }).click();
   await expect(page.locator("#planning-canvas .design-workshop")).toBeVisible();
   await expect(page.locator("#planning-roadmap")).toBeHidden();
@@ -252,7 +255,7 @@ test("initial failure retains the input and the empty view leads to the first in
   await page.getByRole("button", { name: "계획 입력 접기", exact: true }).click();
   await page.getByRole("button", { name: "계획 입력", exact: true }).click();
   await expect(page.getByLabel("계획 요구사항", { exact: true })).toBeFocused();
-  await page.getByRole("button", { name: "계획 생성", exact: true }).click();
+  await reviewAndGenerate(page);
   const failure = page.getByRole("alert", { name: "AI 생성 실패", exact: true });
   await expect(failure).toBeVisible();
   await expect(page.locator(".react-flow__node")).toHaveCount(0);
@@ -327,10 +330,10 @@ test("catalog and history can retry independently without repeating successful g
   const { control } = await setupRecoveryFixture(page, { modelFailures: 1 });
   await page.goto("/");
   await expect(page.locator(".react-flow__node").first()).toBeVisible();
-  await expect(page.getByRole("button", { name: "새 버전으로 다시 생성", exact: true })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "AI 입력 검토", exact: true })).toBeEnabled();
   await page.getByRole("button", { name: "모델 다시 불러오기", exact: true }).click();
   control.historyFailures = 1;
-  await page.getByRole("button", { name: "새 버전으로 다시 생성", exact: true }).click();
+  await reviewAndGenerate(page);
   await expect(page.locator(".react-flow__node").first()).toContainText("재생성된 노드");
   await expect(page.getByLabel("계획 버전", { exact: true })).toHaveValue("generated-1");
   await expect(page.getByRole("alert", { name: "AI 생성 실패", exact: true })).toHaveCount(0);
@@ -344,7 +347,7 @@ test("mobile generation failure brings the retained result and retry into view",
   await page.setViewportSize({ width: 390, height: 844 });
   await setupRecoveryFixture(page, { generationFailures: 1 });
   await page.goto("/");
-  await page.getByRole("button", { name: "새 버전으로 다시 생성", exact: true }).click();
+  await reviewAndGenerate(page);
   const failure = page.getByRole("alert", { name: "AI 생성 실패", exact: true });
   await expect(failure).toBeFocused();
   await expect(failure).toBeInViewport();

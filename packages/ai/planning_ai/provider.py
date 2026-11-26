@@ -7,6 +7,7 @@ from pydantic import ValidationError
 from .errors import PlanningConfigurationError, PlanningProviderError
 from .models import GeneratedPlanningResult
 from .prompt import resolve_system_prompt
+from .telemetry import record_response
 
 
 class PlanningProvider(Protocol):
@@ -44,7 +45,9 @@ class OpenAIPlanningProvider:
 
         self._model = model or os.getenv("OPENAI_MODEL", "gpt-5-mini")
         timeout = timeout_seconds or float(os.getenv("OPENAI_TIMEOUT_SECONDS", "180"))
-        self._client = client or OpenAI(api_key=resolved_api_key, timeout=timeout)
+        if not 1 <= timeout <= 300:
+            raise PlanningConfigurationError("Planning timeout must be between 1 and 300 seconds.")
+        self._client = client or OpenAI(api_key=resolved_api_key, timeout=timeout, max_retries=0)
 
     @property
     def model(self) -> str:
@@ -84,6 +87,7 @@ class OpenAIPlanningProvider:
                 f"OpenAI structured response validation failed: {str(error)[:500]}"
             ) from error
 
+        record_response(response, self._model)
         parsed = response.output_parsed
         if parsed is None:
             raise PlanningProviderError(

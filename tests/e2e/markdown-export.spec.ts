@@ -11,6 +11,7 @@ test("downloads saved, edited and historical plans without saving or restoring a
   await page.route("http://localhost:8000/**", async (route) => {
     const request = route.request();
     const path = new URL(request.url()).pathname;
+    if (path.endsWith("/planning-reviews")) { await route.fulfill({ json: [] }); return; }
     if (request.method() !== "GET") mutations.push(`${request.method()} ${path}`);
     let json: unknown;
     if (path === "/planning/models") json = { defaultModel: "mock", models: [{ id: "mock", label: "테스트 모델", description: "테스트", recommendedFor: "테스트", cost: "low", speed: "fast", quality: "standard" }] };
@@ -63,6 +64,7 @@ test("downloads saved, edited and historical plans without saving or restoring a
 test("disables export for a project without a generated result", async ({ page }) => {
   await page.route("http://localhost:8000/**", async (route) => {
     const path = new URL(route.request().url()).pathname;
+    if (path.endsWith("/planning-reviews")) { await route.fulfill({ json: [] }); return; }
     if (path === "/planning/models") await route.fulfill({ json: { defaultModel: "mock", models: [] } });
     else await route.fulfill({ json: [] });
   });

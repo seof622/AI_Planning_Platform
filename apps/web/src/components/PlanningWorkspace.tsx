@@ -16,7 +16,9 @@ import { versionLabel } from "../lib/planningVersions";
 import { WorkspaceIcon } from "./WorkspaceIcon";
 import { PlanningOperationFeedback } from "./PlanningOperationFeedback";
 import { operationLabels } from "../lib/planningOperations";
-import { getGenerationBlocker } from "../lib/planningInput";
+import { getReviewBlocker } from "../lib/planningInput";
+import { usePlanningReviewStore } from "../store/planningReviewStore";
+import { PlanningReviewDialog } from "./PlanningReviewDialog";
 import { defaultWorkspaceLayout, layoutLimits, useWorkspaceLayout } from "../lib/useWorkspaceLayout";
 import { WorkspaceResizeHandle } from "./WorkspaceResizeHandle";
 import type { NodeFocusRequest } from "../lib/graphNavigation";
@@ -32,6 +34,7 @@ const statusLabels = {
 };
 
 export function PlanningWorkspace() {
+  const reviewState = usePlanningReviewStore();
   useWorkspacePositionPersistence();
   const [nodeFocusRequest, setNodeFocusRequest] = useState<NodeFocusRequest | null>(null);
   const [connectionType, setConnectionType] = useState<DependencyType>("requires");
@@ -60,7 +63,6 @@ export function PlanningWorkspace() {
     updateEdge,
     createAndSelectProject,
     errorMessage,
-    generateResult,
     graphEditErrorMessage,
     graphEditStatus,
     versionConflict,
@@ -99,7 +101,6 @@ export function PlanningWorkspace() {
     setErrorState,
     setPlanningBriefField,
     setRequirementText,
-    setSelectedModel,
     status,
     updateNode,
     updateNodePosition,
@@ -116,7 +117,14 @@ export function PlanningWorkspace() {
   }
   const selectedStep = planningResult?.roadmap.find((step) => step.id === selectedRoadmapStepId) ?? null;
   const hasUnsavedEdits = graphEditStatus !== "idle";
-  const isBusy = status === "loading" || graphEditStatus === "saving";
+  const reviewBusy = reviewState.status === "reviewing" || reviewState.status === "confirming";
+  const isBusy = status === "loading" || graphEditStatus === "saving" || reviewBusy;
+  const { syncProject, restoreLatest, invalidate: invalidateReview, preference: reviewPreference } = reviewState;
+  useEffect(() => {
+    syncProject(selectedProjectId);
+    if (projectStatus === "ready") void restoreLatest();
+  }, [selectedProjectId, projectStatus, syncProject, restoreLatest]);
+  useEffect(() => { invalidateReview(); }, [requirementText, planningBrief, reviewPreference, invalidateReview]);
   function navigateToNode(nodeId: string) {
     if (isBusy || !planningResult?.nodes.some((node) => node.id === nodeId)) return;
     selectNode(nodeId);
@@ -124,12 +132,12 @@ export function PlanningWorkspace() {
     setNodeFocusRequest((previous) => ({ nodeId, revision: canvasRevision, sequence: (previous?.sequence ?? 0) + 1 }));
   }
   const resultStatus = planningResult && (pendingOperation || failedOperation) ? (planningResult.nodes.length ? "ready" : "empty") : status;
-  const loadingLabel = pendingOperation?.kind === "generate" ? "생성 중"
+  const loadingLabel = reviewBusy ? "입력 검토 중" : pendingOperation?.kind === "generate" ? "생성 중"
     : pendingOperation?.kind === "restore" ? "복원 중"
     : graphEditStatus === "saving" ? "저장 중" : "불러오는 중";
-  const retryBlocker = failedOperation?.kind === "generate" ? getGenerationBlocker({
-    hasSelectedProject: selectedProjectId !== null, modelStatus, models, selectedModel, requirementText, planningBrief,
-  }) : null;
+  const retryBlocker = failedOperation?.kind === "generate" ? getReviewBlocker({
+    hasSelectedProject: selectedProjectId !== null, requirementText,
+  }) ?? (!usePlanningStore.getState().confirmedGeneration ? "현재 입력과 모델을 다시 확인해 주세요." : null) : null;
   const feedback = pendingOperation || failedOperation ? <PlanningOperationFeedback
     pending={pendingOperation} failed={failedOperation} errorMessage={errorMessage} hasResult={planningResult !== null}
     retryDisabled={isBusy || retryBlocker !== null} retryDisabledReason={retryBlocker}
@@ -218,6 +226,7 @@ export function PlanningWorkspace() {
         if (kind === "node") selectNode(id); else selectRoadmapStep(id);
         requestAnimationFrame(() => document.querySelector<HTMLInputElement>("#workspace-detail input")?.focus({ preventScroll: true }));
       }}>
+    <PlanningReviewDialog onConfirm={async () => { if (confirmDiscardEdits()) await reviewState.confirmAndGenerate(); }} />
     <main className="workspace" onBlurCapture={finishEditGroup} onKeyDown={(event) => {
       if (event.defaultPrevented || event.nativeEvent.isComposing || event.altKey || !(event.ctrlKey || event.metaKey)) return;
       const target = event.target;
@@ -324,7 +333,11 @@ export function PlanningWorkspace() {
             modelErrorMessage={modelErrorMessage}
             models={models}
             modelStatus={modelStatus}
-            onGenerate={async () => { if (confirmDiscardEdits()) await generateResult(); }}
+            onReview={reviewState.startReview}
+            hasReview={reviewState.review !== null || reviewState.status === "uncertain"}
+            recommendation={reviewState.status === "ready" ? reviewState.review?.recommendation ?? null : null}
+            onOpenReview={reviewState.show}
+            onOpenHistory={() => void reviewState.showHistory()}
             onReset={() => { if (confirmDiscardEdits()) resetToEmpty(); }}
             onShowError={() =>
               setErrorState("AI 계획 결과를 생성하지 못했습니다.")
@@ -334,7 +347,7 @@ export function PlanningWorkspace() {
             selectedModel={selectedModel}
             setPlanningBriefField={setPlanningBriefField}
             setRequirementText={setRequirementText}
-            setSelectedModel={setSelectedModel}
+            setSelectedModel={(value) => void reviewState.selectModel(value)}
           />
         </div>
         {!layout.inputCollapsed ? <WorkspaceResizeHandle label="입력 패널 너비 조절" orientation="vertical" controls="workspace-input"

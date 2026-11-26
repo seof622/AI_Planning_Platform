@@ -12,7 +12,7 @@ interface StatusViewProps {
 const statusCopy: Record<PlanningStatus, { title: string; copy: string }> = {
   empty: {
     title: "첫 계획을 만들어 보세요",
-    copy: "주제와 해야 할 일을 입력하면 계획을 정리해 드려요.",
+    copy: "주제를 입력하면 AI가 필요한 내용을 함께 확인해 드려요.",
   },
   error: {
     title: "오류",

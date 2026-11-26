@@ -48,7 +48,9 @@ packages/shared/src/fixtures/mockPlanningResult.json
 ```
 
 `/planning/generate` runs the LangGraph workflow in `packages/ai` and uses the
-OpenAI Responses API with Pydantic Structured Outputs.
+OpenAI Responses API with Pydantic Structured Outputs. Evaluation scripts continue
+to call this endpoint. The response metadata identifies these calls as
+`executionOrigin: evaluation-direct`.
 
 Set these environment variables before calling it:
 
@@ -58,10 +60,13 @@ OPENAI_MODEL=gpt-5-mini
 OPENAI_ALLOWED_MODELS=gpt-5-mini,gpt-5.6-luna,gpt-5.6-terra,gpt-5.6-sol
 OPENAI_TIMEOUT_SECONDS=180
 PLANNING_PROMPT_VERSION=planning-prompt-v2
+PLANNING_REVIEW_MODEL=gpt-5-mini
+PLANNING_REVIEW_TIMEOUT_SECONDS=90
 ```
 
 `GET /planning/models` returns the configured model catalog for the Web UI.
-`OPENAI_MODEL` must be included in `OPENAI_ALLOWED_MODELS`.
+`OPENAI_MODEL` and `PLANNING_REVIEW_MODEL` must be included in
+`OPENAI_ALLOWED_MODELS`. The review model defaults to `OPENAI_MODEL`.
 
 ## Test
 
@@ -78,7 +83,14 @@ Project endpoints:
 - `POST /projects`
 - `GET /projects`
 - `GET /projects/{project_id}`
-- `POST /projects/{project_id}/planning/generate`
+- `POST /projects/{project_id}/planning-reviews`
+- `GET /projects/{project_id}/planning-reviews`
+- `GET /projects/{project_id}/planning-reviews/{review_id}`
+- `POST /projects/{project_id}/planning-reviews/{review_id}/decisions`
+- `POST /projects/{project_id}/planning-confirmations/{confirmation_id}/generate`
+- `GET /projects/{project_id}/ai-execution-runs/{run_id}`
+- `GET /projects/{project_id}/ai-execution-runs/by-key/{request_key}?kind=review`
+- `GET|POST /projects/{project_id}/planning-results/{result_id}/quality-evaluations`
 - `GET /projects/{project_id}/planning-results/latest`
 - `GET /projects/{project_id}/planning-results`
 - `GET /projects/{project_id}/planning-results/{result_id}`
@@ -87,6 +99,13 @@ Project endpoints:
 - `POST /projects/{project_id}/planning-results/{result_id}/restore`
 - `GET /projects/{project_id}/planning-brief`
 - `PUT /projects/{project_id}/planning-brief`
+
+Project generation requires a completed review and a confirmation of its input,
+assumptions and selected model. Submit the confirmation ID and a request key to
+the confirmed generation endpoint. Reuse the same key to check an uncertain
+request. A new key after a known failure records a new attempt.
+`POST /projects/{project_id}/planning/generate` returns HTTP 409 with
+`planning_review_required`.
 
 The Web automatically saves the current requirement, planning brief fields, and
 selected model to the project planning-brief endpoint. Selecting the project

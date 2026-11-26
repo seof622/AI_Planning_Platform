@@ -51,7 +51,7 @@ class FakeWorkflow:
         return GENERATED_RESULT
 
 
-def test_project_planning_result_round_trip(monkeypatch) -> None:
+def test_project_planning_result_round_trip(monkeypatch, reviewed_generate) -> None:
     engine = create_engine(
         "sqlite+pysqlite:///:memory:",
         connect_args={"check_same_thread": False},
@@ -114,9 +114,8 @@ def test_project_planning_result_round_trip(monkeypatch) -> None:
         assert get_brief_response.status_code == 200
         assert get_brief_response.json() == brief_payload
 
-        generate_response = client.post(
-            f"/projects/{project['id']}/planning/generate",
-            json={
+        generate_response = reviewed_generate(
+            client, project["id"], {
                 "requirement": brief_payload["requirement"],
                 "brief": brief_payload["brief"],
                 "options": {"model": brief_payload["selectedModel"]},

@@ -16,6 +16,7 @@ async function fixture(page: Page) {
   const controls = { failB: false, writes: [] as string[] };
   await page.route("http://localhost:8000/**", async (route) => {
     const path = new URL(route.request().url()).pathname;
+    if (path.endsWith("/planning-reviews")) { await route.fulfill({ json: [] }); return; }
     if (route.request().method() !== "GET") controls.writes.push(path);
     if (controls.failB && path.includes("/position-b/")) {
       await route.fulfill({ status: 503, json: { detail: "Project unavailable" } }); return;

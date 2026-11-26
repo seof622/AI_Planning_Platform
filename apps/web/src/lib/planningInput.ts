@@ -1,5 +1,29 @@
-import type { AIModelOption } from "@ai-planning-platform/shared";
+import type { AIModelOption, PlanType, SuccessCriterion } from "@ai-planning-platform/shared";
 import type { PlanningBriefDraft } from "../store/planningStore";
+
+export const planTypeLabels: Record<PlanType, string> = {
+  creative: "창작 / 아이디어",
+  daily: "일상 / 루틴",
+  decision: "선택 / 의사결정",
+  event: "행사 / 여행",
+  learning: "학습 / 성장",
+  project: "프로젝트",
+};
+
+export const criterionLabels: Record<SuccessCriterion, string> = {
+  balance: "균형",
+  clarity: "명확함",
+  consistency: "꾸준함",
+  quality: "완성도",
+  speed: "빠른 실행",
+};
+
+export function getReviewBlocker(input: { hasSelectedProject: boolean; requirementText: string }): string | null {
+  if (!input.hasSelectedProject) return "프로젝트를 먼저 선택하거나 만들어 주세요.";
+  if (!input.requirementText.trim()) return "계획 주제를 입력해 주세요.";
+  if (input.requirementText.length > 8000) return "계획 주제는 8,000자 이내로 입력해 주세요.";
+  return null;
+}
 
 export function getGenerationBlocker(input: {
   hasSelectedProject: boolean;

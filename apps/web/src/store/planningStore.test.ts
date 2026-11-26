@@ -3,7 +3,7 @@ import type {
   Project,
 } from "@ai-planning-platform/shared";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { hasUnappliedInput, usePlanningStore } from "./planningStore";
+import { currentReviewInput, hasUnappliedInput, usePlanningStore } from "./planningStore";
 import { validatePlanningResult, mockPlanningResult } from "@ai-planning-platform/shared";
 
 const project: Project = {
@@ -105,6 +105,16 @@ function setLoadedResult() {
     resultPlanningBrief: persistedBrief, requirementText: persistedBrief.requirement,
     planningBrief: { ...persistedBrief.brief, actionItems: [{ necessity: "required", text: "Implement tests" }] },
   });
+  usePlanningStore.setState({ confirmedGeneration: confirmationForCurrentInput() });
+}
+
+function confirmationForCurrentInput() {
+  return { confirmationId: "confirmation-test", idempotencyKey: "generation-key", input: currentReviewInput(),
+    selectedModel: usePlanningStore.getState().selectedModel };
+}
+
+function execution(result: PlanningResult) {
+  return { result, review: null, run: { id: "run-test", status: "succeeded", kind: "generation", resultId: result.metadata.resultId } };
 }
 
 describe("planningStore", () => {
@@ -428,7 +438,7 @@ describe("planningStore", () => {
     expect(hasUnappliedInput(usePlanningStore.getState())).toBe(true);
   });
 
-  it("sends the selected model through the project generation request", async () => {
+  it("generates using the confirmation that fixes the selected model and input", async () => {
     usePlanningStore.setState({
       planningBrief: {
         actionItems: [{ necessity: "required", text: "Implement tests" }],
@@ -444,23 +454,18 @@ describe("planningStore", () => {
       selectedProjectId: project.id,
     });
     vi.mocked(fetch)
-      .mockResolvedValueOnce(jsonResponse(planningResult))
+      .mockResolvedValueOnce(jsonResponse(execution(planningResult)))
       .mockResolvedValueOnce(jsonResponse(planningHistory));
 
-    await usePlanningStore.getState().generateResult();
+    await usePlanningStore.getState().generateResult(confirmationForCurrentInput());
 
     expect(fetch).toHaveBeenCalledTimes(2);
     const [url, init] = vi.mocked(fetch).mock.calls[0]!;
     expect(url).toBe(
-      "http://localhost:8000/projects/project-test/planning/generate",
+      "http://localhost:8000/projects/project-test/planning-confirmations/confirmation-test/generate",
     );
     expect(JSON.parse(String(init?.body))).toMatchObject({
-      options: { model: "gpt-5.6-luna" },
-      project: {
-        id: project.id,
-        title: project.title,
-      },
-      requirement: "Build a test plan",
+      idempotencyKey: "generation-key",
     });
     expect(usePlanningStore.getState().status).toBe("ready");
     expect(usePlanningStore.getState().planningHistory).toEqual(planningHistory);
@@ -555,7 +560,7 @@ describe("planningStore", () => {
     });
     expect(usePlanningStore.getState().planningResult).toBe(before.planningResult);
     const generated = { ...planningResult, metadata: { ...planningResult.metadata, resultId: "generated-retry" } };
-    vi.mocked(fetch).mockResolvedValueOnce(jsonResponse(generated))
+    vi.mocked(fetch).mockResolvedValueOnce(jsonResponse(execution(generated)))
       .mockResolvedValueOnce(jsonResponse([{ ...planningHistory[0]!, id: "generated-retry" }, ...planningHistory]));
     await usePlanningStore.getState().retryFailedOperation();
     expect(usePlanningStore.getState()).toMatchObject({
@@ -578,7 +583,7 @@ describe("planningStore", () => {
   it("keeps a successful generation and its token when only history loading fails", async () => {
     setLoadedResult();
     const generated = { ...planningResult, metadata: { ...planningResult.metadata, resultId: "generated-with-history-error" } };
-    vi.mocked(fetch).mockResolvedValueOnce(jsonResponse(generated))
+    vi.mocked(fetch).mockResolvedValueOnce(jsonResponse(execution(generated)))
       .mockResolvedValueOnce(jsonResponse({ detail: "History unavailable" }, 503));
     await usePlanningStore.getState().generateResult();
     expect(usePlanningStore.getState()).toMatchObject({ planningResult: generated, planningHistory,

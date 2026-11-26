@@ -17,6 +17,7 @@ test.beforeEach(async ({ page }) => {
     brief: { planType: "project", successCriterion: "clarity", context: ["개인 프로젝트"], actionItems: [] }, selectedModel: "mock" };
   await page.route("http://localhost:8000/**", async (route) => {
     const path = new URL(route.request().url()).pathname;
+    if (path.endsWith("/planning-reviews")) { await route.fulfill({ json: [] }); return; }
     let json: unknown;
     if (path === "/planning/models") json = { defaultModel: "mock", models: [{ id: "mock", label: "기본 계획 모델", description: "간결하고 실행 가능한 계획", recommendedFor: "개인 프로젝트", cost: "low", speed: "fast", quality: "standard" }] };
     else if (path === "/projects") json = [project];
@@ -98,7 +99,7 @@ test("desktop workspace fits the viewport and keeps canvas, roadmap and inspecto
   await expect(page.locator(".brief-options > summary")).toContainText("제약 있음");
   await page.locator(".brief-options > summary").click();
   await expect(page.getByLabel("제약 조건", { exact: true })).toHaveValue("주말에만 진행");
-  const generate = page.getByRole("button", { name: "새 버전으로 다시 생성", exact: true });
+  const generate = page.getByRole("button", { name: "AI 입력 검토", exact: true });
   const beforeScroll = await generate.boundingBox();
   await page.locator(".requirement-form__body").evaluate((body) => { body.scrollTop = body.scrollHeight; });
   expect(await generate.boundingBox()).toEqual(beforeScroll);
@@ -141,7 +142,7 @@ test("compact desktop keeps the toolbar and generation action inside the workspa
   const bounds = await page.evaluate(() => ({ width: document.documentElement.scrollWidth, height: document.documentElement.scrollHeight }));
   expect(bounds.width).toBeLessThanOrEqual(1024);
   expect(bounds.height).toBeLessThanOrEqual(768);
-  const generate = await page.getByRole("button", { name: "새 버전으로 다시 생성", exact: true }).boundingBox();
+  const generate = await page.getByRole("button", { name: "AI 입력 검토", exact: true }).boundingBox();
   expect(generate!.y + generate!.height).toBeLessThanOrEqual(768);
   const toolbar = page.locator(".graph-edit-panel");
   await expect(toolbar.getByRole("button", { name: "변경 내용을 새 버전으로 저장", exact: true })).toBeVisible();
@@ -170,9 +171,9 @@ test("draft retry, unapplied inputs and the full result save scope remain distin
   });
   await page.goto("/");
   await expect(page.locator(".react-flow__node").first()).toBeVisible();
-  const generate = page.getByRole("button", { name: "새 버전으로 다시 생성", exact: true });
-  await expect(generate).toBeDisabled();
-  await expect(generate).toHaveAccessibleDescription(/해야 할 일을 1개 이상 입력해 주세요/);
+  const generate = page.getByRole("button", { name: "AI 입력 검토", exact: true });
+  await expect(generate).toBeEnabled();
+  await expect(generate).toHaveAccessibleDescription(/AI 피드백과 모델을 확인한 뒤 계획을 생성합니다/);
   await page.getByLabel("계획 요구사항", { exact: true }).fill("입력을 바꾼 계획");
   await expect(page.getByText("입력 변경됨", { exact: true })).toBeVisible();
   await expect(page.getByLabel("입력 초안 저장 상태")).toContainText("입력 초안 자동 저장 실패");

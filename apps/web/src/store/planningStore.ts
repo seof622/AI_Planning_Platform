@@ -16,7 +16,10 @@ import type {
   ProjectPlanningBrief,
   RoadmapStep,
   SuccessCriterion,
+  ReviewInput,
+  AIExecutionRun,
 } from "@ai-planning-platform/shared";
+import { sameReviewInput } from "@ai-planning-platform/shared";
 import {
   createProject,
   generatePlanningResult,
@@ -31,7 +34,15 @@ import {
   restorePlanningResult,
   saveGraphEdit,
   PlanningVersionConflictError,
+  PlanningApiError,
 } from "../lib/planningClient";
+
+export interface ConfirmedPlanningInput {
+  confirmationId: string;
+  idempotencyKey: string;
+  input: ReviewInput;
+  selectedModel: string;
+}
 
 export type PlanningStatus = "idle" | "ready" | "loading" | "error" | "empty";
 export type BriefSaveStatus = "idle" | "dirty" | "saving" | "saved" | "error";
@@ -135,6 +146,8 @@ const emptyEditHistory = { editPast: [] as EditSnapshot[], editFuture: [] as Edi
   savedEditSnapshot: null as EditSnapshot | null, editGroup: null as string | null };
 
 interface PlanningState {
+  confirmedGeneration: ConfirmedPlanningInput | null;
+  generationRun: AIExecutionRun | null;
   editPast: EditSnapshot[];
   editFuture: EditSnapshot[];
   savedEditSnapshot: EditSnapshot | null;
@@ -179,7 +192,7 @@ interface PlanningState {
   selectedRoadmapStepId: string | null;
   status: PlanningStatus;
   createAndSelectProject: (title: string) => Promise<void>;
-  generateResult: () => Promise<void>;
+  generateResult: (confirmation?: ConfirmedPlanningInput) => Promise<void>;
   loadProjects: () => Promise<void>;
   loadModels: () => Promise<void>;
   loadPlanningHistory: (projectId: string) => Promise<void>;
@@ -264,6 +277,8 @@ export const usePlanningStore = create<PlanningState>((set, get) => {
     });
   }
   return ({
+  confirmedGeneration: null,
+  generationRun: null,
   ...emptyEditHistory,
   canvasRevision: 0,
   workspaceRestore: null,
@@ -282,7 +297,12 @@ export const usePlanningStore = create<PlanningState>((set, get) => {
         if (get().selectedProjectId === target.projectId) await get().selectPlanningResult(target.resultId);
         break;
       case "generate":
-        if (get().selectedProjectId === target.projectId) await get().generateResult();
+        if (get().selectedProjectId === target.projectId) {
+          const confirmation = get().confirmedGeneration;
+          if (confirmation && (get().generationRun?.status === "failed" || get().generationRun?.status === "interrupted")) {
+            await get().generateResult({ ...confirmation, idempotencyKey: crypto.randomUUID() });
+          } else await get().generateResult();
+        }
         break;
       case "restore": break;
     }
@@ -352,7 +372,7 @@ export const usePlanningStore = create<PlanningState>((set, get) => {
       });
     }
   },
-  async generateResult() {
+  async generateResult(confirmation) {
     const state = get();
     if (state.pendingOperation || state.graphEditStatus === "saving") return;
     const selectedProjectId = state.selectedProjectId;
@@ -364,11 +384,19 @@ export const usePlanningStore = create<PlanningState>((set, get) => {
       return;
     }
 
+    const confirmed = confirmation ?? state.confirmedGeneration;
+    if (!confirmed || !sameReviewInput(confirmed.input, currentReviewInput(state, confirmed.input.preference))
+      || confirmed.selectedModel !== state.selectedModel) {
+      set({ errorMessage: "현재 입력과 모델을 AI 검토 화면에서 확인한 뒤 생성해 주세요.", failedOperation: null });
+      return;
+    }
+    set({ confirmedGeneration: confirmed, generationRun: null });
+
     const operation = beginOperation({ kind: "generate", projectId: selectedProjectId });
     set({ status: "loading" });
 
     try {
-      const currentRequirement = get().requirementText.trim();
+      const currentRequirement = confirmed.input.requirement;
       const planningBrief = get().planningBrief;
       const request: PlanningRequest = {
         requirement: currentRequirement,
@@ -393,8 +421,16 @@ export const usePlanningStore = create<PlanningState>((set, get) => {
           title: project.title,
         };
       }
-      const result = await generatePlanningResult(selectedProjectId, request);
+      request.requirement = confirmed.input.requirement;
+      request.brief = confirmed.input.brief;
+      request.options = { model: confirmed.selectedModel };
+      const execution = await generatePlanningResult(selectedProjectId, confirmed.confirmationId, confirmed.idempotencyKey);
       if (get().pendingOperation !== operation) return;
+      set({ generationRun: execution.run });
+      if (execution.run.status !== "succeeded" || !execution.result) {
+        throw new Error(execution.run.errorMessage ?? "계획 생성을 처리 중입니다. 다시 시도하면 같은 실행 상태를 확인합니다.");
+      }
+      const result = execution.result;
 
       set({
         planningResult: result,
@@ -431,6 +467,7 @@ export const usePlanningStore = create<PlanningState>((set, get) => {
         error instanceof Error ? error.message : "계획 결과를 불러올 수 없습니다.";
 
       set({
+        ...(error instanceof PlanningApiError && (error.status === 409 || error.status === 422) ? { confirmedGeneration: null } : {}),
         errorMessage: message,
         pendingOperation: null,
         failedOperation: operation,
@@ -527,6 +564,7 @@ export const usePlanningStore = create<PlanningState>((set, get) => {
     }
   },
   resetToEmpty() {
+    set({ confirmedGeneration: null, generationRun: null });
     set({
       pendingOperation: null,
       failedOperation: null,
@@ -707,6 +745,8 @@ export const usePlanningStore = create<PlanningState>((set, get) => {
     }
     const operation = beginOperation({ kind: "project", projectId });
     set({
+      confirmedGeneration: null,
+      generationRun: null,
       briefSaveStatus: "idle",
       briefSaveErrorMessage: null,
       briefRevision: get().briefRevision + 1,
@@ -1088,6 +1128,7 @@ export const usePlanningStore = create<PlanningState>((set, get) => {
   },
   setPlanningBriefField(field, value) {
     set((state) => ({
+      confirmedGeneration: null,
       briefSaveStatus: "dirty",
       briefSaveErrorMessage: null,
       briefRevision: state.briefRevision + 1,
@@ -1096,15 +1137,24 @@ export const usePlanningStore = create<PlanningState>((set, get) => {
     }));
   },
   setRequirementText(value) {
-    set({ isViewingHistoricalResult: false, requirementText: value,
+    set({ confirmedGeneration: null, isViewingHistoricalResult: false, requirementText: value,
       briefSaveStatus: "dirty", briefSaveErrorMessage: null, briefRevision: get().briefRevision + 1 });
   },
   setSelectedModel(value) {
-    set({ isViewingHistoricalResult: false, selectedModel: value,
+    set({ confirmedGeneration: null, isViewingHistoricalResult: false, selectedModel: value,
       briefSaveStatus: "dirty", briefSaveErrorMessage: null, briefRevision: get().briefRevision + 1 });
   },
 });
 });
+
+export function currentReviewInput(state = usePlanningStore.getState(), preference: ReviewInput["preference"] = "balanced"): ReviewInput {
+  const brief = state.planningBrief;
+  return { requirement: state.requirementText.trim(), preference, brief: {
+    actionItems: trimActionItems(brief.actionItems), context: trimList(brief.context),
+    ...(brief.constraints.trim() ? { constraints: brief.constraints.trim() } : {}),
+    planType: brief.planType, successCriterion: brief.successCriterion,
+  } };
+}
 
 export function hasUnappliedInput(state: Pick<PlanningState,
   "planningResult" | "resultPlanningBrief" | "requirementText" | "planningBrief" | "selectedModel"

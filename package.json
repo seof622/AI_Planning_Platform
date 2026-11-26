@@ -9,6 +9,7 @@
   "scripts": {
     "dev": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/start-local.ps1",
     "test:e2e": "playwright test",
+    "smoke:planning-review": "node scripts/smokePlanningReview.mjs",
     "web:dev": "npm run dev -w apps/web",
     "web:build": "npm run build -w apps/web",
     "web:typecheck": "npm run typecheck -w apps/web",

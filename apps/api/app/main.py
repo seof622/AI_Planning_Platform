@@ -48,6 +48,10 @@ from .schemas import (
 
 app = FastAPI(title="AI Planning Platform API", version="0.1.0")
 
+from .review_routes import router as review_router
+
+app.include_router(review_router)
+
 
 @app.exception_handler(PlanningVersionConflict)
 async def version_conflict_handler(_request: Request, error: PlanningVersionConflict) -> JSONResponse:
@@ -110,7 +114,9 @@ def planning_generate(request: PlanningRequest) -> dict:
     if not request.requirement.strip():
         raise HTTPException(status_code=422, detail="Requirement must not be empty.")
 
-    return generate_result(request)
+    result = generate_result(request)
+    result.setdefault("metadata", {})["executionOrigin"] = "evaluation-direct"
+    return result
 
 
 @app.post("/projects", status_code=201)
@@ -189,28 +195,10 @@ def projects_generate(
     request: PlanningRequest,
     session: Session = Depends(get_db_session),
 ) -> dict:
-    if not request.requirement.strip():
-        raise HTTPException(status_code=422, detail="Requirement must not be empty.")
-
-    project = get_project(session, project_id)
-    if project is None:
-        raise HTTPException(status_code=404, detail="Project not found.")
-
-    result = generate_result(request)
-    return save_planning_result(
-        session,
-        project=project,
-        requirement_content=request.requirement,
-        planning_brief=(
-            request.brief.model_dump(exclude_none=True) if request.brief else None
-        ),
-        selected_model=(
-            request.options.model
-            if request.options and request.options.model
-            else result.get("metadata", {}).get("model")
-        ),
-        result=result,
-    )
+    raise HTTPException(status_code=409, detail={
+        "code": "planning_review_required",
+        "message": "AI 입력 검토와 최종 확인 후 계획을 생성해 주세요.",
+    })
 
 
 @app.get("/projects/{project_id}/planning-results/latest")

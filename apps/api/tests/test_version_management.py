@@ -13,7 +13,7 @@ from app.fixtures import load_mock_planning_result
 
 
 @pytest.fixture
-def version_project(monkeypatch):
+def version_project(monkeypatch, reviewed_generate):
     engine = create_engine("sqlite+pysqlite:///:memory:", connect_args={"check_same_thread": False}, poolclass=StaticPool)
     Base.metadata.create_all(engine)
     factory = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
@@ -28,7 +28,7 @@ def version_project(monkeypatch):
         with TestClient(main_module.app) as client:
             project = client.post("/projects", json={"title": "Version tests"}).json()
             prefix = f"/projects/{project['id']}/planning-results"
-            result = client.post(f"/projects/{project['id']}/planning/generate", json={
+            result = reviewed_generate(client, project["id"], {
                 "requirement": "Version test", "options": {"model": "gpt-5-mini"},
                 "brief": {"planType": "project", "successCriterion": "quality", "context": [], "actionItems": []},
             })

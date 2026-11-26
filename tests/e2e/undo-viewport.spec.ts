@@ -13,6 +13,7 @@ test.beforeEach(async ({ page }) => {
     brief: { planType: "project", successCriterion: "clarity", context: [], actionItems: [] }, selectedModel: "mock" };
   await page.route("http://localhost:8000/**", async (route) => {
     const path = new URL(route.request().url()).pathname;
+    if (path.endsWith("/planning-reviews")) { await route.fulfill({ json: [] }); return; }
     let json: unknown;
     if (path === "/planning/models") json = { defaultModel: "mock", models: [{ id: "mock", label: "Mock", cost: "low", speed: "fast", quality: "standard" }] };
     else if (path === "/projects") json = [project];

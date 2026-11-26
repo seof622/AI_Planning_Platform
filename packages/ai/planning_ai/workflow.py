@@ -6,6 +6,7 @@ from .models import PlanningWorkflowState
 from .prompt import build_user_prompt
 from .provider import OpenAIPlanningProvider, PlanningProvider
 from .validation import normalize_planning_result
+from .review import append_confirmed_context
 
 
 class PlanningWorkflow:
@@ -28,7 +29,7 @@ class PlanningWorkflow:
 
     @staticmethod
     def _prepare_request(state: PlanningWorkflowState) -> dict[str, str]:
-        return {"prompt": build_user_prompt(state["request"])}
+        return {"prompt": append_confirmed_context(build_user_prompt(state["request"]), state["request"])}
 
     def _generate_plan(self, state: PlanningWorkflowState) -> dict[str, Any]:
         return {"generated": self._provider.generate(state["prompt"])}

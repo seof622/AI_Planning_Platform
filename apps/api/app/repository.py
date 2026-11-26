@@ -72,6 +72,9 @@ def save_project_planning_brief(
     brief: dict[str, Any],
     selected_model: str | None,
 ) -> dict[str, Any]:
+    lock_project_results(session, project.id)
+    session.refresh(project)
+    mark_draft_change(project, requirement, brief, selected_model)
     project.requirement_draft = requirement
     project.planning_brief = brief
     project.selected_model = selected_model
@@ -79,6 +82,19 @@ def save_project_planning_brief(
     session.commit()
     session.refresh(project)
     return serialize_project_planning_brief(project) or {}
+
+
+def mark_draft_change(project: ProjectModel, requirement: str, brief: dict | None, selected_model: str | None) -> None:
+    from .review_schemas import ReviewInput, input_hash
+    def signature(text: str, data: dict | None) -> str:
+        try:
+            return input_hash(ReviewInput(requirement=text, brief=data or {}).model_dump())
+        except ValueError:
+            return input_hash({"requirement": text.strip(), "brief": data})
+    if signature(project.requirement_draft, project.planning_brief) != signature(requirement, brief):
+        project.input_revision = (project.input_revision or 0) + 1
+    if selected_model != project.selected_model:
+        project.model_revision = (project.model_revision or 0) + 1
 
 
 def save_planning_result(
@@ -91,6 +107,8 @@ def save_planning_result(
     result: dict[str, Any],
     restored_from_result_id: str | None = None,
     edited_from_result_id: str | None = None,
+    commit: bool = True,
+    update_draft: bool = True,
 ) -> dict[str, Any]:
     lock_project_results(session, project.id)
     now = utc_now()
@@ -105,9 +123,11 @@ def save_planning_result(
     )
 
     project.status = "generated"
-    project.requirement_draft = requirement_content
-    project.planning_brief = planning_brief
-    project.selected_model = selected_model
+    if update_draft:
+        mark_draft_change(project, requirement_content, planning_brief, selected_model)
+        project.requirement_draft = requirement_content
+        project.planning_brief = planning_brief
+        project.selected_model = selected_model
     project.updated_at = now
     project_record = serialize_project(project)
     requirement_record = {
@@ -148,7 +168,10 @@ def save_planning_result(
         created_at=now,
     )
     session.add_all([requirement, stored_result])
-    session.commit()
+    if commit:
+        session.commit()
+    else:
+        session.flush()
     return persisted_result
 
 

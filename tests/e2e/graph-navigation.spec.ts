@@ -15,6 +15,7 @@ async function fixture(page: Page, versionFailures = 0) {
   const writes: string[] = [];
   await page.route("http://localhost:8000/**", async (route) => {
     const path = new URL(route.request().url()).pathname;
+    if (path.endsWith("/planning-reviews")) { await route.fulfill({ json: [] }); return; }
     if (route.request().method() === "POST") writes.push(path);
     let json: unknown;
     if (path === "/planning/models") json = { defaultModel: "mock", models: [{ id: "mock", label: "Mock", cost: "low", speed: "fast", quality: "standard" }] };
